@@ -174,7 +174,8 @@ input[type="range"] {
 }
 
 .chip,
-.template-chip {
+.template-chip,
+.phrase-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -219,6 +220,29 @@ input[type="range"] {
   min-width: 38px;
   padding: 0;
   font-size: 18px;
+}
+
+.phrase-button {
+  min-width: 54px;
+  padding: 0 10px;
+  border: 0;
+}
+
+.file-button {
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #b7c4ce;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.file-button input {
+  display: none;
 }
 
 .preview-wrap {
@@ -364,6 +388,7 @@ input[type="range"] {
   white-space: pre-wrap;
   overflow: hidden;
   text-align: start;
+  transform: translate(var(--body-offset-x, 0mm), var(--body-offset-y, 0mm));
 }
 
 .circled-char {

@@ -1,4 +1,5 @@
 const STORAGE_KEY = "renrakucho-maker-v1";
+const TEMPLATE_EXPORT_VERSION = 1;
 
 const defaultState = {
   month: "",
@@ -8,9 +9,23 @@ const defaultState = {
   opacity: 34,
   fontWeight: 400,
   letterSpacing: 4,
+  bodyOffsetX: 0,
+  bodyOffsetY: 0,
   circleTemplates: [
     { id: "circle-shi", name: "し○", token: "[丸:し]" },
     { id: "circle-te", name: "て○", token: "[丸:て]" },
+  ],
+  phraseTemplates: [
+    { id: "phrase-page-short", text: "p." },
+    { id: "phrase-page", text: "ページ" },
+    { id: "phrase-reading", text: "音読" },
+    { id: "phrase-math-drill", text: "計ド" },
+    { id: "phrase-kanji-drill", text: "漢ド" },
+    { id: "phrase-homework", text: "宿題" },
+    { id: "phrase-print", text: "プリント" },
+    { id: "phrase-belongings", text: "持ち物" },
+    { id: "phrase-reading-card", text: "音読カード" },
+    { id: "phrase-notebook", text: "連絡帳" },
   ],
   textTemplates: [],
 };
@@ -23,6 +38,9 @@ const elements = {
   opacity: document.querySelector("#opacityInput"),
   fontWeight: document.querySelector("#fontWeightInput"),
   letterSpacing: document.querySelector("#letterSpacingInput"),
+  bodyOffsetX: document.querySelector("#bodyOffsetXInput"),
+  bodyOffsetY: document.querySelector("#bodyOffsetYInput"),
+  resetBodyPosition: document.querySelector("#resetBodyPositionButton"),
   previewMonth: document.querySelector("#previewMonth"),
   previewDay: document.querySelector("#previewDay"),
   previewWeekday: document.querySelector("#previewWeekday"),
@@ -40,9 +58,15 @@ const elements = {
   rangeEnd: document.querySelector("#rangeEndInput"),
   insertRange: document.querySelector("#insertRangeButton"),
   circledNumberList: document.querySelector("#circledNumberList"),
+  phraseList: document.querySelector("#phraseList"),
+  phraseTemplateInput: document.querySelector("#phraseTemplateInput"),
+  savePhraseTemplate: document.querySelector("#savePhraseTemplateButton"),
   textTemplateName: document.querySelector("#textTemplateName"),
   saveTextTemplate: document.querySelector("#saveTextTemplateButton"),
   textTemplateList: document.querySelector("#textTemplateList"),
+  exportTemplates: document.querySelector("#exportTemplatesButton"),
+  importTemplates: document.querySelector("#importTemplatesInput"),
+  templateImportStatus: document.querySelector("#templateImportStatus"),
 };
 
 let state = loadState();
@@ -72,6 +96,9 @@ function loadState() {
       circleTemplates: parsed.circleTemplates?.length
         ? parsed.circleTemplates
         : cloneDefaultState().circleTemplates,
+      phraseTemplates: parsed.phraseTemplates?.length
+        ? parsed.phraseTemplates
+        : cloneDefaultState().phraseTemplates,
       textTemplates: parsed.textTemplates || [],
     };
   } catch {
@@ -91,6 +118,8 @@ function syncInputs() {
   elements.opacity.value = state.opacity;
   elements.fontWeight.value = state.fontWeight;
   elements.letterSpacing.value = state.letterSpacing;
+  elements.bodyOffsetX.value = state.bodyOffsetX;
+  elements.bodyOffsetY.value = state.bodyOffsetY;
 }
 
 function render() {
@@ -101,8 +130,11 @@ function render() {
   elements.previewText.style.setProperty("--preview-opacity", Number(state.opacity) / 100);
   elements.previewText.style.setProperty("--preview-weight", state.fontWeight);
   elements.previewText.style.setProperty("--preview-spacing", `${state.letterSpacing}px`);
+  elements.previewText.style.setProperty("--body-offset-x", `${state.bodyOffsetX}mm`);
+  elements.previewText.style.setProperty("--body-offset-y", `${state.bodyOffsetY}mm`);
   renderCircleTemplates();
   renderNumberButtons();
+  renderPhraseButtons();
   renderTextTemplates();
   saveState();
 }
@@ -176,6 +208,35 @@ function renderNumberButtons() {
     button.textContent = number;
     button.addEventListener("click", () => insertAtCursor(number));
     elements.circledNumberList.append(button);
+  });
+}
+
+function renderPhraseButtons() {
+  elements.phraseList.replaceChildren();
+
+  state.phraseTemplates.forEach((phrase) => {
+    const chip = document.createElement("div");
+    chip.className = "phrase-chip";
+
+    const action = document.createElement("button");
+    action.className = "phrase-button";
+    action.type = "button";
+    action.textContent = phrase.text;
+    action.addEventListener("click", () => insertAtCursor(phrase.text));
+    chip.append(action);
+
+    const remove = document.createElement("button");
+    remove.className = "delete-button";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.ariaLabel = `${phrase.text}を削除`;
+    remove.addEventListener("click", () => {
+      state.phraseTemplates = state.phraseTemplates.filter((item) => item.id !== phrase.id);
+      render();
+    });
+    chip.append(remove);
+
+    elements.phraseList.append(chip);
   });
 }
 
@@ -291,6 +352,97 @@ function insertRange() {
   }
 }
 
+function exportTemplates() {
+  const exportData = {
+    version: TEMPLATE_EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    circleTemplates: state.circleTemplates,
+    phraseTemplates: state.phraseTemplates,
+    textTemplates: state.textTemplates,
+  };
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "renrakucho-templates.json";
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  setTemplateStatus("テンプレートを書き出しました。");
+}
+
+function importTemplates(event) {
+  const file = event.target.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const data = JSON.parse(String(reader.result));
+      if (!Array.isArray(data.circleTemplates) || !Array.isArray(data.textTemplates)) {
+        throw new Error("invalid template file");
+      }
+
+      state.circleTemplates = normalizeCircleTemplates(data.circleTemplates);
+      state.phraseTemplates = normalizePhraseTemplates(
+        Array.isArray(data.phraseTemplates) ? data.phraseTemplates : cloneDefaultState().phraseTemplates,
+      );
+      state.textTemplates = normalizeTextTemplates(data.textTemplates);
+      render();
+      setTemplateStatus("テンプレートを読み込みました。");
+    } catch {
+      setTemplateStatus("読み込みできませんでした。ファイルを確認してください。");
+    } finally {
+      elements.importTemplates.value = "";
+    }
+  });
+  reader.readAsText(file);
+}
+
+function normalizeCircleTemplates(templates) {
+  return templates
+    .filter((template) => template && typeof template.name === "string" && typeof template.token === "string")
+    .map((template) => ({
+      id: template.id || makeId("circle"),
+      name: template.name.slice(0, 40),
+      token: template.token,
+    }));
+}
+
+function normalizePhraseTemplates(templates) {
+  return templates
+    .filter((template) => {
+      if (typeof template === "string") {
+        return template.trim();
+      }
+      return template && typeof template.text === "string" && template.text.trim();
+    })
+    .map((template) => {
+      const text = typeof template === "string" ? template : template.text;
+      return {
+        id: template.id || makeId("phrase"),
+        text: text.trim().slice(0, 30),
+      };
+    });
+}
+
+function normalizeTextTemplates(templates) {
+  return templates
+    .filter((template) => template && typeof template.name === "string" && typeof template.body === "string")
+    .map((template) => ({
+      id: template.id || makeId("text"),
+      name: template.name.slice(0, 40),
+      body: template.body,
+    }));
+}
+
+function setTemplateStatus(message) {
+  elements.templateImportStatus.textContent = message;
+}
+
 function addTextTemplate() {
   const name = elements.textTemplateName.value.trim();
   const body = elements.body.value;
@@ -306,6 +458,20 @@ function addTextTemplate() {
   render();
 }
 
+function addPhraseTemplate() {
+  const text = elements.phraseTemplateInput.value.trim();
+  if (!text) {
+    return;
+  }
+
+  state.phraseTemplates = [
+    ...state.phraseTemplates.filter((item) => item.text !== text),
+    { id: makeId("phrase"), text },
+  ];
+  elements.phraseTemplateInput.value = "";
+  render();
+}
+
 function bindInputs() {
   [
     ["month", "month"],
@@ -315,6 +481,8 @@ function bindInputs() {
     ["opacity", "opacity"],
     ["fontWeight", "fontWeight"],
     ["letterSpacing", "letterSpacing"],
+    ["bodyOffsetX", "bodyOffsetX"],
+    ["bodyOffsetY", "bodyOffsetY"],
   ].forEach(([key, elementKey]) => {
     elements[elementKey].addEventListener("input", (event) => {
       state[key] = event.target.value;
@@ -332,7 +500,22 @@ function bindInputs() {
   elements.saveCircleTemplate.addEventListener("click", addCircleTemplate);
   elements.insertSquareNumber.addEventListener("click", insertSquareNumber);
   elements.insertRange.addEventListener("click", insertRange);
+  elements.resetBodyPosition.addEventListener("click", () => {
+    state.bodyOffsetX = 0;
+    state.bodyOffsetY = 0;
+    syncInputs();
+    render();
+  });
   elements.saveTextTemplate.addEventListener("click", addTextTemplate);
+  elements.savePhraseTemplate.addEventListener("click", addPhraseTemplate);
+  elements.phraseTemplateInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addPhraseTemplate();
+    }
+  });
+  elements.exportTemplates.addEventListener("click", exportTemplates);
+  elements.importTemplates.addEventListener("change", importTemplates);
   elements.printButton.addEventListener("click", () => window.print());
 }
 

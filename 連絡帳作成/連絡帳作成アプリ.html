@@ -43,20 +43,13 @@
           <textarea id="bodyInput" rows="10" spellcheck="false"></textarea>
         </label>
 
-        <section class="control-group" aria-label="文字設定">
-          <h2>文字設定</h2>
-          <label>
-            薄さ
-            <input id="opacityInput" type="range" min="10" max="100" value="34" />
-          </label>
-          <label>
-            太さ
-            <input id="fontWeightInput" type="range" min="300" max="700" step="100" value="400" />
-          </label>
-          <label>
-            間隔
-            <input id="letterSpacingInput" type="range" min="0" max="14" value="4" />
-          </label>
+        <section class="control-group" aria-label="よく使う言葉">
+          <h2>よく使う言葉</h2>
+          <div id="phraseList" class="symbol-grid" aria-label="よく使う言葉一覧"></div>
+          <div class="save-row">
+            <input id="phraseTemplateInput" placeholder="追加する言葉" aria-label="追加するよく使う言葉" />
+            <button id="savePhraseTemplateButton" type="button">追加</button>
+          </div>
         </section>
 
         <section class="control-group" aria-label="丸付き文字">
@@ -104,6 +97,49 @@
             <input id="textTemplateName" placeholder="テンプレート名" aria-label="文章テンプレート名" />
             <button id="saveTextTemplateButton" type="button">保存</button>
           </div>
+        </section>
+
+        <section class="control-group" aria-label="文字設定">
+          <h2>文字設定</h2>
+          <label>
+            薄さ
+            <input id="opacityInput" type="range" min="10" max="100" value="34" />
+          </label>
+          <label>
+            太さ
+            <input id="fontWeightInput" type="range" min="300" max="700" step="100" value="400" />
+          </label>
+          <label>
+            間隔
+            <input id="letterSpacingInput" type="range" min="0" max="14" value="4" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-label="本文位置">
+          <div class="group-title-row">
+            <h2>本文位置</h2>
+            <button id="resetBodyPositionButton" type="button">リセット</button>
+          </div>
+          <label>
+            左右
+            <input id="bodyOffsetXInput" type="range" min="-6" max="6" step="0.5" value="0" />
+          </label>
+          <label>
+            上下
+            <input id="bodyOffsetYInput" type="range" min="-6" max="6" step="0.5" value="0" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-label="テンプレート管理">
+          <h2>テンプレート管理</h2>
+          <div class="save-row">
+            <button id="exportTemplatesButton" type="button">書き出し</button>
+            <label class="file-button">
+              読み込み
+              <input id="importTemplatesInput" type="file" accept="application/json,.json" />
+            </label>
+          </div>
+          <p id="templateImportStatus" class="empty-state" aria-live="polite"></p>
         </section>
       </section>
 
