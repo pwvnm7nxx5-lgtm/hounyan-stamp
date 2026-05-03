@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>漢字なぞりプリント</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="controls" aria-label="プリント設定">
+      <div class="brand">
+        <h1>漢字なぞりプリント</h1>
+        <div class="brand-actions">
+          <a class="home-link" href="../../index.html">入口に戻る</a>
+          <span id="pageCount">1枚</span>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>文章</span>
+        <textarea id="sourceText" rows="10" spellcheck="false">大陸を横断する。
+紙の中央。
+九州へたびに出る。
+ぎゅうにゅうを練習する。
+早起きする。</textarea>
+      </label>
+
+      <div class="row-fields">
+        <label class="field">
+          <span>名前</span>
+          <input id="studentName" type="text" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>日付</span>
+          <input id="worksheetDate" type="text" autocomplete="off" placeholder="4 / 29">
+        </label>
+      </div>
+
+      <div class="settings-grid">
+        <label class="field">
+          <span>列</span>
+          <input id="cols" type="number" min="6" max="14" value="10">
+        </label>
+        <label class="field">
+          <span>行</span>
+          <input id="rows" type="number" min="8" max="20" value="14">
+        </label>
+        <label class="field">
+          <span>文字サイズ</span>
+          <input id="fontSize" type="number" min="18" max="72" value="34">
+        </label>
+        <label class="field">
+          <span>小さい文字</span>
+          <input id="smallFontSize" type="number" min="14" max="56" value="30">
+        </label>
+        <label class="field">
+          <span>句読点サイズ</span>
+          <input id="punctuationScale" type="number" min="35" max="90" value="58">
+        </label>
+        <label class="field">
+          <span>フォント</span>
+          <select id="fontFamily">
+            <option value="kyokasho" selected>教科書体</option>
+            <option value="gothic">ゴシック</option>
+            <option value="mincho">明朝</option>
+            <option value="maru">丸ゴシック</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>文字の太さ</span>
+          <select id="fontWeight">
+            <option value="300">細い</option>
+            <option value="500" selected>普通</option>
+            <option value="700">太い</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>余白</span>
+          <input id="letterSpacing" type="number" min="-2" max="6" value="0">
+        </label>
+      </div>
+
+      <label class="range-field">
+        <span>文字の薄さ</span>
+        <input id="opacity" type="range" min="8" max="45" value="24">
+      </label>
+
+      <div class="check-row">
+        <label><input id="stripSpaces" type="checkbox" checked> 空白を詰める</label>
+        <label><input id="lineBreakColumn" type="checkbox" checked> 改行で次の列</label>
+      </div>
+
+      <fieldset class="segmented">
+        <legend>流し方向</legend>
+        <label><input type="radio" name="direction" value="ltr" checked><span>左から</span></label>
+        <label><input type="radio" name="direction" value="rtl"><span>右から</span></label>
+      </fieldset>
+
+      <section class="template-box" aria-label="テンプレート">
+        <h2>テンプレート</h2>
+        <label class="field">
+          <span>保存名</span>
+          <input id="templateName" type="text" autocomplete="off" placeholder="例: 7列12行 右から">
+        </label>
+        <label class="field">
+          <span>呼び出し</span>
+          <select id="templateSelect"></select>
+        </label>
+        <div class="template-actions">
+          <button id="saveTemplateBtn" type="button">保存</button>
+          <button id="applyTemplateBtn" type="button">適用</button>
+          <button id="deleteTemplateBtn" type="button">削除</button>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button id="printBtn" type="button">印刷 / PDF保存</button>
+        <button id="copyLinkBtn" type="button">共有URLをコピー</button>
+        <button id="clearBtn" type="button">消去</button>
+      </div>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </aside>
+
+    <main class="preview-wrap" aria-label="プレビュー">
+      <div id="pages" class="pages"></div>
+    </main>
+  </div>
+
+  <template id="pageTemplate">
+    <section class="print-page">
+      <header class="sheet-header">
+        <div class="name-line">なまえ <span class="value" data-name></span></div>
+        <div class="title">漢字学習プリント</div>
+        <div class="page-number" data-page-number></div>
+        <div class="date-line">日づけ <span class="value" data-date></span></div>
+      </header>
+      <div class="reading-row" data-readings></div>
+      <div class="kanji-grid" data-grid></div>
+    </section>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

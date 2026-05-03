@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>連絡帳作成</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel" aria-label="入力フォーム">
+        <div class="panel-header">
+          <h1>連絡帳作成</h1>
+          <div class="header-actions">
+            <a class="home-link" href="../../index.html">入口に戻る</a>
+            <button id="printButton" class="primary-button" type="button">PDF / 印刷</button>
+          </div>
+        </div>
+
+        <div class="date-controls">
+          <label>
+            月
+            <input id="monthInput" type="number" min="1" max="12" inputmode="numeric" />
+          </label>
+          <label>
+            日
+            <input id="dayInput" type="number" min="1" max="31" inputmode="numeric" />
+          </label>
+          <label>
+            曜日
+            <select id="weekdayInput">
+              <option value=""></option>
+              <option value="月">月</option>
+              <option value="火">火</option>
+              <option value="水">水</option>
+              <option value="木">木</option>
+              <option value="金">金</option>
+              <option value="土">土</option>
+              <option value="日">日</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="field-block">
+          本文
+          <textarea id="bodyInput" rows="10" spellcheck="false"></textarea>
+        </label>
+
+        <section class="control-group" aria-label="よく使う言葉">
+          <h2>よく使う言葉</h2>
+          <div id="phraseList" class="symbol-grid" aria-label="よく使う言葉一覧"></div>
+          <div class="save-row">
+            <input id="phraseTemplateInput" placeholder="追加する言葉" aria-label="追加するよく使う言葉" />
+            <button id="savePhraseTemplateButton" type="button">追加</button>
+          </div>
+        </section>
+
+        <section class="control-group" aria-label="丸付き文字">
+          <div class="group-title-row">
+            <h2>丸付き文字</h2>
+            <div class="inline-tools">
+              <input id="circleCharInput" class="short-input" maxlength="2" value="し" aria-label="丸を付ける文字" />
+              <button id="insertCircleButton" type="button">挿入</button>
+            </div>
+          </div>
+          <div id="circleTemplateList" class="chip-list" aria-label="丸付き文字テンプレート"></div>
+          <div class="save-row">
+            <input id="circleTemplateName" placeholder="名前" aria-label="丸付き文字テンプレート名" />
+            <button id="saveCircleTemplateButton" type="button">保存</button>
+          </div>
+        </section>
+
+        <section class="control-group" aria-label="番号記号">
+          <div class="group-title-row">
+            <h2>四角つき番号</h2>
+            <div class="inline-tools">
+              <input id="squareNumberInput" class="short-input" type="number" min="1" max="99" value="1" aria-label="四角に入れる数字" />
+              <button id="insertSquareNumberButton" type="button">□挿入</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="control-group" aria-label="範囲番号">
+          <div class="group-title-row">
+            <h2>範囲</h2>
+            <div class="range-tools">
+              <input id="rangeStartInput" class="short-input" type="number" min="1" max="10" value="1" aria-label="範囲の開始番号" />
+              <span>～</span>
+              <input id="rangeEndInput" class="short-input" type="number" min="1" max="10" value="10" aria-label="範囲の終了番号" />
+              <button id="insertRangeButton" type="button">挿入</button>
+            </div>
+          </div>
+          <div id="circledNumberList" class="symbol-grid" aria-label="丸数字"></div>
+        </section>
+
+        <section class="control-group" aria-label="文章テンプレート">
+          <h2>文章テンプレート</h2>
+          <div id="textTemplateList" class="template-list"></div>
+          <div class="save-row">
+            <input id="textTemplateName" placeholder="テンプレート名" aria-label="文章テンプレート名" />
+            <button id="saveTextTemplateButton" type="button">保存</button>
+          </div>
+        </section>
+
+        <section class="control-group" aria-label="文字設定">
+          <h2>文字設定</h2>
+          <label>
+            薄さ
+            <input id="opacityInput" type="range" min="10" max="100" value="34" />
+          </label>
+          <label>
+            太さ
+            <input id="fontWeightInput" type="range" min="300" max="700" step="100" value="400" />
+          </label>
+          <label>
+            間隔
+            <input id="letterSpacingInput" type="range" min="0" max="14" value="4" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-label="本文位置">
+          <div class="group-title-row">
+            <h2>本文位置</h2>
+            <button id="resetBodyPositionButton" type="button">リセット</button>
+          </div>
+          <label>
+            左右
+            <input id="bodyOffsetXInput" type="range" min="-6" max="6" step="0.5" value="0" />
+          </label>
+          <label>
+            上下
+            <input id="bodyOffsetYInput" type="range" min="-6" max="6" step="0.5" value="0" />
+          </label>
+        </section>
+
+        <section class="control-group" aria-label="テンプレート管理">
+          <h2>テンプレート管理</h2>
+          <div class="save-row">
+            <button id="exportTemplatesButton" type="button">書き出し</button>
+            <label class="file-button">
+              読み込み
+              <input id="importTemplatesInput" type="file" accept="application/json,.json" />
+            </label>
+          </div>
+          <p id="templateImportStatus" class="empty-state" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section class="preview-wrap" aria-label="印刷プレビュー">
+        <div id="printPage" class="print-page">
+          <article class="notebook" aria-label="連絡帳用紙">
+            <div class="top-space">
+              <div class="name-line"></div>
+            <div class="date-line">
+              <span>（</span>
+              <span></span>
+              <span>）</span>
+            </div>
+            </div>
+            <div class="sheet">
+              <div class="date-values-column">
+                <div class="date-value-cell"><span id="previewMonth"></span></div>
+                <div class="date-value-cell"><span id="previewDay"></span></div>
+                <div class="date-value-cell"><span id="previewWeekday"></span></div>
+              </div>
+              <div class="date-column">
+                <div class="date-cell">月</div>
+                <div class="date-cell">日</div>
+                <div class="date-cell">曜</div>
+              </div>
+              <div class="body-grid">
+                <div id="previewText" class="preview-text"></div>
+              </div>
+              <div class="side-label">連絡する事がら</div>
+              <div class="stamp-row">
+                <div class="stamp-cell teacher-stamp">先生印</div>
+                <div class="stamp-cell guardian-stamp">
+                  <span class="stamp-pair">保護</span>
+                  <span class="stamp-pair">者印</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
