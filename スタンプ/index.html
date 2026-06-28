@@ -19,18 +19,12 @@
         </div>
       </header>
 
-      <div class="student-switcher">
-        <button class="switch-button" type="button" id="studentSwitchButton" aria-expanded="false" aria-controls="studentSwitchMenu">
-          <span>切り替え</span>
-          <strong id="currentStudentLabel">児童未選択</strong>
-        </button>
-        <div class="switch-menu" id="studentSwitchMenu" hidden>
-          <div class="switch-menu-head">
-            <span>児童を選択</span>
-            <button class="soft-button small-button" type="button" id="closeSwitchButton">閉じる</button>
-          </div>
-          <div class="switch-list" id="studentSwitchList"></div>
+      <div class="student-switcher" aria-label="児童切り替え">
+        <div class="switch-status">
+          <span>児童切り替え</span>
+          <strong id="currentStudentLabel">選択中：児童未選択</strong>
         </div>
+        <div class="student-tab-list" id="studentSwitchList" role="tablist" aria-label="児童を選択"></div>
       </div>
 
       <main>

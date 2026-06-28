@@ -92,10 +92,7 @@ let stampAnimationTimer = 0;
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
   views: document.querySelectorAll("[data-view]"),
-  studentSwitchButton: document.querySelector("#studentSwitchButton"),
   currentStudentLabel: document.querySelector("#currentStudentLabel"),
-  studentSwitchMenu: document.querySelector("#studentSwitchMenu"),
-  closeSwitchButton: document.querySelector("#closeSwitchButton"),
   studentSwitchList: document.querySelector("#studentSwitchList"),
   totalStudents: document.querySelector("#totalStudents"),
   todayStamps: document.querySelector("#todayStamps"),
@@ -152,19 +149,6 @@ function init() {
 function bindEvents() {
   els.viewButtons.forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.viewButton));
-  });
-
-  els.studentSwitchButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    toggleStudentSwitch();
-  });
-  els.closeSwitchButton.addEventListener("click", closeStudentSwitch);
-  els.studentSwitchMenu.addEventListener("click", (event) => event.stopPropagation());
-  document.addEventListener("click", closeStudentSwitch);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      closeStudentSwitch();
-    }
   });
 
   els.studentForm.addEventListener("submit", (event) => {
@@ -254,27 +238,22 @@ function render() {
 
 function renderStudentSwitch() {
   const student = selectedStudent();
-  els.currentStudentLabel.textContent = student ? student.name : "児童未選択";
+  els.currentStudentLabel.textContent = student ? `選択中：${student.name}` : "選択中：児童未選択";
 
   if (!state.students.length) {
-    els.studentSwitchList.innerHTML = '<p class="empty-state">先生ページで児童を追加してください。</p>';
-    els.studentSwitchButton.disabled = true;
-    closeStudentSwitch();
+    els.studentSwitchList.innerHTML = '<p class="empty-state switch-empty">先生ページで児童を追加してください。</p>';
     return;
   }
 
-  els.studentSwitchButton.disabled = false;
   els.studentSwitchList.innerHTML = state.students
     .map((studentItem) => {
       const stats = studentStats(studentItem.id);
       const selected = studentItem.id === state.selectedStudentId ? " is-selected" : "";
+      const selectedText = studentItem.id === state.selectedStudentId ? "true" : "false";
       return `
-        <button class="switch-student${selected}" type="button" data-switch-student="${studentItem.id}">
-          <span>
-            <strong>${escapeHtml(studentItem.name)}</strong>
-            <small>${escapeHtml(studentItem.note || "メモなし")}</small>
-          </span>
-          <small>${stats.currentSheet.count}/${SHEET_SIZE}</small>
+        <button class="student-tab-button${selected}" type="button" role="tab" aria-selected="${selectedText}" data-switch-student="${studentItem.id}">
+          <strong>${escapeHtml(studentItem.name)}</strong>
+          <span>${stats.currentSheet.count}/${SHEET_SIZE}</span>
         </button>
       `;
     })
@@ -282,7 +261,7 @@ function renderStudentSwitch() {
 
   els.studentSwitchList.querySelectorAll("[data-switch-student]").forEach((button) => {
     button.addEventListener("click", () => {
-      selectStudent(button.dataset.switchStudent, { closeSwitch: true });
+      selectStudent(button.dataset.switchStudent);
     });
   });
 }
@@ -550,17 +529,6 @@ function showView(viewName) {
   });
 }
 
-function toggleStudentSwitch() {
-  const willOpen = els.studentSwitchMenu.hidden;
-  els.studentSwitchMenu.hidden = !willOpen;
-  els.studentSwitchButton.setAttribute("aria-expanded", String(willOpen));
-}
-
-function closeStudentSwitch() {
-  els.studentSwitchMenu.hidden = true;
-  els.studentSwitchButton.setAttribute("aria-expanded", "false");
-}
-
 function activeView() {
   return document.querySelector(".view.is-active")?.dataset.view || "child";
 }
@@ -757,7 +725,7 @@ function selectedStudent() {
   return state.students.find((student) => student.id === state.selectedStudentId) || null;
 }
 
-function selectStudent(studentId, { closeSwitch = false } = {}) {
+function selectStudent(studentId) {
   if (!state.students.some((student) => student.id === studentId)) {
     return;
   }
@@ -765,9 +733,6 @@ function selectStudent(studentId, { closeSwitch = false } = {}) {
   state.selectedStudentId = studentId;
   persist();
   render();
-  if (closeSwitch) {
-    closeStudentSwitch();
-  }
 }
 
 function ensureSelection() {
