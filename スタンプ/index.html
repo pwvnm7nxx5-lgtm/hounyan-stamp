@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ほうにゃんスタンプ台帳</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">特別支援スタンプ管理</p>
+          <h1>ほうにゃんスタンプ台帳</h1>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" type="button" data-view-button="home" title="ホーム" aria-label="ホーム">⌂</button>
+          <button class="icon-button" type="button" data-view-button="rewards" title="報酬" aria-label="報酬">★</button>
+          <button class="icon-button" type="button" data-view-button="settings" title="設定" aria-label="設定">⚙</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="view is-active" data-view="home" aria-labelledby="home-title">
+          <div class="home-grid">
+            <section class="hero-panel">
+              <div class="hounyan-stage">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image">
+                <div class="speech-bubble">
+                  <p id="hounyan-line">今日もプリント、いっしょにがんばろう！</p>
+                  <button class="soft-button" id="voiceButton" type="button">音声</button>
+                </div>
+              </div>
+              <div class="hero-stats">
+                <div>
+                  <span class="stat-label">児童</span>
+                  <strong id="totalStudents">0</strong>
+                </div>
+                <div>
+                  <span class="stat-label">今日</span>
+                  <strong id="todayStamps">0</strong>
+                </div>
+                <div>
+                  <span class="stat-label">全累計</span>
+                  <strong id="allStamps">0</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="work-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">児童一覧</p>
+                  <h2 id="home-title">スタンプを押す児童を選ぶ</h2>
+                </div>
+                <button class="primary-button" type="button" id="quickAddOpen">＋</button>
+              </div>
+              <div class="student-list" id="studentList"></div>
+            </section>
+          </div>
+
+          <section class="detail-panel" id="studentDetail" hidden>
+            <div class="section-head detail-head">
+              <div>
+                <p class="eyebrow">児童詳細</p>
+                <h2 id="selectedStudentName">未選択</h2>
+              </div>
+              <div class="detail-actions">
+                <button class="soft-button" type="button" id="editStudentButton">編集</button>
+                <button class="danger-button" type="button" id="deleteStudentButton">削除</button>
+              </div>
+            </div>
+
+            <div class="score-row">
+              <div class="score-box">
+                <span>累計スタンプ</span>
+                <strong id="selectedTotal">0</strong>
+              </div>
+              <div class="score-box">
+                <span>使えるスタンプ</span>
+                <strong id="selectedAvailable">0</strong>
+              </div>
+              <div class="score-box">
+                <span>ほうにゃんLv.</span>
+                <strong id="selectedLevel">1</strong>
+              </div>
+              <div class="score-box">
+                <span>次のレベル</span>
+                <strong id="nextLevelText">あと5</strong>
+              </div>
+            </div>
+
+            <div class="stamp-workbench">
+              <section>
+                <div class="section-head compact">
+                  <div>
+                    <p class="eyebrow">スタンプ</p>
+                    <h3>プリント1枚できたら押す</h3>
+                  </div>
+                </div>
+                <div class="stamp-picker" id="stampPicker"></div>
+                <label class="field">
+                  <span>メモ</span>
+                  <input id="stampMemo" type="text" placeholder="例: 国語プリント、計算プリント">
+                </label>
+                <button class="primary-button wide" type="button" id="addStampButton">スタンプを押す</button>
+              </section>
+
+              <section>
+                <div class="section-head compact">
+                  <div>
+                    <p class="eyebrow">履歴</p>
+                    <h3>最近の記録</h3>
+                  </div>
+                </div>
+                <div class="history-list" id="historyList"></div>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" data-view="rewards" aria-labelledby="rewards-title">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">報酬</p>
+              <h2 id="rewards-title">解放とお買い物</h2>
+            </div>
+            <select id="rewardStudentSelect" class="select"></select>
+          </div>
+          <div class="rewards-grid">
+            <section>
+              <h3>累計で解放</h3>
+              <div id="unlockRewards" class="reward-list"></div>
+            </section>
+            <section>
+              <h3>スタンプで交換</h3>
+              <div id="shopRewards" class="reward-list"></div>
+            </section>
+            <section>
+              <h3>ほうにゃん強化</h3>
+              <div class="mascot-upgrade">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="mini-hounyan">
+                <div>
+                  <p id="upgradeLevel">Lv.1</p>
+                  <span id="upgradeText">着せ替えアイテム枠を準備中</span>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" data-view="settings" aria-labelledby="settings-title">
+          <div class="settings-grid">
+            <section class="work-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">設定</p>
+                  <h2 id="settings-title">児童を登録</h2>
+                </div>
+              </div>
+              <form id="studentForm" class="form-grid">
+                <input type="hidden" id="studentId">
+                <label class="field">
+                  <span>名前</span>
+                  <input id="studentName" type="text" autocomplete="off" required placeholder="例: 山田さん">
+                </label>
+                <label class="field">
+                  <span>メモ</span>
+                  <input id="studentNote" type="text" autocomplete="off" placeholder="例: 3年 / Aグループ">
+                </label>
+                <button class="primary-button wide" type="submit">保存</button>
+              </form>
+            </section>
+
+            <section class="work-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">データ</p>
+                  <h2>バックアップ</h2>
+                </div>
+              </div>
+              <div class="backup-actions">
+                <button class="soft-button" type="button" id="exportButton">JSONを書き出す</button>
+                <label class="file-button">
+                  JSONを読み込む
+                  <input id="importInput" type="file" accept="application/json">
+                </label>
+              </div>
+              <p class="hint">保存はこのPCのブラウザ内です。共有PCでは利用者を確認してください。</p>
+            </section>
+
+            <section class="work-panel stamp-assets-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">スタンプ画像</p>
+                  <h2>解放条件</h2>
+                </div>
+              </div>
+              <div id="stampAssetsList" class="asset-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
