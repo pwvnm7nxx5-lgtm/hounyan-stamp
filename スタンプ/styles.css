@@ -598,6 +598,7 @@ button:disabled {
 
 .stamp-press-button {
   min-height: 54px;
+  margin-bottom: 12px;
   font-size: 1.05rem;
 }
 
