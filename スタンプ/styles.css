@@ -100,6 +100,7 @@ rt {
 }
 
 .icon-button,
+.page-tab,
 .primary-button,
 .soft-button,
 .danger-button,
@@ -119,8 +120,19 @@ rt {
   font-size: 1rem;
 }
 
+.page-tab {
+  min-width: 118px;
+  padding: 0 18px;
+  background: var(--panel);
+  color: var(--green-deep);
+  box-shadow: 0 8px 22px rgba(36, 84, 76, 0.12);
+  font-size: 1rem;
+}
+
 .icon-button.is-active,
 .icon-button:hover,
+.page-tab.is-active,
+.page-tab:hover,
 .primary-button {
   background: var(--green);
   color: #fff;
@@ -147,6 +159,12 @@ rt {
   color: var(--danger);
 }
 
+.small-button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.86rem;
+}
+
 .wide {
   width: 100%;
 }
@@ -161,6 +179,105 @@ button:disabled {
   filter: grayscale(0.25);
   opacity: 0.62;
   transform: none;
+}
+
+.student-switcher {
+  position: relative;
+  z-index: 5;
+  margin: -4px 0 16px;
+}
+
+.switch-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 14px;
+  border: 2px solid rgba(66, 180, 51, 0.28);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.switch-button span {
+  color: var(--green-deep);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.switch-button strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.08rem;
+}
+
+.switch-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-height: min(420px, 72vh);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 22px 46px rgba(32, 50, 47, 0.22);
+}
+
+.switch-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-weight: 900;
+}
+
+.switch-list {
+  display: grid;
+  gap: 8px;
+}
+
+.switch-student {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.switch-student.is-selected {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(66, 180, 51, 0.14);
+}
+
+.switch-student span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.switch-student strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switch-student small {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .view {
@@ -736,8 +853,17 @@ input:focus,
     width: 100%;
   }
 
-  .icon-button {
+  .icon-button,
+  .page-tab {
     flex: 1;
+  }
+
+  .student-switcher {
+    margin-top: -2px;
+  }
+
+  .switch-button {
+    min-height: 56px;
   }
 
   .hounyan-stage {

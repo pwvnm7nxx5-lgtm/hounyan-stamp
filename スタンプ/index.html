@@ -14,10 +14,24 @@
           <h1>ほうにゃんスタンプ台帳</h1>
         </div>
         <div class="top-actions" aria-label="ページ切り替え">
-          <button class="icon-button is-active" type="button" data-view-button="child" title="児童ページ" aria-label="児童ページ">こ</button>
-          <button class="icon-button" type="button" data-view-button="teacher" title="先生ページ" aria-label="先生ページ">先</button>
+          <button class="page-tab is-active" type="button" data-view-button="child">児童</button>
+          <button class="page-tab" type="button" data-view-button="teacher">先生</button>
         </div>
       </header>
+
+      <div class="student-switcher">
+        <button class="switch-button" type="button" id="studentSwitchButton" aria-expanded="false" aria-controls="studentSwitchMenu">
+          <span>切り替え</span>
+          <strong id="currentStudentLabel">児童未選択</strong>
+        </button>
+        <div class="switch-menu" id="studentSwitchMenu" hidden>
+          <div class="switch-menu-head">
+            <span>児童を選択</span>
+            <button class="soft-button small-button" type="button" id="closeSwitchButton">閉じる</button>
+          </div>
+          <div class="switch-list" id="studentSwitchList"></div>
+        </div>
+      </div>
 
       <main>
         <section class="view is-active child-page" data-view="child" aria-labelledby="child-title">
