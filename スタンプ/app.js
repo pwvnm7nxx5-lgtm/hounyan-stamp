@@ -32,6 +32,18 @@ const stampAssets = [
   },
 ];
 
+const hounyanOutfits = {
+  default: {
+    id: "default",
+    name: "いつものほうにゃん",
+    idle: "assets/hounyan-home.png",
+    happy: "assets/hounyan-home.png",
+    sheetComplete: "assets/hounyan-home.png",
+    stampUnlock: "assets/hounyan-home.png",
+    shop: "assets/hounyan-home.png",
+  },
+};
+
 const defaultRewards = [
   {
     id: "unlock-yokudekimashita",
@@ -81,6 +93,10 @@ const defaultState = {
   stampEvents: [],
   rewards: defaultRewards,
   redemptions: [],
+  settings: {
+    activeOutfit: "default",
+  },
+  ownedOutfits: ["default"],
   selectedStudentId: "",
   selectedStampId: "sonochoshi",
 };
@@ -135,6 +151,12 @@ const els = {
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   stampAssetsList: document.querySelector("#stampAssetsList"),
+  hounyanAnimationLayer: document.querySelector("#hounyanAnimationLayer"),
+  animationHounyan: document.querySelector("#animationHounyan"),
+  animationEyebrow: document.querySelector("#animationEyebrow"),
+  animationTitle: document.querySelector("#animationTitle"),
+  animationMessage: document.querySelector("#animationMessage"),
+  animationCloseButton: document.querySelector("#animationCloseButton"),
   toast: document.querySelector("#toast"),
 };
 
@@ -167,6 +189,17 @@ function bindEvents() {
   });
   els.exportButton.addEventListener("click", exportData);
   els.importInput.addEventListener("change", importData);
+  els.animationCloseButton.addEventListener("click", hideHounyanAnimation);
+  els.hounyanAnimationLayer.addEventListener("click", (event) => {
+    if (event.target === els.hounyanAnimationLayer) {
+      hideHounyanAnimation();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.hounyanAnimationLayer.hidden) {
+      hideHounyanAnimation();
+    }
+  });
 }
 
 function loadState() {
@@ -192,6 +225,13 @@ function normalizeState(input) {
   merged.stampEvents = Array.isArray(input.stampEvents) ? input.stampEvents : [];
   merged.redemptions = Array.isArray(input.redemptions) ? input.redemptions : [];
   merged.rewards = normalizeRewards(input.rewards);
+  merged.settings = {
+    ...defaultState.settings,
+    ...(input.settings || {}),
+  };
+  merged.ownedOutfits = Array.isArray(input.ownedOutfits) && input.ownedOutfits.length
+    ? input.ownedOutfits
+    : [...defaultState.ownedOutfits];
   return merged;
 }
 
@@ -592,6 +632,7 @@ function addStamp({ source }) {
     createdAt: new Date().toISOString(),
     canceled: false,
   };
+  const isSheetComplete = (stats.total + 1) % SHEET_SIZE === 0;
   state.stampEvents.push(event);
   lastStampedEventId = event.id;
   if (source === "teacher") {
@@ -600,6 +641,12 @@ function addStamp({ source }) {
   persist();
   render();
   showToast(source === "child" ? "スタンプをおしたよ" : `${student.name}にスタンプを押しました`);
+  if (isSheetComplete) {
+    showHounyanAnimation("sheet-completed", {
+      studentName: student.name,
+      sheetNumber: Math.floor((stats.total + 1) / SHEET_SIZE),
+    });
+  }
 
   clearTimeout(stampAnimationTimer);
   stampAnimationTimer = window.setTimeout(() => {
@@ -719,6 +766,56 @@ function importData(event) {
     }
   });
   reader.readAsText(file);
+}
+
+function showHounyanAnimation(type, options = {}) {
+  const outfit = activeOutfit();
+  const animation = animationContent(type, options);
+  els.animationHounyan.src = outfitAsset(outfit, animation.pose);
+  els.animationHounyan.alt = outfit.name;
+  els.animationEyebrow.textContent = animation.eyebrow;
+  els.animationTitle.textContent = animation.title;
+  els.animationMessage.textContent = animation.message;
+  els.hounyanAnimationLayer.hidden = false;
+  els.hounyanAnimationLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.hounyanAnimationLayer.classList.add("is-showing");
+    els.animationCloseButton.focus();
+  });
+}
+
+function hideHounyanAnimation() {
+  els.hounyanAnimationLayer.classList.remove("is-showing");
+  window.setTimeout(() => {
+    els.hounyanAnimationLayer.hidden = true;
+  }, 180);
+}
+
+function animationContent(type, options) {
+  if (type === "sheet-completed") {
+    return {
+      pose: "sheetComplete",
+      eyebrow: options.studentName ? `${options.studentName}のシート` : "シート",
+      title: "シート完成！",
+      message: `${options.sheetNumber || 1}まいめのシートがいっぱいになったよ。ほうにゃんもおいわいしてるよ！`,
+    };
+  }
+
+  return {
+    pose: "happy",
+    eyebrow: "ほうにゃん",
+    title: "やったね！",
+    message: "がんばりがふえたよ。",
+  };
+}
+
+function activeOutfit() {
+  const outfitId = state.settings?.activeOutfit || "default";
+  return hounyanOutfits[outfitId] || hounyanOutfits.default;
+}
+
+function outfitAsset(outfit, pose) {
+  return outfit[pose] || outfit.happy || outfit.idle || hounyanOutfits.default.idle;
 }
 
 function selectedStudent() {
