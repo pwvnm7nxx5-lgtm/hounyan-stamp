@@ -1170,7 +1170,6 @@ function openStampPreview({ source }) {
     memo: source === "teacher" ? els.stampMemo.value.trim() : "",
   };
   stampPreviewCounts = Object.fromEntries(stamps.map((stamp) => [stamp.id, 0]));
-  stampPreviewCounts[availableStamps[0].id] = 1;
   els.stampPreviewStudent.textContent = source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
   renderStampPreview();
   els.stampPreviewLayer.hidden = false;
