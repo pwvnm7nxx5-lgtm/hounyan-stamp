@@ -102,10 +102,12 @@ const defaultState = {
 };
 
 let state = loadState();
-let lastStampedEventId = "";
+let lastStampedEventIds = new Set();
 let stampAnimationTimer = 0;
 let hounyanAnimationQueue = [];
 let hounyanAnimationActive = false;
+let stampPreviewContext = null;
+let stampPreviewCounts = {};
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -125,7 +127,6 @@ const els = {
   childSheetTitle: document.querySelector("#childSheetTitle"),
   childSheetProgress: document.querySelector("#childSheetProgress"),
   childSheetGrid: document.querySelector("#childSheetGrid"),
-  childStampPicker: document.querySelector("#childStampPicker"),
   childAddStampButton: document.querySelector("#childAddStampButton"),
   teacherStudentList: document.querySelector("#teacherStudentList"),
   teacherStudentDetail: document.querySelector("#teacherStudentDetail"),
@@ -137,7 +138,6 @@ const els = {
   teacherSheetTitle: document.querySelector("#teacherSheetTitle"),
   teacherSheetProgress: document.querySelector("#teacherSheetProgress"),
   teacherSheetGrid: document.querySelector("#teacherSheetGrid"),
-  teacherStampPicker: document.querySelector("#teacherStampPicker"),
   stampMemo: document.querySelector("#stampMemo"),
   addStampButton: document.querySelector("#addStampButton"),
   historyList: document.querySelector("#historyList"),
@@ -153,6 +153,12 @@ const els = {
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   stampAssetsList: document.querySelector("#stampAssetsList"),
+  stampPreviewLayer: document.querySelector("#stampPreviewLayer"),
+  stampPreviewStudent: document.querySelector("#stampPreviewStudent"),
+  stampPreviewList: document.querySelector("#stampPreviewList"),
+  stampPreviewTotal: document.querySelector("#stampPreviewTotal"),
+  stampPreviewCancelButton: document.querySelector("#stampPreviewCancelButton"),
+  stampPreviewConfirmButton: document.querySelector("#stampPreviewConfirmButton"),
   hounyanAnimationLayer: document.querySelector("#hounyanAnimationLayer"),
   animationHounyan: document.querySelector("#animationHounyan"),
   animationFeatureImage: document.querySelector("#animationFeatureImage"),
@@ -181,8 +187,15 @@ function bindEvents() {
     saveStudent();
   });
 
-  els.childAddStampButton.addEventListener("click", () => addStamp({ source: "child" }));
-  els.addStampButton.addEventListener("click", () => addStamp({ source: "teacher" }));
+  els.childAddStampButton.addEventListener("click", () => openStampPreview({ source: "child" }));
+  els.addStampButton.addEventListener("click", () => openStampPreview({ source: "teacher" }));
+  els.stampPreviewCancelButton.addEventListener("click", closeStampPreview);
+  els.stampPreviewConfirmButton.addEventListener("click", confirmStampPreview);
+  els.stampPreviewLayer.addEventListener("click", (event) => {
+    if (event.target === els.stampPreviewLayer) {
+      closeStampPreview();
+    }
+  });
   els.editStudentButton.addEventListener("click", editSelectedStudent);
   els.deleteStudentButton.addEventListener("click", deleteSelectedStudent);
   els.rewardStudentSelect.addEventListener("change", () => {
@@ -199,6 +212,10 @@ function bindEvents() {
     }
   });
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.stampPreviewLayer.hidden) {
+      closeStampPreview();
+      return;
+    }
     if (event.key === "Escape" && !els.hounyanAnimationLayer.hidden) {
       hideHounyanAnimation();
     }
@@ -380,7 +397,6 @@ function renderStudentDetails() {
     stats,
     childMode: true,
   });
-  renderStampPicker(els.childStampPicker, stats.total, { childMode: true });
 
   els.selectedStudentName.textContent = student.name;
   els.selectedTotal.textContent = stats.total;
@@ -394,7 +410,6 @@ function renderStudentDetails() {
     stats,
     childMode: false,
   });
-  renderStampPicker(els.teacherStampPicker, stats.total, { childMode: false });
   renderHistory(student.id);
 }
 
@@ -415,49 +430,13 @@ function renderSheet({ grid, title, progress, stats, childMode }) {
     }
 
     const stamp = stampById(event.stampId);
-    const isNew = event.id === lastStampedEventId ? " is-new" : "";
+    const isNew = lastStampedEventIds.has(event.id) ? " is-new" : "";
     return `
       <div class="stamp-slot is-filled${isNew}">
         <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
       </div>
     `;
   }).join("");
-}
-
-function renderStampPicker(container, total, { childMode }) {
-  container.innerHTML = stampAssets
-    .map((stamp) => {
-      const locked = total < stamp.unlockAt;
-      const selected = state.selectedStampId === stamp.id;
-      const label = locked ? `${stamp.unlockAt}個で解放` : stamp.name;
-      const childLabel = locked ? `${stamp.unlockAt}こでつかえる` : stamp.reading;
-      return `
-        <button class="stamp-option${selected ? " is-selected" : ""}${locked ? " is-locked" : ""}"
-          type="button"
-          data-stamp="${stamp.id}"
-          ${locked ? "disabled" : ""}
-          title="${escapeHtml(label)}">
-          <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
-          <span>${escapeHtml(childMode ? childLabel : label)}</span>
-        </button>
-      `;
-    })
-    .join("");
-
-  container.querySelectorAll("[data-stamp]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedStampId = button.dataset.stamp;
-      persist();
-      renderStudentDetails();
-    });
-  });
-
-  const selectedStamp = stampAssets.find((stamp) => stamp.id === state.selectedStampId);
-  if (!selectedStamp || total < selectedStamp.unlockAt) {
-    state.selectedStampId = "sonochoshi";
-    persist();
-    renderStampPicker(container, total, { childMode });
-  }
 }
 
 function renderHistory(studentId) {
@@ -613,7 +592,7 @@ function clearStudentForm() {
   els.studentNote.value = "";
 }
 
-function addStamp({ source }) {
+function openStampPreview({ source }) {
   const student = selectedStudent();
   if (!student) {
     showToast(source === "child" ? "先生に名前を登録してもらってね" : "先に児童を登録してください");
@@ -621,51 +600,191 @@ function addStamp({ source }) {
   }
 
   const stats = studentStats(student.id);
-  const stamp = stampById(state.selectedStampId);
-  if (stats.total < stamp.unlockAt) {
-    showToast(source === "child" ? "このスタンプはまだつかえません" : "このスタンプはまだ解放されていません");
+  const availableStamps = stampAssets.filter((stamp) => stats.total >= stamp.unlockAt);
+  if (!availableStamps.length) {
+    showToast("使えるスタンプがありません");
     return;
   }
 
-  const event = {
-    id: crypto.randomUUID(),
+  stampPreviewContext = {
+    source,
     studentId: student.id,
-    stampId: stamp.id,
+    totalBefore: stats.total,
     memo: source === "teacher" ? els.stampMemo.value.trim() : "",
-    createdAt: new Date().toISOString(),
-    canceled: false,
   };
-  const nextTotal = stats.total + 1;
-  const isSheetComplete = (stats.total + 1) % SHEET_SIZE === 0;
+  stampPreviewCounts = Object.fromEntries(stampAssets.map((stamp) => [stamp.id, 0]));
+  stampPreviewCounts[availableStamps[0].id] = 1;
+  els.stampPreviewStudent.textContent = source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
+  renderStampPreview();
+  els.stampPreviewLayer.hidden = false;
+  els.stampPreviewLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.stampPreviewLayer.classList.add("is-showing");
+    els.stampPreviewConfirmButton.focus();
+  });
+}
+
+function renderStampPreview() {
+  const student = selectedStudent();
+  const stats = student ? studentStats(student.id) : emptyStats();
+  const childMode = stampPreviewContext?.source === "child";
+  const totalCount = stampPreviewTotalCount();
+
+  els.stampPreviewList.innerHTML = stampAssets
+    .map((stamp) => {
+      const locked = stats.total < stamp.unlockAt;
+      const count = Number(stampPreviewCounts[stamp.id] || 0);
+      const label = locked ? `${stamp.unlockAt}${childMode ? "こ" : "個"}で解放` : stamp.name;
+      return `
+        <article class="preview-stamp${locked ? " is-locked" : ""}">
+          <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
+          <div>
+            <strong>${escapeHtml(locked && childMode ? label : stamp.name)}</strong>
+            <span>${escapeHtml(locked ? label : "押す数を選びます")}</span>
+          </div>
+          <div class="preview-stepper" aria-label="${escapeHtml(stamp.name)}の数">
+            <button type="button" data-preview-count="${stamp.id}" data-delta="-1" ${locked || count === 0 ? "disabled" : ""}>-</button>
+            <output>${count}</output>
+            <button type="button" data-preview-count="${stamp.id}" data-delta="1" ${locked ? "disabled" : ""}>+</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  els.stampPreviewTotal.textContent = `合計 ${totalCount}${childMode ? "こ" : "個"}`;
+  els.stampPreviewConfirmButton.disabled = totalCount === 0;
+  els.stampPreviewList.querySelectorAll("[data-preview-count]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const stampId = button.dataset.previewCount;
+      const delta = Number(button.dataset.delta || 0);
+      stampPreviewCounts[stampId] = Math.max(0, Number(stampPreviewCounts[stampId] || 0) + delta);
+      renderStampPreview();
+    });
+  });
+}
+
+function closeStampPreview() {
+  els.stampPreviewLayer.classList.remove("is-showing");
+  window.setTimeout(() => {
+    els.stampPreviewLayer.hidden = true;
+    stampPreviewContext = null;
+    stampPreviewCounts = {};
+  }, 160);
+}
+
+function confirmStampPreview() {
+  if (!stampPreviewContext) {
+    return;
+  }
+
+  const student = selectedStudent();
+  if (!student || student.id !== stampPreviewContext.studentId) {
+    closeStampPreview();
+    showToast("児童をもう一度選んでください");
+    return;
+  }
+
+  const selections = stampPreviewSelections();
+  if (!selections.length) {
+    showToast("押すスタンプを選んでください");
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const lockedSelection = selections.find(({ stamp }) => stats.total < stamp.unlockAt);
+  if (lockedSelection) {
+    showToast("まだ使えないスタンプがあります");
+    renderStampPreview();
+    return;
+  }
+
+  addStampBatch({
+    student,
+    selections,
+    source: stampPreviewContext.source,
+    memo: stampPreviewContext.memo,
+  });
+  closeStampPreview();
+}
+
+function addStampBatch({ student, selections, source, memo }) {
+  const stats = studentStats(student.id);
+  const totalAdded = selections.reduce((sum, selection) => sum + selection.count, 0);
+  const createdAt = new Date().toISOString();
+  const events = [];
+
+  selections.forEach(({ stamp, count }) => {
+    for (let index = 0; index < count; index += 1) {
+      events.push({
+        id: crypto.randomUUID(),
+        studentId: student.id,
+        stampId: stamp.id,
+        memo,
+        createdAt,
+        canceled: false,
+      });
+    }
+  });
+
+  const nextTotal = stats.total + totalAdded;
+  const completedSheets = sheetsCompletedBetween(stats.total, nextTotal);
   const unlockedStamps = stampsUnlockedBetween(stats.total, nextTotal);
-  state.stampEvents.push(event);
-  lastStampedEventId = event.id;
+  const dominantStamp = dominantStampFromSelections(selections);
+  state.stampEvents.push(...events);
+  lastStampedEventIds = new Set(events.map((event) => event.id));
   if (source === "teacher") {
     els.stampMemo.value = "";
   }
+  playDominantStampVoice(dominantStamp);
   persist();
   render();
-  showToast(source === "child" ? "スタンプをおしたよ" : `${student.name}にスタンプを押しました`);
+  showToast(source === "child" ? `${totalAdded}こスタンプをおしたよ` : `${student.name}に${totalAdded}個スタンプを押しました`);
   unlockedStamps.forEach((unlockedStamp) => {
     showHounyanAnimation("stamp-unlocked", {
       stamp: unlockedStamp,
       studentName: student.name,
     });
   });
-  if (isSheetComplete) {
+  completedSheets.forEach((sheetNumber) => {
     showHounyanAnimation("sheet-completed", {
       studentName: student.name,
-      sheetNumber: Math.floor(nextTotal / SHEET_SIZE),
+      sheetNumber,
     });
-  }
+  });
 
   clearTimeout(stampAnimationTimer);
   stampAnimationTimer = window.setTimeout(() => {
-    if (lastStampedEventId === event.id) {
-      lastStampedEventId = "";
-      renderStudentDetails();
-    }
+    lastStampedEventIds.clear();
+    renderStudentDetails();
   }, 900);
+}
+
+function stampPreviewSelections() {
+  return stampAssets
+    .map((stamp) => ({
+      stamp,
+      count: Number(stampPreviewCounts[stamp.id] || 0),
+    }))
+    .filter((selection) => selection.count > 0);
+}
+
+function stampPreviewTotalCount() {
+  return Object.values(stampPreviewCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
+function dominantStampFromSelections(selections) {
+  return selections.reduce((best, current) => {
+    if (!best || current.count > best.count) {
+      return current;
+    }
+    return best;
+  }, null)?.stamp || stampAssets[0];
+}
+
+function playDominantStampVoice(stamp) {
+  // Voice files are not wired yet. This is the future hook for stamp-specific audio.
+  return stamp;
 }
 
 function cancelStamp(eventId) {
@@ -867,6 +986,19 @@ function outfitAsset(outfit, pose) {
 
 function stampsUnlockedBetween(beforeTotal, afterTotal) {
   return stampAssets.filter((stamp) => stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
+}
+
+function sheetsCompletedBetween(beforeTotal, afterTotal) {
+  const completed = [];
+  const firstSheet = Math.floor(beforeTotal / SHEET_SIZE) + 1;
+  const lastSheet = Math.floor(afterTotal / SHEET_SIZE);
+  for (let sheetNumber = firstSheet; sheetNumber <= lastSheet; sheetNumber += 1) {
+    const completeAt = sheetNumber * SHEET_SIZE;
+    if (beforeTotal < completeAt && afterTotal >= completeAt) {
+      completed.push(sheetNumber);
+    }
+  }
+  return completed;
 }
 
 function selectedStudent() {

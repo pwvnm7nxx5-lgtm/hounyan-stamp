@@ -103,7 +103,6 @@
                   </div>
                 </div>
                 <button class="primary-button wide stamp-press-button" type="button" id="childAddStampButton">スタンプをおす</button>
-                <div class="stamp-picker" id="childStampPicker"></div>
               </section>
             </div>
           </section>
@@ -179,7 +178,6 @@
                     </div>
                   </div>
                   <button class="primary-button wide stamp-press-button" type="button" id="addStampButton">スタンプを押す</button>
-                  <div class="stamp-picker" id="teacherStampPicker"></div>
                   <label class="field">
                     <span>メモ</span>
                     <input id="stampMemo" type="text" placeholder="例: 国語プリント、計算プリント">
@@ -257,6 +255,23 @@
           </div>
         </section>
       </main>
+    </div>
+
+    <div class="preview-layer" id="stampPreviewLayer" hidden>
+      <div class="preview-card" role="dialog" aria-modal="true" aria-labelledby="stampPreviewTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="stampPreviewStudent">スタンプ</p>
+            <h2 id="stampPreviewTitle">押すスタンプを選ぶ</h2>
+          </div>
+        </div>
+        <div class="preview-list" id="stampPreviewList"></div>
+        <p class="preview-total" id="stampPreviewTotal">合計 0こ</p>
+        <div class="preview-actions">
+          <button class="soft-button" type="button" id="stampPreviewCancelButton">戻る</button>
+          <button class="primary-button" type="button" id="stampPreviewConfirmButton">まとめて押す</button>
+        </div>
+      </div>
     </div>
 
     <div class="animation-layer" id="hounyanAnimationLayer" hidden>
