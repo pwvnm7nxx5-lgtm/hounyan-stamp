@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254">
+  <rect width="1254" height="1254" fill="none"/>
+  <circle cx="627" cy="627" r="500" fill="#e9f7ff" stroke="#2996d8" stroke-width="22"/>
+  <circle cx="627" cy="627" r="430" fill="#ffffff" stroke="#7dd3ff" stroke-width="16" stroke-dasharray="28 20"/>
+  <path d="M394 512c90-118 376-118 466 0 25 139-60 238-233 238s-258-99-233-238z" fill="#fff0c4" stroke="#161616" stroke-width="16"/>
+  <circle cx="548" cy="548" r="34" fill="#161616"/><circle cx="706" cy="548" r="34" fill="#161616"/>
+  <path d="M589 610c24 22 54 22 78 0" fill="none" stroke="#161616" stroke-width="14" stroke-linecap="round"/>
+  <path d="M431 430l70-98 42 120M824 430l-70-98-42 120" fill="#f8c36d" stroke="#161616" stroke-width="16" stroke-linejoin="round"/>
+  <path d="M302 377l45 18M952 377l-45 18M627 256v54" stroke="#ffd84c" stroke-width="22" stroke-linecap="round"/>
+  <text x="627" y="850" text-anchor="middle" font-family="sans-serif" font-size="150" font-weight="900" fill="#168ad0" stroke="#fff" stroke-width="10" paint-order="stroke">すごい</text>
+</svg>

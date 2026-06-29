@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254">
+  <rect width="1254" height="1254" fill="none"/>
+  <circle cx="627" cy="627" r="500" fill="#edf8ff" stroke="#4bb4e8" stroke-width="22"/>
+  <circle cx="627" cy="627" r="435" fill="#ffffff" stroke="#abe3ff" stroke-width="16"/>
+  <path d="M420 520c70-120 344-120 414 0 20 128-70 224-207 224s-227-96-207-224z" fill="#fff0c4" stroke="#161616" stroke-width="16"/>
+  <path d="M457 435l70-92 38 115M797 435l-70-92-38 115" fill="#f8c36d" stroke="#161616" stroke-width="16" stroke-linejoin="round"/>
+  <circle cx="550" cy="545" r="30" fill="#161616"/><circle cx="705" cy="545" r="30" fill="#161616"/>
+  <path d="M592 616c24 20 48 20 72 0" fill="none" stroke="#161616" stroke-width="14" stroke-linecap="round"/>
+  <rect x="340" y="665" width="210" height="115" rx="28" fill="#dff5ff" stroke="#161616" stroke-width="12"/>
+  <path d="M374 704h142M374 742h112" stroke="#4bb4e8" stroke-width="14" stroke-linecap="round"/>
+  <text x="682" y="850" text-anchor="middle" font-family="sans-serif" font-size="134" font-weight="900" fill="#279ed6" stroke="#fff" stroke-width="10" paint-order="stroke">ていねい</text>
+</svg>

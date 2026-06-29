@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254">
+  <rect width="1254" height="1254" fill="none"/>
+  <circle cx="627" cy="627" r="500" fill="#fffbe8" stroke="#ffc736" stroke-width="22"/>
+  <circle cx="627" cy="627" r="430" fill="#ffffff" stroke="#ffe58a" stroke-width="16" stroke-dasharray="18 14"/>
+  <path d="M418 525c72-122 346-122 418 0 18 130-76 222-209 222s-227-92-209-222z" fill="#fff0c4" stroke="#161616" stroke-width="16"/>
+  <path d="M458 440l70-92 38 116M797 440l-70-92-38 116" fill="#f8c36d" stroke="#161616" stroke-width="16" stroke-linejoin="round"/>
+  <circle cx="550" cy="548" r="30" fill="#161616"/><circle cx="705" cy="548" r="30" fill="#161616"/>
+  <path d="M588 614c27 24 54 24 81 0" fill="none" stroke="#161616" stroke-width="14" stroke-linecap="round"/>
+  <path d="M627 265c70 0 126 55 126 124 0 48-28 82-61 108l-18 56h-94l-18-56c-34-26-61-60-61-108 0-69 56-124 126-124z" fill="#ffe566" stroke="#161616" stroke-width="12"/>
+  <path d="M585 585h84M596 628h62" stroke="#161616" stroke-width="12" stroke-linecap="round"/>
+  <text x="627" y="850" text-anchor="middle" font-family="sans-serif" font-size="132" font-weight="900" fill="#f4a900" stroke="#fff" stroke-width="10" paint-order="stroke">ひらめき</text>
+</svg>

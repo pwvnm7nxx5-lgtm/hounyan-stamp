@@ -31,6 +31,136 @@ const defaultStampAssets = [
     src: "assets/stamp-ganbattane.png",
     unlockAt: 60,
   },
+  {
+    id: "shop-hanamaru",
+    name: "はなまる",
+    reading: "はなまる",
+    src: "assets/shop-stamps/stamp-hanamaru.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-sugoi",
+    name: "すごい",
+    reading: "すごい",
+    src: "assets/shop-stamps/stamp-sugoi.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-nice",
+    name: "ナイス",
+    reading: "ないす",
+    src: "assets/shop-stamps/stamp-nice.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-fight",
+    name: "ファイト",
+    reading: "ふぁいと",
+    src: "assets/shop-stamps/stamp-fight.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-dekita",
+    name: "できた",
+    reading: "できた",
+    src: "assets/shop-stamps/stamp-dekita.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-challenge",
+    name: "チャレンジ",
+    reading: "ちゃれんじ",
+    src: "assets/shop-stamps/stamp-challenge.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-teinei",
+    name: "ていねい",
+    reading: "ていねい",
+    src: "assets/shop-stamps/stamp-teinei.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-hirameki",
+    name: "ひらめき",
+    reading: "ひらめき",
+    src: "assets/shop-stamps/stamp-hirameki.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-shuchu",
+    name: "しゅうちゅう",
+    reading: "しゅうちゅう",
+    src: "assets/shop-stamps/stamp-shuchu.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-yasashii",
+    name: "やさしい",
+    reading: "やさしい",
+    src: "assets/shop-stamps/stamp-yasashii.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 1,
+    rarity: "normal",
+  },
+  {
+    id: "shop-special-rainbow",
+    name: "スペシャル",
+    reading: "すぺしゃる",
+    src: "assets/shop-stamps/stamp-special-rainbow.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 3,
+    rarity: "special",
+  },
+  {
+    id: "shop-special-legend",
+    name: "レジェンド",
+    reading: "れじぇんど",
+    src: "assets/shop-stamps/stamp-special-legend.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 3,
+    rarity: "special",
+  },
+  {
+    id: "shop-special-gorgeous",
+    name: "ごうか",
+    reading: "ごうか",
+    src: "assets/shop-stamps/stamp-special-gorgeous.svg",
+    unlockAt: 0,
+    purchaseOnly: true,
+    shopPriceSheets: 3,
+    rarity: "special",
+  },
 ];
 
 const hounyanOutfits = {
@@ -99,6 +229,7 @@ const defaultState = {
     activeOutfit: "default",
   },
   ownedOutfits: ["default"],
+  ownedStampIdsByStudent: {},
   selectedStudentId: "",
   selectedStampId: "sonochoshi",
 };
@@ -112,6 +243,7 @@ let hounyanAnimationActive = false;
 let stampPreviewContext = null;
 let stampPreviewCounts = {};
 let exchangeConfirmRewardId = "";
+let exchangeConfirmAction = null;
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -154,6 +286,7 @@ const els = {
   deleteStudentButton: document.querySelector("#deleteStudentButton"),
   unlockRewards: document.querySelector("#unlockRewards"),
   shopRewards: document.querySelector("#shopRewards"),
+  shopStampRewards: document.querySelector("#shopStampRewards"),
   prizeForm: document.querySelector("#prizeForm"),
   prizeId: document.querySelector("#prizeId"),
   prizeName: document.querySelector("#prizeName"),
@@ -312,6 +445,7 @@ function normalizeState(input) {
   merged.ownedOutfits = Array.isArray(input.ownedOutfits) && input.ownedOutfits.length
     ? input.ownedOutfits
     : [...defaultState.ownedOutfits];
+  merged.ownedStampIdsByStudent = normalizeOwnedStampIdsByStudent(input.ownedStampIdsByStudent);
   return merged;
 }
 
@@ -367,10 +501,30 @@ function normalizeStampAssets(inputAssets) {
         src: String(stamp.src || base.src || defaultStampAssets[0].src),
         unlockAt: Math.max(0, Math.floor(Number(stamp.unlockAt ?? base.unlockAt ?? 0))),
         custom: Boolean(stamp.custom || !base.id),
+        purchaseOnly: Boolean(stamp.purchaseOnly ?? base.purchaseOnly ?? false),
+        shopPriceSheets: Math.max(1, Math.floor(Number(stamp.shopPriceSheets ?? base.shopPriceSheets ?? 1))),
+        rarity: String(stamp.rarity || base.rarity || "normal"),
       });
     });
   }
-  return Array.from(byId.values()).sort((a, b) => a.unlockAt - b.unlockAt || a.name.localeCompare(b.name, "ja"));
+  return Array.from(byId.values()).sort((a, b) =>
+    Number(a.purchaseOnly) - Number(b.purchaseOnly) ||
+    a.unlockAt - b.unlockAt ||
+    stampPriceSheets(a) - stampPriceSheets(b) ||
+    a.name.localeCompare(b.name, "ja")
+  );
+}
+
+function normalizeOwnedStampIdsByStudent(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(input).map(([studentId, stampIds]) => [
+      studentId,
+      Array.isArray(stampIds) ? [...new Set(stampIds.map(String))] : [],
+    ]),
+  );
 }
 
 function activeStampAssets() {
@@ -552,7 +706,7 @@ function renderChildNextUnlock(total) {
 
 function nextUnlockStamp(total) {
   return activeStampAssets()
-    .filter((stamp) => stamp.unlockAt > total)
+    .filter((stamp) => !stamp.purchaseOnly && stamp.unlockAt > total)
     .sort((a, b) => a.unlockAt - b.unlockAt || a.name.localeCompare(b.name, "ja"))[0] || null;
 }
 
@@ -639,10 +793,14 @@ function renderRewards() {
   els.shopRewards.innerHTML = shopRewards.length
     ? shopRewards.map((reward) => rewardCard(reward, stats, student)).join("")
     : '<p class="empty-state">まだ景品がありません。先生ページで追加してください。</p>';
+  renderStampShop(student, stats);
   renderPrizeSettings();
 
   els.shopRewards.querySelectorAll("[data-redeem]").forEach((button) => {
     button.addEventListener("click", () => openExchangeConfirm(button.dataset.redeem));
+  });
+  els.shopStampRewards.querySelectorAll("[data-buy-stamp]").forEach((button) => {
+    button.addEventListener("click", () => openStampPurchaseConfirm(button.dataset.buyStamp));
   });
 }
 
@@ -752,7 +910,11 @@ function renderPrizeSettings() {
 function renderStampAssets() {
   els.stampAssetsList.innerHTML = activeStampAssets()
     .map((stamp) => {
-      const text = stamp.unlockAt === 0 ? "最初から使用可" : `累計${stamp.unlockAt}個で解放`;
+      const text = stamp.purchaseOnly
+        ? `買い物で購入（${stampPriceSheets(stamp)}シート）`
+        : stamp.unlockAt === 0
+          ? "最初から使用可"
+          : `累計${stamp.unlockAt}個で解放`;
       return `
         <article class="asset-card">
           <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
@@ -833,6 +995,37 @@ function clearStampAssetForm() {
   els.stampAssetImage.value = "";
 }
 
+function ownedStampIdsForStudent(studentId) {
+  if (!studentId) {
+    return [];
+  }
+  if (!Array.isArray(state.ownedStampIdsByStudent[studentId])) {
+    state.ownedStampIdsByStudent[studentId] = [];
+  }
+  return state.ownedStampIdsByStudent[studentId];
+}
+
+function studentOwnsStamp(studentId, stampId) {
+  return ownedStampIdsForStudent(studentId).includes(stampId);
+}
+
+function stampIsAvailableForStudent(stamp, student, total) {
+  if (!stamp) {
+    return false;
+  }
+  if (student && studentOwnsStamp(student.id, stamp.id)) {
+    return true;
+  }
+  if (stamp.purchaseOnly) {
+    return false;
+  }
+  return total >= stamp.unlockAt;
+}
+
+function stampPriceSheets(stamp) {
+  return Math.max(1, Math.floor(Number(stamp.shopPriceSheets || 1)));
+}
+
 async function saveStampAsset() {
   const name = els.stampAssetName.value.trim();
   const unlockAt = Math.max(0, Math.floor(Number(els.stampAssetUnlockAt.value || 0)));
@@ -875,6 +1068,9 @@ async function saveStampAsset() {
     src,
     unlockAt,
     custom: existing?.custom || !existing,
+    purchaseOnly: existing?.purchaseOnly || false,
+    shopPriceSheets: existing?.shopPriceSheets || 1,
+    rarity: existing?.rarity || "normal",
   };
 
   const previousStampAssets = state.stampAssets;
@@ -893,6 +1089,37 @@ async function saveStampAsset() {
   clearStampAssetForm();
   render();
   showToast(existing ? "スタンプ設定を更新しました" : "新しいスタンプを追加しました");
+}
+
+function renderStampShop(student, stats) {
+  const stamps = activeStampAssets().filter((stamp) => stamp.purchaseOnly);
+  if (!stamps.length) {
+    els.shopStampRewards.innerHTML = '<p class="empty-state">買えるスタンプはまだありません。</p>';
+    return;
+  }
+
+  els.shopStampRewards.innerHTML = stamps
+    .map((stamp) => stampShopCard(stamp, stats, student))
+    .join("");
+}
+
+function stampShopCard(stamp, stats, student) {
+  const owned = student ? studentOwnsStamp(student.id, stamp.id) : false;
+  const price = stampPriceSheets(stamp);
+  const canBuy = Boolean(student) && !owned && stats.availableSheets >= price;
+  const special = stamp.rarity === "special";
+  const label = owned ? "購入済み" : canBuy ? "購入する" : `あと${Math.max(0, price - stats.availableSheets)}シート`;
+  return `
+    <article class="stamp-shop-card${special ? " is-special" : ""}${owned ? " is-owned" : ""}">
+      <img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}スタンプ">
+      <div>
+        <span>${special ? "スペシャル" : "スタンプ"}</span>
+        <strong>${escapeHtml(stamp.name)}</strong>
+        <p>${price}シート</p>
+      </div>
+      <button class="primary-button" type="button" data-buy-stamp="${stamp.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
+    </article>
+  `;
 }
 
 function imageFileToStampDataUrl(file) {
@@ -1038,7 +1265,7 @@ function openStampPreview({ source }) {
 
   const stats = studentStats(student.id);
   const stamps = activeStampAssets();
-  const availableStamps = stamps.filter((stamp) => stats.total >= stamp.unlockAt);
+  const availableStamps = stamps.filter((stamp) => stampIsAvailableForStudent(stamp, student, stats.total));
   if (!availableStamps.length) {
     showToast("使えるスタンプがありません");
     return;
@@ -1070,9 +1297,15 @@ function renderStampPreview() {
 
   els.stampPreviewList.innerHTML = activeStampAssets()
     .map((stamp) => {
-      const locked = stats.total < stamp.unlockAt;
+      const locked = !stampIsAvailableForStudent(stamp, student, stats.total);
       const count = Number(stampPreviewCounts[stamp.id] || 0);
-      const label = locked ? `${stamp.unlockAt}${childMode ? "こ" : "個"}で解放` : stamp.name;
+      const label = locked
+        ? stamp.purchaseOnly
+          ? childMode
+            ? "おかいものでこうにゅう"
+            : "買い物で購入"
+          : `${stamp.unlockAt}${childMode ? "こ" : "個"}で解放`
+        : stamp.name;
       return `
         <article class="preview-stamp${locked ? " is-locked" : ""}">
           <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
@@ -1130,7 +1363,7 @@ function confirmStampPreview() {
   }
 
   const stats = studentStats(student.id);
-  const lockedSelection = selections.find(({ stamp }) => stats.total < stamp.unlockAt);
+  const lockedSelection = selections.find(({ stamp }) => !stampIsAvailableForStudent(stamp, student, stats.total));
   if (lockedSelection) {
     showToast("まだ使えないスタンプがあります");
     renderStampPreview();
@@ -1253,6 +1486,7 @@ function openExchangeConfirm(rewardId) {
   }
 
   exchangeConfirmRewardId = rewardId;
+  exchangeConfirmAction = { type: "reward", id: rewardId };
   els.exchangeConfirmTitle.textContent = "こうかんする？";
   els.exchangeConfirmMessage.textContent = `${student.name}の使えるシート${costSheets}枚を「${reward.name}」と交換します。`;
   els.exchangeConfirmLayer.hidden = false;
@@ -1268,13 +1502,44 @@ function closeExchangeConfirm() {
   window.setTimeout(() => {
     els.exchangeConfirmLayer.hidden = true;
     exchangeConfirmRewardId = "";
+    exchangeConfirmAction = null;
   }, 160);
 }
 
 function confirmExchange() {
-  const rewardId = exchangeConfirmRewardId;
+  const action = exchangeConfirmAction || { type: "reward", id: exchangeConfirmRewardId };
   closeExchangeConfirm();
-  redeemReward(rewardId);
+  if (action.type === "stamp") {
+    buyStamp(action.id);
+    return;
+  }
+  redeemReward(action.id);
+}
+
+function openStampPurchaseConfirm(stampId) {
+  const student = selectedStudent();
+  const stamp = activeStampAssets().find((item) => item.id === stampId);
+  if (!student || !stamp || !stamp.purchaseOnly || studentOwnsStamp(student.id, stamp.id)) {
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const costSheets = stampPriceSheets(stamp);
+  if (stats.availableSheets < costSheets) {
+    showToast("使えるシートが足りません");
+    return;
+  }
+
+  exchangeConfirmRewardId = "";
+  exchangeConfirmAction = { type: "stamp", id: stampId };
+  els.exchangeConfirmTitle.textContent = "こうにゅうする？";
+  els.exchangeConfirmMessage.textContent = `${student.name}の使えるシート${costSheets}枚で「${stamp.name}」スタンプを購入します。`;
+  els.exchangeConfirmLayer.hidden = false;
+  els.exchangeConfirmLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.exchangeConfirmLayer.classList.add("is-showing");
+    els.exchangeConfirmButton.focus();
+  });
 }
 
 function redeemReward(rewardId) {
@@ -1304,6 +1569,41 @@ function redeemReward(rewardId) {
   showToast(`${reward.name}と交換しました`);
 }
 
+function buyStamp(stampId) {
+  const student = selectedStudent();
+  const stamp = activeStampAssets().find((item) => item.id === stampId);
+  if (!student || !stamp || !stamp.purchaseOnly || studentOwnsStamp(student.id, stamp.id)) {
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const costSheets = stampPriceSheets(stamp);
+  if (stats.availableSheets < costSheets) {
+    showToast("使えるシートが足りません");
+    return;
+  }
+
+  ownedStampIdsForStudent(student.id).push(stamp.id);
+  state.ownedStampIdsByStudent[student.id] = [...new Set(ownedStampIdsForStudent(student.id))];
+  state.redemptions.push({
+    id: crypto.randomUUID(),
+    studentId: student.id,
+    rewardId: `stamp:${stamp.id}`,
+    type: "stamp-purchase",
+    stampId: stamp.id,
+    sheetCost: costSheets,
+    createdAt: new Date().toISOString(),
+    memo: `${stamp.name}スタンプ`,
+  });
+  if (!persist()) {
+    state.ownedStampIdsByStudent[student.id] = ownedStampIdsForStudent(student.id).filter((id) => id !== stamp.id);
+    state.redemptions = state.redemptions.filter((redemption) => redemption.stampId !== stamp.id || redemption.studentId !== student.id || redemption.type !== "stamp-purchase");
+    return;
+  }
+  render();
+  showToast(`${stamp.name}スタンプを購入しました`);
+}
+
 function cancelRedemption(redemptionId) {
   const redemption = state.redemptions.find((item) => item.id === redemptionId);
   if (!redemption || redemption.canceled) {
@@ -1312,6 +1612,19 @@ function cancelRedemption(redemptionId) {
 
   redemption.canceled = true;
   redemption.canceledAt = new Date().toISOString();
+  if (redemption.type === "stamp-purchase" && redemption.stampId) {
+    const stillOwned = state.redemptions.some((item) =>
+      item.id !== redemption.id &&
+      item.studentId === redemption.studentId &&
+      item.type === "stamp-purchase" &&
+      item.stampId === redemption.stampId &&
+      !item.canceled
+    );
+    if (!stillOwned) {
+      state.ownedStampIdsByStudent[redemption.studentId] = ownedStampIdsForStudent(redemption.studentId)
+        .filter((stampId) => stampId !== redemption.stampId);
+    }
+  }
   persist();
   render();
   showToast("交換を取り消しました。シートを戻しました");
@@ -1344,6 +1657,7 @@ function deleteSelectedStudent() {
   state.students = state.students.filter((item) => item.id !== student.id);
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
   state.redemptions = state.redemptions.filter((redemption) => redemption.studentId !== student.id);
+  delete state.ownedStampIdsByStudent[student.id];
   state.selectedStudentId = state.students[0]?.id || "";
   clearStudentForm();
   persist();
@@ -1476,7 +1790,7 @@ function outfitAsset(outfit, pose) {
 }
 
 function stampsUnlockedBetween(beforeTotal, afterTotal) {
-  return activeStampAssets().filter((stamp) => stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
+  return activeStampAssets().filter((stamp) => !stamp.purchaseOnly && stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
 }
 
 function sheetsCompletedBetween(beforeTotal, afterTotal) {
