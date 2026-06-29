@@ -530,8 +530,10 @@ function renderChildNextUnlock(total) {
   const nextStamp = nextUnlockStamp(total);
   if (!nextStamp) {
     els.childNextUnlock.innerHTML = `
-      <span>つぎのもくひょう</span>
-      <strong>ぜんぶかいほうずみ！</strong>
+      <div>
+        <span>つぎのもくひょう</span>
+        <strong>ぜんぶかいほうずみ！</strong>
+      </div>
     `;
     els.childNextUnlock.classList.add("is-complete");
     return;
@@ -539,8 +541,11 @@ function renderChildNextUnlock(total) {
 
   const remaining = Math.max(0, nextStamp.unlockAt - total);
   els.childNextUnlock.innerHTML = `
-    <span>つぎのもくひょう</span>
-    <strong>あと${remaining}こで${escapeHtml(nextStamp.name)}かいほう！</strong>
+    <div>
+      <span>つぎのもくひょう</span>
+      <strong>あと${remaining}こで${escapeHtml(nextStamp.name)}かいほう！</strong>
+    </div>
+    <img class="next-unlock-preview" src="${escapeHtml(nextStamp.src)}" alt="${escapeHtml(nextStamp.name)}のプレビュー">
   `;
   els.childNextUnlock.classList.remove("is-complete");
 }

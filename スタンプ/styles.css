@@ -490,7 +490,9 @@ button:disabled {
 
 .next-unlock-banner {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 12px;
+  align-items: center;
   margin: 14px 0;
   padding: 16px;
   border: 2px solid rgba(66, 180, 51, 0.28);
@@ -506,12 +508,26 @@ button:disabled {
 }
 
 .next-unlock-banner strong {
+  display: block;
   color: var(--text);
   font-size: clamp(1.28rem, 4vw, 2rem);
   line-height: 1.25;
 }
 
+.next-unlock-preview {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  justify-self: end;
+  padding: 6px;
+  border: 1px solid rgba(66, 180, 51, 0.2);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 8px 18px rgba(32, 50, 47, 0.12);
+}
+
 .next-unlock-banner.is-complete {
+  grid-template-columns: 1fr;
   border-color: rgba(246, 192, 52, 0.52);
   background: linear-gradient(135deg, #ffffff, #fff7d7);
 }
@@ -1356,6 +1372,16 @@ input:focus,
   .shop-prize-foot {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .next-unlock-banner {
+    grid-template-columns: minmax(0, 1fr) 74px;
+    padding: 14px;
+  }
+
+  .next-unlock-preview {
+    width: 72px;
+    height: 72px;
   }
 
   .stamp-sheet {
