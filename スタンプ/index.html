@@ -229,6 +229,16 @@
             <section class="work-panel">
               <div class="section-head">
                 <div>
+                  <p class="eyebrow">交換履歴</p>
+                  <h2>交換済みシート</h2>
+                </div>
+              </div>
+              <div id="redemptionList" class="redemption-list"></div>
+            </section>
+
+            <section class="work-panel">
+              <div class="section-head">
+                <div>
                   <p class="eyebrow">データ</p>
                   <h2>バックアップ</h2>
                 </div>
@@ -250,6 +260,26 @@
                   <h2>解放条件</h2>
                 </div>
               </div>
+              <form id="stampAssetForm" class="form-grid stamp-asset-form">
+                <input id="stampAssetId" type="hidden">
+                <label>
+                  スタンプ名
+                  <input id="stampAssetName" type="text" placeholder="例: すばらしい" required>
+                </label>
+                <label>
+                  解放する累計スタンプ数
+                  <input id="stampAssetUnlockAt" type="number" min="0" step="1" value="20" required>
+                </label>
+                <label class="file-button stamp-file-button">
+                  画像を選ぶ
+                  <input id="stampAssetImage" type="file" accept="image/*">
+                </label>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">スタンプを保存</button>
+                  <button class="soft-button" type="button" id="clearStampAssetForm">新規入力</button>
+                </div>
+                <p class="hint">追加した画像はこのブラウザ内に保存されます。別端末で使う時はJSONを書き出してください。</p>
+              </form>
               <div id="stampAssetsList" class="asset-list"></div>
             </section>
           </div>
@@ -270,6 +300,18 @@
         <div class="preview-actions">
           <button class="soft-button" type="button" id="stampPreviewCancelButton">戻る</button>
           <button class="primary-button" type="button" id="stampPreviewConfirmButton">まとめて押す</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm-layer" id="exchangeConfirmLayer" hidden>
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="exchangeConfirmTitle">
+        <p class="eyebrow">シート交換</p>
+        <h2 id="exchangeConfirmTitle">こうかんする？</h2>
+        <p id="exchangeConfirmMessage">使えるシートを使って交換します。</p>
+        <div class="confirm-actions">
+          <button class="soft-button" type="button" id="exchangeCancelButton">やめる</button>
+          <button class="primary-button" type="button" id="exchangeConfirmButton">こうかんする</button>
         </div>
       </div>
     </div>

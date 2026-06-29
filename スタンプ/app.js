@@ -1,7 +1,7 @@
 const STORAGE_KEY = "hounyan-stamp-ledger-v1";
 const SHEET_SIZE = 20;
 
-const stampAssets = [
+const defaultStampAssets = [
   {
     id: "sonochoshi",
     name: "そのちょうし",
@@ -92,6 +92,7 @@ const defaultState = {
   students: [],
   stampEvents: [],
   rewards: defaultRewards,
+  stampAssets: defaultStampAssets,
   redemptions: [],
   settings: {
     activeOutfit: "default",
@@ -108,6 +109,7 @@ let hounyanAnimationQueue = [];
 let hounyanAnimationActive = false;
 let stampPreviewContext = null;
 let stampPreviewCounts = {};
+let exchangeConfirmRewardId = "";
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -152,6 +154,13 @@ const els = {
   studentNote: document.querySelector("#studentNote"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
+  redemptionList: document.querySelector("#redemptionList"),
+  stampAssetForm: document.querySelector("#stampAssetForm"),
+  stampAssetId: document.querySelector("#stampAssetId"),
+  stampAssetName: document.querySelector("#stampAssetName"),
+  stampAssetUnlockAt: document.querySelector("#stampAssetUnlockAt"),
+  stampAssetImage: document.querySelector("#stampAssetImage"),
+  clearStampAssetForm: document.querySelector("#clearStampAssetForm"),
   stampAssetsList: document.querySelector("#stampAssetsList"),
   stampPreviewLayer: document.querySelector("#stampPreviewLayer"),
   stampPreviewStudent: document.querySelector("#stampPreviewStudent"),
@@ -159,6 +168,11 @@ const els = {
   stampPreviewTotal: document.querySelector("#stampPreviewTotal"),
   stampPreviewCancelButton: document.querySelector("#stampPreviewCancelButton"),
   stampPreviewConfirmButton: document.querySelector("#stampPreviewConfirmButton"),
+  exchangeConfirmLayer: document.querySelector("#exchangeConfirmLayer"),
+  exchangeConfirmTitle: document.querySelector("#exchangeConfirmTitle"),
+  exchangeConfirmMessage: document.querySelector("#exchangeConfirmMessage"),
+  exchangeCancelButton: document.querySelector("#exchangeCancelButton"),
+  exchangeConfirmButton: document.querySelector("#exchangeConfirmButton"),
   hounyanAnimationLayer: document.querySelector("#hounyanAnimationLayer"),
   animationHounyan: document.querySelector("#animationHounyan"),
   animationFeatureImage: document.querySelector("#animationFeatureImage"),
@@ -186,6 +200,11 @@ function bindEvents() {
     event.preventDefault();
     saveStudent();
   });
+  els.stampAssetForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveStampAsset();
+  });
+  els.clearStampAssetForm.addEventListener("click", clearStampAssetForm);
 
   els.childAddStampButton.addEventListener("click", () => openStampPreview({ source: "child" }));
   els.addStampButton.addEventListener("click", () => openStampPreview({ source: "teacher" }));
@@ -205,6 +224,13 @@ function bindEvents() {
   });
   els.exportButton.addEventListener("click", exportData);
   els.importInput.addEventListener("change", importData);
+  els.exchangeCancelButton.addEventListener("click", closeExchangeConfirm);
+  els.exchangeConfirmButton.addEventListener("click", confirmExchange);
+  els.exchangeConfirmLayer.addEventListener("click", (event) => {
+    if (event.target === els.exchangeConfirmLayer) {
+      closeExchangeConfirm();
+    }
+  });
   els.animationCloseButton.addEventListener("click", hideHounyanAnimation);
   els.hounyanAnimationLayer.addEventListener("click", (event) => {
     if (event.target === els.hounyanAnimationLayer) {
@@ -214,6 +240,10 @@ function bindEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !els.stampPreviewLayer.hidden) {
       closeStampPreview();
+      return;
+    }
+    if (event.key === "Escape" && !els.exchangeConfirmLayer.hidden) {
+      closeExchangeConfirm();
       return;
     }
     if (event.key === "Escape" && !els.hounyanAnimationLayer.hidden) {
@@ -245,6 +275,7 @@ function normalizeState(input) {
   merged.stampEvents = Array.isArray(input.stampEvents) ? input.stampEvents : [];
   merged.redemptions = Array.isArray(input.redemptions) ? input.redemptions : [];
   merged.rewards = normalizeRewards(input.rewards);
+  merged.stampAssets = normalizeStampAssets(input.stampAssets || input.stamps || input.stampSettings);
   merged.settings = {
     ...defaultState.settings,
     ...(input.settings || {}),
@@ -280,6 +311,37 @@ function normalizeRewards(inputRewards) {
   return Array.from(byId.values());
 }
 
+function normalizeStampAssets(inputAssets) {
+  const byId = new Map(defaultStampAssets.map((stamp) => [stamp.id, structuredClone(stamp)]));
+  if (Array.isArray(inputAssets)) {
+    inputAssets.forEach((stamp) => {
+      if (!stamp || !stamp.id) {
+        return;
+      }
+      const base = byId.get(stamp.id) || {};
+      const name = String(stamp.name || base.name || "新しいスタンプ").trim();
+      byId.set(stamp.id, {
+        ...base,
+        ...stamp,
+        id: String(stamp.id),
+        name,
+        reading: String(stamp.reading || stamp.name || base.reading || name).trim(),
+        src: String(stamp.src || base.src || defaultStampAssets[0].src),
+        unlockAt: Math.max(0, Math.floor(Number(stamp.unlockAt ?? base.unlockAt ?? 0))),
+        custom: Boolean(stamp.custom || !base.id),
+      });
+    });
+  }
+  return Array.from(byId.values()).sort((a, b) => a.unlockAt - b.unlockAt || a.name.localeCompare(b.name, "ja"));
+}
+
+function activeStampAssets() {
+  if (!Array.isArray(state.stampAssets) || !state.stampAssets.length) {
+    state.stampAssets = normalizeStampAssets();
+  }
+  return state.stampAssets;
+}
+
 function persist() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
@@ -290,6 +352,7 @@ function render() {
   renderStudentLists();
   renderStudentDetails();
   renderRewards();
+  renderRedemptions();
   renderStampAssets();
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === activeView());
@@ -487,14 +550,37 @@ function renderRewards() {
 
   const student = selectedStudent();
   const stats = student ? studentStats(student.id) : emptyStats();
-  const unlockRewards = state.rewards.filter((reward) => reward.enabled && reward.type === "unlock");
+  const unlockRewards = activeStampAssets().filter((stamp) => stamp.unlockAt > 0);
   const shopRewards = state.rewards.filter((reward) => reward.enabled && reward.type === "shop");
-  els.unlockRewards.innerHTML = unlockRewards.map((reward) => rewardCard(reward, stats, student)).join("");
+  els.unlockRewards.innerHTML = unlockRewards.length
+    ? unlockRewards.map((stamp) => unlockStampCard(stamp, stats)).join("")
+    : '<p class="empty-state">解放条件つきのスタンプはありません。</p>';
   els.shopRewards.innerHTML = shopRewards.map((reward) => rewardCard(reward, stats, student)).join("");
 
   els.shopRewards.querySelectorAll("[data-redeem]").forEach((button) => {
-    button.addEventListener("click", () => redeemReward(button.dataset.redeem));
+    button.addEventListener("click", () => openExchangeConfirm(button.dataset.redeem));
   });
+}
+
+function unlockStampCard(stamp, stats) {
+  const value = stats.total;
+  const done = value >= stamp.unlockAt;
+  const percent = stamp.unlockAt > 0 ? Math.min(100, Math.round((value / stamp.unlockAt) * 100)) : 100;
+  return `
+    <article class="reward-card">
+      <div class="reward-top">
+        <div>
+          <strong>${escapeHtml(stamp.name)}スタンプ</strong>
+          <p>累計${stamp.unlockAt}個で使えるようになります。</p>
+        </div>
+        <strong>${done ? "解放済み" : `あと${stamp.unlockAt - value}個`}</strong>
+      </div>
+      <div class="progress" aria-label="${percent}%">
+        <span style="width: ${percent}%"></span>
+      </div>
+      <p>${value} / ${stamp.unlockAt}個</p>
+    </article>
+  `;
 }
 
 function rewardCard(reward, stats, student) {
@@ -526,7 +612,7 @@ function rewardCard(reward, stats, student) {
 }
 
 function renderStampAssets() {
-  els.stampAssetsList.innerHTML = stampAssets
+  els.stampAssetsList.innerHTML = activeStampAssets()
     .map((stamp) => {
       const text = stamp.unlockAt === 0 ? "最初から使用可" : `累計${stamp.unlockAt}個で解放`;
       return `
@@ -536,10 +622,137 @@ function renderStampAssets() {
             <strong>${escapeHtml(stamp.name)}</strong>
             <p>${text}</p>
           </div>
+          <button class="soft-button compact-button" type="button" data-edit-stamp="${stamp.id}">編集</button>
         </article>
       `;
     })
     .join("");
+
+  els.stampAssetsList.querySelectorAll("[data-edit-stamp]").forEach((button) => {
+    button.addEventListener("click", () => editStampAsset(button.dataset.editStamp));
+  });
+}
+
+function renderRedemptions() {
+  const student = selectedStudent();
+  if (!student) {
+    els.redemptionList.innerHTML = '<p class="empty-state">児童を選ぶと交換履歴が表示されます。</p>';
+    return;
+  }
+
+  const redemptions = state.redemptions
+    .filter((redemption) => redemption.studentId === student.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  if (!redemptions.length) {
+    els.redemptionList.innerHTML = '<p class="empty-state">まだ交換はありません。</p>';
+    return;
+  }
+
+  els.redemptionList.innerHTML = redemptions
+    .map((redemption) => {
+      const reward = state.rewards.find((item) => item.id === redemption.rewardId);
+      const name = redemption.memo || reward?.name || "交換";
+      const sheetCost = redemptionSheetCost(redemption);
+      return `
+        <article class="redemption-card${redemption.canceled ? " is-canceled" : ""}">
+          <div>
+            <strong>${escapeHtml(name)}</strong>
+            <p>${formatDateTime(redemption.createdAt)} / ${sheetCost}シート${redemption.canceled ? " / 取消済み" : ""}</p>
+          </div>
+          ${
+            redemption.canceled
+              ? '<span class="status-pill">取消済み</span>'
+              : `<button class="danger-button compact-button" type="button" data-cancel-redemption="${redemption.id}">取り消す</button>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+
+  els.redemptionList.querySelectorAll("[data-cancel-redemption]").forEach((button) => {
+    button.addEventListener("click", () => cancelRedemption(button.dataset.cancelRedemption));
+  });
+}
+
+function editStampAsset(stampId) {
+  const stamp = activeStampAssets().find((item) => item.id === stampId);
+  if (!stamp) {
+    return;
+  }
+
+  els.stampAssetId.value = stamp.id;
+  els.stampAssetName.value = stamp.name;
+  els.stampAssetUnlockAt.value = String(stamp.unlockAt);
+  els.stampAssetImage.value = "";
+  els.stampAssetName.focus();
+}
+
+function clearStampAssetForm() {
+  els.stampAssetId.value = "";
+  els.stampAssetName.value = "";
+  els.stampAssetUnlockAt.value = "20";
+  els.stampAssetImage.value = "";
+}
+
+async function saveStampAsset() {
+  const name = els.stampAssetName.value.trim();
+  const unlockAt = Math.max(0, Math.floor(Number(els.stampAssetUnlockAt.value || 0)));
+  const stampId = els.stampAssetId.value;
+  const existing = activeStampAssets().find((stamp) => stamp.id === stampId);
+  const file = els.stampAssetImage.files?.[0];
+
+  if (!name) {
+    showToast("スタンプ名を入力してください");
+    return;
+  }
+  if (!Number.isFinite(unlockAt)) {
+    showToast("解放する数を入力してください");
+    return;
+  }
+  if (!existing && !file) {
+    showToast("新規スタンプは画像を選んでください");
+    return;
+  }
+
+  let src = existing?.src || "";
+  if (file) {
+    if (!file.type.startsWith("image/")) {
+      showToast("画像ファイルを選んでください");
+      return;
+    }
+    src = await readFileAsDataUrl(file);
+  }
+
+  const nextStamp = {
+    id: existing?.id || `custom-${crypto.randomUUID()}`,
+    name,
+    reading: name,
+    src,
+    unlockAt,
+    custom: existing?.custom || !existing,
+  };
+
+  state.stampAssets = normalizeStampAssets([
+    ...activeStampAssets().filter((stamp) => stamp.id !== nextStamp.id),
+    nextStamp,
+  ]);
+  if (!activeStampAssets().some((stamp) => stamp.id === state.selectedStampId)) {
+    state.selectedStampId = activeStampAssets()[0]?.id || "sonochoshi";
+  }
+  clearStampAssetForm();
+  persist();
+  render();
+  showToast(existing ? "スタンプ設定を更新しました" : "新しいスタンプを追加しました");
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", reject);
+    reader.readAsDataURL(file);
+  });
 }
 
 function showView(viewName) {
@@ -600,7 +813,8 @@ function openStampPreview({ source }) {
   }
 
   const stats = studentStats(student.id);
-  const availableStamps = stampAssets.filter((stamp) => stats.total >= stamp.unlockAt);
+  const stamps = activeStampAssets();
+  const availableStamps = stamps.filter((stamp) => stats.total >= stamp.unlockAt);
   if (!availableStamps.length) {
     showToast("使えるスタンプがありません");
     return;
@@ -612,7 +826,7 @@ function openStampPreview({ source }) {
     totalBefore: stats.total,
     memo: source === "teacher" ? els.stampMemo.value.trim() : "",
   };
-  stampPreviewCounts = Object.fromEntries(stampAssets.map((stamp) => [stamp.id, 0]));
+  stampPreviewCounts = Object.fromEntries(stamps.map((stamp) => [stamp.id, 0]));
   stampPreviewCounts[availableStamps[0].id] = 1;
   els.stampPreviewStudent.textContent = source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
   renderStampPreview();
@@ -630,7 +844,7 @@ function renderStampPreview() {
   const childMode = stampPreviewContext?.source === "child";
   const totalCount = stampPreviewTotalCount();
 
-  els.stampPreviewList.innerHTML = stampAssets
+  els.stampPreviewList.innerHTML = activeStampAssets()
     .map((stamp) => {
       const locked = stats.total < stamp.unlockAt;
       const count = Number(stampPreviewCounts[stamp.id] || 0);
@@ -761,7 +975,7 @@ function addStampBatch({ student, selections, source, memo }) {
 }
 
 function stampPreviewSelections() {
-  return stampAssets
+  return activeStampAssets()
     .map((stamp) => ({
       stamp,
       count: Number(stampPreviewCounts[stamp.id] || 0),
@@ -779,7 +993,7 @@ function dominantStampFromSelections(selections) {
       return current;
     }
     return best;
-  }, null)?.stamp || stampAssets[0];
+  }, null)?.stamp || activeStampAssets()[0];
 }
 
 function playDominantStampVoice(stamp) {
@@ -798,6 +1012,45 @@ function cancelStamp(eventId) {
   persist();
   render();
   showToast("スタンプを取り消しました");
+}
+
+function openExchangeConfirm(rewardId) {
+  const student = selectedStudent();
+  const reward = state.rewards.find((item) => item.id === rewardId);
+  if (!student || !reward || reward.type !== "shop" || reward.locked) {
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const costSheets = Number(reward.costSheets || 0);
+  if (stats.availableSheets < costSheets) {
+    showToast("使えるシートが足りません");
+    return;
+  }
+
+  exchangeConfirmRewardId = rewardId;
+  els.exchangeConfirmTitle.textContent = "こうかんする？";
+  els.exchangeConfirmMessage.textContent = `${student.name}の使えるシート${costSheets}枚を「${reward.name}」と交換します。`;
+  els.exchangeConfirmLayer.hidden = false;
+  els.exchangeConfirmLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.exchangeConfirmLayer.classList.add("is-showing");
+    els.exchangeConfirmButton.focus();
+  });
+}
+
+function closeExchangeConfirm() {
+  els.exchangeConfirmLayer.classList.remove("is-showing");
+  window.setTimeout(() => {
+    els.exchangeConfirmLayer.hidden = true;
+    exchangeConfirmRewardId = "";
+  }, 160);
+}
+
+function confirmExchange() {
+  const rewardId = exchangeConfirmRewardId;
+  closeExchangeConfirm();
+  redeemReward(rewardId);
 }
 
 function redeemReward(rewardId) {
@@ -825,6 +1078,19 @@ function redeemReward(rewardId) {
   persist();
   render();
   showToast(`${reward.name}と交換しました`);
+}
+
+function cancelRedemption(redemptionId) {
+  const redemption = state.redemptions.find((item) => item.id === redemptionId);
+  if (!redemption || redemption.canceled) {
+    return;
+  }
+
+  redemption.canceled = true;
+  redemption.canceledAt = new Date().toISOString();
+  persist();
+  render();
+  showToast("交換を取り消しました。シートを戻しました");
 }
 
 function editSelectedStudent() {
@@ -945,7 +1211,7 @@ function hideHounyanAnimation() {
 
 function animationContent(type, options) {
   if (type === "stamp-unlocked") {
-    const stamp = options.stamp || stampAssets[0];
+    const stamp = options.stamp || activeStampAssets()[0];
     return {
       pose: "stampUnlock",
       eyebrow: options.studentName ? `${options.studentName}の新スタンプ` : "新スタンプ",
@@ -985,7 +1251,7 @@ function outfitAsset(outfit, pose) {
 }
 
 function stampsUnlockedBetween(beforeTotal, afterTotal) {
-  return stampAssets.filter((stamp) => stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
+  return activeStampAssets().filter((stamp) => stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
 }
 
 function sheetsCompletedBetween(beforeTotal, afterTotal) {
@@ -1035,7 +1301,7 @@ function studentStats(studentId) {
   const total = activeEvents.length;
   const completedSheets = Math.floor(total / SHEET_SIZE);
   const spentSheets = state.redemptions
-    .filter((redemption) => redemption.studentId === studentId)
+    .filter((redemption) => redemption.studentId === studentId && !redemption.canceled)
     .reduce((sum, redemption) => sum + redemptionSheetCost(redemption), 0);
   const currentSheet = currentSheetInfo(activeEvents);
 
@@ -1103,7 +1369,7 @@ function mascotLevel(total) {
 }
 
 function stampById(stampId) {
-  return stampAssets.find((stamp) => stamp.id === stampId) || stampAssets[0];
+  return activeStampAssets().find((stamp) => stamp.id === stampId) || activeStampAssets()[0];
 }
 
 function eventsForToday() {
