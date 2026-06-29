@@ -1,6 +1,21 @@
 const STORAGE_KEY = "hounyan-stamp-ledger-v1";
 const BACKUP_STORAGE_KEY = `${STORAGE_KEY}-broken-backup`;
 const SHEET_SIZE = 20;
+const REMOVED_PURCHASABLE_STAMP_IDS = new Set([
+  "shop-hanamaru",
+  "shop-sugoi",
+  "shop-nice",
+  "shop-fight",
+  "shop-dekita",
+  "shop-challenge",
+  "shop-teinei",
+  "shop-hirameki",
+  "shop-shuchu",
+  "shop-yasashii",
+  "shop-special-rainbow",
+  "shop-special-legend",
+  "shop-special-gorgeous",
+]);
 
 const defaultStampAssets = [
   {
@@ -30,136 +45,6 @@ const defaultStampAssets = [
     reading: "がんばったね",
     src: "assets/stamp-ganbattane.png",
     unlockAt: 60,
-  },
-  {
-    id: "shop-hanamaru",
-    name: "はなまる",
-    reading: "はなまる",
-    src: "assets/shop-stamps/stamp-hanamaru.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-sugoi",
-    name: "すごい",
-    reading: "すごい",
-    src: "assets/shop-stamps/stamp-sugoi.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-nice",
-    name: "ナイス",
-    reading: "ないす",
-    src: "assets/shop-stamps/stamp-nice.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-fight",
-    name: "ファイト",
-    reading: "ふぁいと",
-    src: "assets/shop-stamps/stamp-fight.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-dekita",
-    name: "できた",
-    reading: "できた",
-    src: "assets/shop-stamps/stamp-dekita.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-challenge",
-    name: "チャレンジ",
-    reading: "ちゃれんじ",
-    src: "assets/shop-stamps/stamp-challenge.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-teinei",
-    name: "ていねい",
-    reading: "ていねい",
-    src: "assets/shop-stamps/stamp-teinei.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-hirameki",
-    name: "ひらめき",
-    reading: "ひらめき",
-    src: "assets/shop-stamps/stamp-hirameki.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-shuchu",
-    name: "しゅうちゅう",
-    reading: "しゅうちゅう",
-    src: "assets/shop-stamps/stamp-shuchu.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-yasashii",
-    name: "やさしい",
-    reading: "やさしい",
-    src: "assets/shop-stamps/stamp-yasashii.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 1,
-    rarity: "normal",
-  },
-  {
-    id: "shop-special-rainbow",
-    name: "スペシャル",
-    reading: "すぺしゃる",
-    src: "assets/shop-stamps/stamp-special-rainbow.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 3,
-    rarity: "special",
-  },
-  {
-    id: "shop-special-legend",
-    name: "レジェンド",
-    reading: "れじぇんど",
-    src: "assets/shop-stamps/stamp-special-legend.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 3,
-    rarity: "special",
-  },
-  {
-    id: "shop-special-gorgeous",
-    name: "ごうか",
-    reading: "ごうか",
-    src: "assets/shop-stamps/stamp-special-gorgeous.svg",
-    unlockAt: 0,
-    purchaseOnly: true,
-    shopPriceSheets: 3,
-    rarity: "special",
   },
 ];
 
@@ -435,7 +320,9 @@ function normalizeState(input) {
 
   merged.students = Array.isArray(input.students) ? input.students : [];
   merged.stampEvents = Array.isArray(input.stampEvents) ? input.stampEvents : [];
-  merged.redemptions = Array.isArray(input.redemptions) ? input.redemptions : [];
+  merged.redemptions = Array.isArray(input.redemptions)
+    ? input.redemptions.filter((redemption) => !REMOVED_PURCHASABLE_STAMP_IDS.has(redemption.stampId))
+    : [];
   merged.rewards = normalizeRewards(input.rewards);
   merged.stampAssets = normalizeStampAssets(input.stampAssets || input.stamps || input.stampSettings);
   merged.settings = {
@@ -490,6 +377,9 @@ function normalizeStampAssets(inputAssets) {
       if (!stamp || !stamp.id) {
         return;
       }
+      if (REMOVED_PURCHASABLE_STAMP_IDS.has(String(stamp.id))) {
+        return;
+      }
       const base = byId.get(stamp.id) || {};
       const name = String(stamp.name || base.name || "新しいスタンプ").trim();
       byId.set(stamp.id, {
@@ -522,7 +412,9 @@ function normalizeOwnedStampIdsByStudent(input) {
   return Object.fromEntries(
     Object.entries(input).map(([studentId, stampIds]) => [
       studentId,
-      Array.isArray(stampIds) ? [...new Set(stampIds.map(String))] : [],
+      Array.isArray(stampIds)
+        ? [...new Set(stampIds.map(String).filter((stampId) => !REMOVED_PURCHASABLE_STAMP_IDS.has(stampId)))]
+        : [],
     ]),
   );
 }
