@@ -14,21 +14,21 @@ const stampAssets = [
     name: "よくできました",
     reading: "よくできました",
     src: "assets/stamp-yokudekimashita.png",
-    unlockAt: 10,
+    unlockAt: 20,
   },
   {
     id: "sasuga",
     name: "さすが",
     reading: "さすが",
     src: "assets/stamp-sasuga.png",
-    unlockAt: 20,
+    unlockAt: 40,
   },
   {
     id: "ganbattane",
     name: "がんばったね",
     reading: "がんばったね",
     src: "assets/stamp-ganbattane.png",
-    unlockAt: 30,
+    unlockAt: 60,
   },
 ];
 
@@ -49,24 +49,24 @@ const defaultRewards = [
     id: "unlock-yokudekimashita",
     name: "よくできましたスタンプ",
     type: "unlock",
-    costStamps: 10,
-    description: "累計10個でピンクのスタンプが使えるようになります。",
+    costStamps: 20,
+    description: "累計20個でピンクのスタンプが使えるようになります。",
     enabled: true,
   },
   {
     id: "unlock-sasuga",
     name: "さすがスタンプ",
     type: "unlock",
-    costStamps: 20,
-    description: "累計20個で青いスタンプが使えるようになります。",
+    costStamps: 40,
+    description: "累計40個で青いスタンプが使えるようになります。",
     enabled: true,
   },
   {
     id: "unlock-ganbattane",
     name: "がんばったねスタンプ",
     type: "unlock",
-    costStamps: 30,
-    description: "累計30個で黄色のスタンプが使えるようになります。",
+    costStamps: 60,
+    description: "累計60個で黄色のスタンプが使えるようになります。",
     enabled: true,
   },
   {
@@ -104,6 +104,8 @@ const defaultState = {
 let state = loadState();
 let lastStampedEventId = "";
 let stampAnimationTimer = 0;
+let hounyanAnimationQueue = [];
+let hounyanAnimationActive = false;
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -153,6 +155,7 @@ const els = {
   stampAssetsList: document.querySelector("#stampAssetsList"),
   hounyanAnimationLayer: document.querySelector("#hounyanAnimationLayer"),
   animationHounyan: document.querySelector("#animationHounyan"),
+  animationFeatureImage: document.querySelector("#animationFeatureImage"),
   animationEyebrow: document.querySelector("#animationEyebrow"),
   animationTitle: document.querySelector("#animationTitle"),
   animationMessage: document.querySelector("#animationMessage"),
@@ -632,7 +635,9 @@ function addStamp({ source }) {
     createdAt: new Date().toISOString(),
     canceled: false,
   };
+  const nextTotal = stats.total + 1;
   const isSheetComplete = (stats.total + 1) % SHEET_SIZE === 0;
+  const unlockedStamps = stampsUnlockedBetween(stats.total, nextTotal);
   state.stampEvents.push(event);
   lastStampedEventId = event.id;
   if (source === "teacher") {
@@ -641,10 +646,16 @@ function addStamp({ source }) {
   persist();
   render();
   showToast(source === "child" ? "スタンプをおしたよ" : `${student.name}にスタンプを押しました`);
+  unlockedStamps.forEach((unlockedStamp) => {
+    showHounyanAnimation("stamp-unlocked", {
+      stamp: unlockedStamp,
+      studentName: student.name,
+    });
+  });
   if (isSheetComplete) {
     showHounyanAnimation("sheet-completed", {
       studentName: student.name,
-      sheetNumber: Math.floor((stats.total + 1) / SHEET_SIZE),
+      sheetNumber: Math.floor(nextTotal / SHEET_SIZE),
     });
   }
 
@@ -769,10 +780,30 @@ function importData(event) {
 }
 
 function showHounyanAnimation(type, options = {}) {
+  hounyanAnimationQueue.push({ type, options });
+  playNextHounyanAnimation();
+}
+
+function playNextHounyanAnimation() {
+  if (hounyanAnimationActive || !hounyanAnimationQueue.length) {
+    return;
+  }
+
+  hounyanAnimationActive = true;
+  const { type, options } = hounyanAnimationQueue.shift();
   const outfit = activeOutfit();
   const animation = animationContent(type, options);
   els.animationHounyan.src = outfitAsset(outfit, animation.pose);
   els.animationHounyan.alt = outfit.name;
+  if (animation.featureImage) {
+    els.animationFeatureImage.src = animation.featureImage.src;
+    els.animationFeatureImage.alt = animation.featureImage.alt;
+    els.animationFeatureImage.hidden = false;
+  } else {
+    els.animationFeatureImage.hidden = true;
+    els.animationFeatureImage.removeAttribute("src");
+    els.animationFeatureImage.alt = "";
+  }
   els.animationEyebrow.textContent = animation.eyebrow;
   els.animationTitle.textContent = animation.title;
   els.animationMessage.textContent = animation.message;
@@ -788,10 +819,26 @@ function hideHounyanAnimation() {
   els.hounyanAnimationLayer.classList.remove("is-showing");
   window.setTimeout(() => {
     els.hounyanAnimationLayer.hidden = true;
+    hounyanAnimationActive = false;
+    playNextHounyanAnimation();
   }, 180);
 }
 
 function animationContent(type, options) {
+  if (type === "stamp-unlocked") {
+    const stamp = options.stamp || stampAssets[0];
+    return {
+      pose: "stampUnlock",
+      eyebrow: options.studentName ? `${options.studentName}の新スタンプ` : "新スタンプ",
+      title: "スタンプ解放！",
+      message: `${stamp.name}がつかえるようになったよ。次のプリントでためしてみよう！`,
+      featureImage: {
+        src: stamp.src,
+        alt: `${stamp.name}スタンプ`,
+      },
+    };
+  }
+
   if (type === "sheet-completed") {
     return {
       pose: "sheetComplete",
@@ -816,6 +863,10 @@ function activeOutfit() {
 
 function outfitAsset(outfit, pose) {
   return outfit[pose] || outfit.happy || outfit.idle || hounyanOutfits.default.idle;
+}
+
+function stampsUnlockedBetween(beforeTotal, afterTotal) {
+  return stampAssets.filter((stamp) => stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
 }
 
 function selectedStudent() {
