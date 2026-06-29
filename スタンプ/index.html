@@ -112,24 +112,27 @@
         <section class="view shop-page" data-view="shop" aria-labelledby="shop-title">
           <div class="shop-grid">
             <section class="hero-panel shop-summary">
-              <div>
-                <p class="eyebrow">ごほうび</p>
-                <h2 id="shop-title"><ruby>お買い物<rt>おかいもの</rt></ruby></h2>
+              <div class="shop-hero-top">
+                <div>
+                  <p class="eyebrow">ごほうび</p>
+                  <h2 id="shop-title"><ruby>お買い物<rt>おかいもの</rt></ruby></h2>
+                </div>
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="shop-hounyan">
               </div>
               <label>
                 <ruby>児童<rt>じどう</rt></ruby>をえらぶ
                 <select id="shopStudentSelect" class="select"></select>
               </label>
-              <div class="score-row">
-                <div class="score-card">
-                  <span><ruby>児童<rt>じどう</rt></ruby></span>
-                  <strong id="shopSelectedName">未選択</strong>
-                </div>
-                <div class="score-card">
+              <div class="shop-wallet">
+                <div class="shop-wallet-main">
                   <span><ruby>使<rt>つか</rt></ruby>えるシート</span>
                   <strong id="shopAvailableSheets">0</strong>
                 </div>
-                <div class="score-card">
+                <div class="shop-wallet-sub">
+                  <span><ruby>児童<rt>じどう</rt></ruby></span>
+                  <strong id="shopSelectedName">未選択</strong>
+                </div>
+                <div class="shop-wallet-sub">
                   <span><ruby>完成<rt>かんせい</rt></ruby>シート</span>
                   <strong id="shopCompletedSheets">0</strong>
                 </div>
@@ -346,7 +349,7 @@
                   <button class="primary-button" type="submit">スタンプを保存</button>
                   <button class="soft-button" type="button" id="clearStampAssetForm">新規入力</button>
                 </div>
-                <p class="hint">追加した画像はこのブラウザ内に保存されます。別端末で使う時はJSONを書き出してください。</p>
+                <p class="hint">追加した画像は自動で小さくして、このブラウザ内に保存します。別端末で使う時はJSONを書き出してください。</p>
               </form>
               <div id="stampAssetsList" class="asset-list"></div>
             </section>

@@ -292,7 +292,7 @@ button:disabled {
 }
 
 .shop-grid {
-  grid-template-columns: minmax(300px, 0.8fr) minmax(420px, 1.2fr);
+  grid-template-columns: minmax(300px, 0.72fr) minmax(420px, 1.28fr);
   align-items: start;
 }
 
@@ -681,6 +681,7 @@ input:focus,
 }
 
 .shop-prize-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   margin-top: 0;
 }
 
@@ -752,6 +753,106 @@ input:focus,
 .shop-summary {
   display: grid;
   gap: 16px;
+}
+
+.shop-hero-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 12px;
+  align-items: center;
+}
+
+.shop-hounyan {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  justify-self: end;
+}
+
+.shop-wallet {
+  display: grid;
+  gap: 10px;
+}
+
+.shop-wallet-main,
+.shop-wallet-sub {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.shop-wallet-main {
+  padding: 18px;
+  display: grid;
+  gap: 6px;
+  background: linear-gradient(135deg, #ffffff, #e8f6ed);
+}
+
+.shop-wallet-main span,
+.shop-wallet-sub span,
+.shop-prize-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.shop-wallet-main strong {
+  color: var(--green-dark);
+  font-size: clamp(3rem, 12vw, 5.5rem);
+  line-height: 0.95;
+}
+
+.shop-wallet-sub {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.shop-wallet-sub strong {
+  font-size: 1.05rem;
+}
+
+.shop-prize-card {
+  min-height: 220px;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+}
+
+.shop-prize-head,
+.shop-prize-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.shop-prize-head strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 1.18rem;
+}
+
+.sheet-badge {
+  flex: 0 0 auto;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: #e8f6ed;
+  color: var(--green-dark);
+  font-size: 0.88rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.shop-prize-foot {
+  margin-top: auto;
+}
+
+.shop-prize-foot span {
+  color: var(--muted);
+  font-weight: 900;
 }
 
 .stamp-asset-form,
@@ -1212,6 +1313,21 @@ input:focus,
   .score-row,
   .stamp-picker {
     grid-template-columns: 1fr;
+  }
+
+  .shop-hero-top {
+    grid-template-columns: minmax(0, 1fr) 86px;
+  }
+
+  .shop-hounyan {
+    width: 86px;
+    height: 86px;
+  }
+
+  .shop-prize-head,
+  .shop-prize-foot {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .stamp-sheet {

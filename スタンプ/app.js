@@ -1,4 +1,5 @@
 const STORAGE_KEY = "hounyan-stamp-ledger-v1";
+const BACKUP_STORAGE_KEY = `${STORAGE_KEY}-broken-backup`;
 const SHEET_SIZE = 20;
 
 const defaultStampAssets = [
@@ -102,6 +103,7 @@ const defaultState = {
   selectedStampId: "sonochoshi",
 };
 
+let stateLoadFailed = false;
 let state = loadState();
 let lastStampedEventIds = new Set();
 let stampAnimationTimer = 0;
@@ -276,7 +278,17 @@ function loadState() {
     }
     const parsed = JSON.parse(raw);
     return normalizeState(parsed);
-  } catch {
+  } catch (error) {
+    console.error(error);
+    stateLoadFailed = true;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        localStorage.setItem(BACKUP_STORAGE_KEY, raw);
+      } catch (backupError) {
+        console.error(backupError);
+      }
+    }
     return structuredClone(defaultState);
   }
 }
@@ -368,7 +380,18 @@ function activeStampAssets() {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (stateLoadFailed) {
+    showToast("保存データの読み込みに失敗しました。上書きを止めています");
+    return false;
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (error) {
+    console.error(error);
+    showToast("保存容量がいっぱいです。画像を小さくしてもう一度試してください");
+    return false;
+  }
 }
 
 function render() {
@@ -625,6 +648,28 @@ function rewardCard(reward, stats, student) {
   const done = value >= cost;
   const percent = cost > 0 ? Math.min(100, Math.round((value / cost) * 100)) : 100;
   const unit = isUnlock ? "個" : "シート";
+  if (!isUnlock) {
+    const remaining = Math.max(0, cost - value);
+    return `
+      <article class="reward-card shop-prize-card${reward.locked ? " is-disabled" : ""}">
+        <div class="shop-prize-head">
+          <div>
+            <span class="shop-prize-label">景品</span>
+            <strong>${escapeHtml(reward.name)}</strong>
+          </div>
+          <span class="sheet-badge">${cost}シート</span>
+        </div>
+        <p>${escapeHtml(reward.description || "説明なし")}</p>
+        <div class="progress" aria-label="${percent}%">
+          <span style="width: ${percent}%"></span>
+        </div>
+        <div class="shop-prize-foot">
+          <span>${done ? "交換できます" : `あと${remaining}シート`}</span>
+          <button class="primary-button" type="button" data-redeem="${reward.id}" ${!student || !done || reward.locked ? "disabled" : ""}>${reward.locked ? "使用不可" : "交換する"}</button>
+        </div>
+      </article>
+    `;
+  }
   const button = isUnlock
     ? `<strong>${done ? "解放済み" : `あと${cost - value}${unit}`}</strong>`
     : `<button class="primary-button" type="button" data-redeem="${reward.id}" ${!student || !done || reward.locked ? "disabled" : ""}>${reward.locked ? "使用不可" : "交換"}</button>`;
@@ -782,7 +827,13 @@ async function saveStampAsset() {
       showToast("画像ファイルを選んでください");
       return;
     }
-    src = await readFileAsDataUrl(file);
+    try {
+      src = await imageFileToStampDataUrl(file);
+    } catch (error) {
+      console.error(error);
+      showToast("画像を読み込めませんでした");
+      return;
+    }
   }
 
   const nextStamp = {
@@ -794,25 +845,47 @@ async function saveStampAsset() {
     custom: existing?.custom || !existing,
   };
 
-  state.stampAssets = normalizeStampAssets([
+  const previousStampAssets = state.stampAssets;
+  const nextStampAssets = normalizeStampAssets([
     ...activeStampAssets().filter((stamp) => stamp.id !== nextStamp.id),
     nextStamp,
   ]);
+  state.stampAssets = nextStampAssets;
   if (!activeStampAssets().some((stamp) => stamp.id === state.selectedStampId)) {
     state.selectedStampId = activeStampAssets()[0]?.id || "sonochoshi";
   }
+  if (!persist()) {
+    state.stampAssets = previousStampAssets;
+    return;
+  }
   clearStampAssetForm();
-  persist();
   render();
   showToast(existing ? "スタンプ設定を更新しました" : "新しいスタンプを追加しました");
 }
 
-function readFileAsDataUrl(file) {
+function imageFileToStampDataUrl(file) {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result || "")));
-    reader.addEventListener("error", reject);
-    reader.readAsDataURL(file);
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.addEventListener("load", () => {
+      const maxSize = 360;
+      const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      context.clearRect(0, 0, width, height);
+      context.drawImage(image, 0, 0, width, height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL("image/webp", 0.82));
+    });
+    image.addEventListener("error", () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("image load failed"));
+    });
+    image.src = objectUrl;
   });
 }
 
@@ -1270,6 +1343,7 @@ function importData(event) {
     try {
       const imported = JSON.parse(String(reader.result));
       state = normalizeState(imported);
+      stateLoadFailed = false;
       ensureSelection();
       persist();
       render();
