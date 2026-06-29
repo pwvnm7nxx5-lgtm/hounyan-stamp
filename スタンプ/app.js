@@ -128,6 +128,7 @@ const els = {
   childAvailableSheets: document.querySelector("#childAvailableSheets"),
   childCurrentSheetCount: document.querySelector("#childCurrentSheetCount"),
   childRemainingText: document.querySelector("#childRemainingText"),
+  childNextUnlock: document.querySelector("#childNextUnlock"),
   childSheetTitle: document.querySelector("#childSheetTitle"),
   childSheetProgress: document.querySelector("#childSheetProgress"),
   childSheetGrid: document.querySelector("#childSheetGrid"),
@@ -501,6 +502,7 @@ function renderStudentDetails() {
   els.childAvailableSheets.textContent = stats.availableSheets;
   els.childCurrentSheetCount.textContent = `${stats.currentSheet.count}/${SHEET_SIZE}`;
   els.childRemainingText.textContent = `${stats.currentSheet.remaining}こ`;
+  renderChildNextUnlock(stats.total);
   renderSheet({
     grid: els.childSheetGrid,
     title: els.childSheetTitle,
@@ -522,6 +524,31 @@ function renderStudentDetails() {
     childMode: false,
   });
   renderHistory(student.id);
+}
+
+function renderChildNextUnlock(total) {
+  const nextStamp = nextUnlockStamp(total);
+  if (!nextStamp) {
+    els.childNextUnlock.innerHTML = `
+      <span>つぎのもくひょう</span>
+      <strong>ぜんぶかいほうずみ！</strong>
+    `;
+    els.childNextUnlock.classList.add("is-complete");
+    return;
+  }
+
+  const remaining = Math.max(0, nextStamp.unlockAt - total);
+  els.childNextUnlock.innerHTML = `
+    <span>つぎのもくひょう</span>
+    <strong>あと${remaining}こで${escapeHtml(nextStamp.name)}かいほう！</strong>
+  `;
+  els.childNextUnlock.classList.remove("is-complete");
+}
+
+function nextUnlockStamp(total) {
+  return activeStampAssets()
+    .filter((stamp) => stamp.unlockAt > total)
+    .sort((a, b) => a.unlockAt - b.unlockAt || a.name.localeCompare(b.name, "ja"))[0] || null;
 }
 
 function renderSheet({ grid, title, progress, stats, childMode }) {

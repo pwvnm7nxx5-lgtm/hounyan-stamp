@@ -488,6 +488,34 @@ button:disabled {
   min-height: 92px;
 }
 
+.next-unlock-banner {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 2px solid rgba(66, 180, 51, 0.28);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #ffffff, #e8f6ed);
+  box-shadow: 0 12px 24px rgba(66, 180, 51, 0.12);
+}
+
+.next-unlock-banner span {
+  color: var(--green-dark);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.next-unlock-banner strong {
+  color: var(--text);
+  font-size: clamp(1.28rem, 4vw, 2rem);
+  line-height: 1.25;
+}
+
+.next-unlock-banner.is-complete {
+  border-color: rgba(246, 192, 52, 0.52);
+  background: linear-gradient(135deg, #ffffff, #fff7d7);
+}
+
 .sheet-head {
   display: flex;
   align-items: end;
