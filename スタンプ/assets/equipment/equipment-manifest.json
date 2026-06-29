@@ -1,0 +1,37 @@
+[
+  {
+    "id": "train",
+    "name": "でんしゃそうび",
+    "slot": "equipment",
+    "src": "assets/equipment/equipment-train.svg",
+    "notes": "Body equipment only. Pair with a separate conductor cap later."
+  },
+  {
+    "id": "hero-cape",
+    "name": "ヒーローマント",
+    "slot": "equipment",
+    "src": "assets/equipment/equipment-hero-cape.svg",
+    "notes": "Body equipment only. Based on the red cape direction from the reference."
+  },
+  {
+    "id": "raincoat",
+    "name": "レインコート",
+    "slot": "equipment",
+    "src": "assets/equipment/equipment-raincoat.svg",
+    "notes": "Body equipment only. Hood should be a separate headwear layer later."
+  },
+  {
+    "id": "apron",
+    "name": "おてつだいエプロン",
+    "slot": "equipment",
+    "src": "assets/equipment/equipment-apron.svg",
+    "notes": "Body equipment only."
+  },
+  {
+    "id": "space-suit",
+    "name": "うちゅうそうび",
+    "slot": "equipment",
+    "src": "assets/equipment/equipment-space-suit.svg",
+    "notes": "Body equipment only. Helmet should be a separate headwear layer later."
+  }
+]
