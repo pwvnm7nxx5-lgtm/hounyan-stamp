@@ -353,8 +353,19 @@
                   <input id="stampAssetName" type="text" placeholder="例: すばらしい" required>
                 </label>
                 <label>
+                  解放方法
+                  <select id="stampAssetUnlockMode" class="select">
+                    <option value="count">累計スタンプ数で解放</option>
+                    <option value="purchase">シートで購入</option>
+                  </select>
+                </label>
+                <label>
                   解放する累計スタンプ数
                   <input id="stampAssetUnlockAt" type="number" min="0" step="1" value="20" required>
+                </label>
+                <label>
+                  購入に必要なシート数
+                  <input id="stampAssetShopPriceSheets" type="number" min="1" step="1" value="1" required>
                 </label>
                 <label class="file-button stamp-file-button">
                   画像を選ぶ

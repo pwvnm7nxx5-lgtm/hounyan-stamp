@@ -193,7 +193,9 @@ const els = {
   stampAssetForm: document.querySelector("#stampAssetForm"),
   stampAssetId: document.querySelector("#stampAssetId"),
   stampAssetName: document.querySelector("#stampAssetName"),
+  stampAssetUnlockMode: document.querySelector("#stampAssetUnlockMode"),
   stampAssetUnlockAt: document.querySelector("#stampAssetUnlockAt"),
+  stampAssetShopPriceSheets: document.querySelector("#stampAssetShopPriceSheets"),
   stampAssetImage: document.querySelector("#stampAssetImage"),
   clearStampAssetForm: document.querySelector("#clearStampAssetForm"),
   stampAssetsList: document.querySelector("#stampAssetsList"),
@@ -230,6 +232,7 @@ init();
 
 function init() {
   bindEvents();
+  updateStampAssetModeFields();
   ensureSelection();
   render();
 }
@@ -247,6 +250,7 @@ function bindEvents() {
     event.preventDefault();
     saveStampAsset();
   });
+  els.stampAssetUnlockMode.addEventListener("change", updateStampAssetModeFields);
   els.clearStampAssetForm.addEventListener("click", clearStampAssetForm);
   els.prizeForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -255,7 +259,7 @@ function bindEvents() {
   els.clearPrizeForm.addEventListener("click", clearPrizeForm);
 
   els.childAddStampButton.addEventListener("click", () => openStampCountChoice({ source: "child" }));
-  els.addStampButton.addEventListener("click", () => openStampCountChoice({ source: "teacher" }));
+  els.addStampButton.addEventListener("click", openTeacherStampPreview);
   els.stampCountMinus.addEventListener("click", () => updateStampCountTarget(-1));
   els.stampCountPlus.addEventListener("click", () => updateStampCountTarget(1));
   els.stampCountCancelButton.addEventListener("click", closeStampCountChoice);
@@ -899,16 +903,28 @@ function editStampAsset(stampId) {
 
   els.stampAssetId.value = stamp.id;
   els.stampAssetName.value = stamp.name;
+  els.stampAssetUnlockMode.value = stamp.purchaseOnly ? "purchase" : "count";
   els.stampAssetUnlockAt.value = String(stamp.unlockAt);
+  els.stampAssetShopPriceSheets.value = String(stampPriceSheets(stamp));
   els.stampAssetImage.value = "";
+  updateStampAssetModeFields();
   els.stampAssetName.focus();
 }
 
 function clearStampAssetForm() {
   els.stampAssetId.value = "";
   els.stampAssetName.value = "";
+  els.stampAssetUnlockMode.value = "count";
   els.stampAssetUnlockAt.value = "20";
+  els.stampAssetShopPriceSheets.value = "1";
   els.stampAssetImage.value = "";
+  updateStampAssetModeFields();
+}
+
+function updateStampAssetModeFields() {
+  const purchaseOnly = els.stampAssetUnlockMode.value === "purchase";
+  els.stampAssetUnlockAt.disabled = purchaseOnly;
+  els.stampAssetShopPriceSheets.disabled = !purchaseOnly;
 }
 
 function ownedStampIdsForStudent(studentId) {
@@ -944,7 +960,9 @@ function stampPriceSheets(stamp) {
 
 async function saveStampAsset() {
   const name = els.stampAssetName.value.trim();
-  const unlockAt = Math.max(0, Math.floor(Number(els.stampAssetUnlockAt.value || 0)));
+  const purchaseOnly = els.stampAssetUnlockMode.value === "purchase";
+  const unlockAt = purchaseOnly ? 0 : Math.max(0, Math.floor(Number(els.stampAssetUnlockAt.value || 0)));
+  const shopPriceSheets = Math.max(1, Math.floor(Number(els.stampAssetShopPriceSheets.value || 1)));
   const stampId = els.stampAssetId.value;
   const existing = activeStampAssets().find((stamp) => stamp.id === stampId);
   const file = els.stampAssetImage.files?.[0];
@@ -953,8 +971,12 @@ async function saveStampAsset() {
     showToast("スタンプ名を入力してください");
     return;
   }
-  if (!Number.isFinite(unlockAt)) {
+  if (!purchaseOnly && !Number.isFinite(unlockAt)) {
     showToast("解放する数を入力してください");
+    return;
+  }
+  if (purchaseOnly && (!Number.isFinite(shopPriceSheets) || shopPriceSheets < 1)) {
+    showToast("購入に必要なシート数を入力してください");
     return;
   }
   if (!existing && !file) {
@@ -984,8 +1006,8 @@ async function saveStampAsset() {
     src,
     unlockAt,
     custom: existing?.custom || !existing,
-    purchaseOnly: existing?.purchaseOnly || false,
-    shopPriceSheets: existing?.shopPriceSheets || 1,
+    purchaseOnly,
+    shopPriceSheets,
     rarity: existing?.rarity || "normal",
   };
 
@@ -1170,6 +1192,21 @@ function clearStudentForm() {
   els.studentId.value = "";
   els.studentName.value = "";
   els.studentNote.value = "";
+}
+
+function openTeacherStampPreview() {
+  const student = selectedStudent();
+  if (!student) {
+    showToast("先に児童を登録してください");
+    return;
+  }
+
+  openStampPreview({
+    source: "teacher",
+    studentId: student.id,
+    memo: els.stampMemo.value.trim(),
+    plannedCount: 0,
+  });
 }
 
 function openStampCountChoice({ source }) {
