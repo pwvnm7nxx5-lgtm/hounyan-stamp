@@ -1,6 +1,7 @@
 const STORAGE_KEY = "hounyan-stamp-ledger-v1";
 const BACKUP_STORAGE_KEY = `${STORAGE_KEY}-broken-backup`;
 const SHEET_SIZE = 20;
+const STAMP_BATCH_MAX = SHEET_SIZE;
 const REMOVED_PURCHASABLE_STAMP_IDS = new Set([
   "shop-hanamaru",
   "shop-sugoi",
@@ -125,6 +126,8 @@ let lastStampedEventIds = new Set();
 let stampAnimationTimer = 0;
 let hounyanAnimationQueue = [];
 let hounyanAnimationActive = false;
+let stampCountContext = null;
+let stampCountTarget = 0;
 let stampPreviewContext = null;
 let stampPreviewCounts = {};
 let exchangeConfirmRewardId = "";
@@ -194,6 +197,14 @@ const els = {
   stampAssetImage: document.querySelector("#stampAssetImage"),
   clearStampAssetForm: document.querySelector("#clearStampAssetForm"),
   stampAssetsList: document.querySelector("#stampAssetsList"),
+  stampCountLayer: document.querySelector("#stampCountLayer"),
+  stampCountStudent: document.querySelector("#stampCountStudent"),
+  stampCountMinus: document.querySelector("#stampCountMinus"),
+  stampCountValue: document.querySelector("#stampCountValue"),
+  stampCountPlus: document.querySelector("#stampCountPlus"),
+  stampCountHint: document.querySelector("#stampCountHint"),
+  stampCountCancelButton: document.querySelector("#stampCountCancelButton"),
+  stampCountNextButton: document.querySelector("#stampCountNextButton"),
   stampPreviewLayer: document.querySelector("#stampPreviewLayer"),
   stampPreviewStudent: document.querySelector("#stampPreviewStudent"),
   stampPreviewList: document.querySelector("#stampPreviewList"),
@@ -243,8 +254,17 @@ function bindEvents() {
   });
   els.clearPrizeForm.addEventListener("click", clearPrizeForm);
 
-  els.childAddStampButton.addEventListener("click", () => openStampPreview({ source: "child" }));
-  els.addStampButton.addEventListener("click", () => openStampPreview({ source: "teacher" }));
+  els.childAddStampButton.addEventListener("click", () => openStampCountChoice({ source: "child" }));
+  els.addStampButton.addEventListener("click", () => openStampCountChoice({ source: "teacher" }));
+  els.stampCountMinus.addEventListener("click", () => updateStampCountTarget(-1));
+  els.stampCountPlus.addEventListener("click", () => updateStampCountTarget(1));
+  els.stampCountCancelButton.addEventListener("click", closeStampCountChoice);
+  els.stampCountNextButton.addEventListener("click", continueToStampPreview);
+  els.stampCountLayer.addEventListener("click", (event) => {
+    if (event.target === els.stampCountLayer) {
+      closeStampCountChoice();
+    }
+  });
   els.stampPreviewCancelButton.addEventListener("click", closeStampPreview);
   els.stampPreviewConfirmButton.addEventListener("click", confirmStampPreview);
   els.stampPreviewLayer.addEventListener("click", (event) => {
@@ -275,6 +295,10 @@ function bindEvents() {
     }
   });
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.stampCountLayer.hidden) {
+      closeStampCountChoice();
+      return;
+    }
     if (event.key === "Escape" && !els.stampPreviewLayer.hidden) {
       closeStampPreview();
       return;
@@ -1148,7 +1172,7 @@ function clearStudentForm() {
   els.studentNote.value = "";
 }
 
-function openStampPreview({ source }) {
+function openStampCountChoice({ source }) {
   const student = selectedStudent();
   if (!student) {
     showToast(source === "child" ? "先生に名前を登録してもらってね" : "先に児童を登録してください");
@@ -1163,14 +1187,90 @@ function openStampPreview({ source }) {
     return;
   }
 
-  stampPreviewContext = {
+  stampCountContext = {
     source,
     studentId: student.id,
     totalBefore: stats.total,
     memo: source === "teacher" ? els.stampMemo.value.trim() : "",
   };
+  stampCountTarget = 0;
+  els.stampCountStudent.textContent = source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
+  renderStampCountChoice();
+  els.stampCountLayer.hidden = false;
+  els.stampCountLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.stampCountLayer.classList.add("is-showing");
+    els.stampCountPlus.focus();
+  });
+}
+
+function renderStampCountChoice() {
+  const childMode = stampCountContext?.source === "child";
+  const unit = childMode ? "こ" : "個";
+  els.stampCountValue.textContent = `${stampCountTarget}${unit}`;
+  els.stampCountHint.textContent = stampCountTarget > 0
+    ? `このあと、${stampCountTarget}${unit}ぶんのスタンプを選びます。`
+    : "先に、全部で押す数を決めます。";
+  els.stampCountMinus.disabled = stampCountTarget <= 0;
+  els.stampCountPlus.disabled = stampCountTarget >= STAMP_BATCH_MAX;
+  els.stampCountNextButton.disabled = stampCountTarget <= 0;
+}
+
+function updateStampCountTarget(delta) {
+  stampCountTarget = Math.min(STAMP_BATCH_MAX, Math.max(0, stampCountTarget + delta));
+  renderStampCountChoice();
+}
+
+function closeStampCountChoice() {
+  els.stampCountLayer.classList.remove("is-showing");
+  window.setTimeout(() => {
+    els.stampCountLayer.hidden = true;
+    stampCountContext = null;
+    stampCountTarget = 0;
+  }, 160);
+}
+
+function continueToStampPreview() {
+  if (!stampCountContext) {
+    return;
+  }
+  if (stampCountTarget <= 0) {
+    showToast("押すスタンプの数を決めてください");
+    return;
+  }
+
+  const context = {
+    ...stampCountContext,
+    plannedCount: stampCountTarget,
+  };
+  els.stampCountLayer.classList.remove("is-showing");
+  els.stampCountLayer.hidden = true;
+  stampCountContext = null;
+  stampCountTarget = 0;
+  openStampPreview(context);
+}
+
+function openStampPreview(context) {
+  const student = selectedStudent();
+  if (!student || student.id !== context.studentId) {
+    showToast("児童をもう一度選んでください");
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const stamps = activeStampAssets();
+  const availableStamps = stamps.filter((stamp) => stampIsAvailableForStudent(stamp, student, stats.total));
+  if (!availableStamps.length) {
+    showToast("使えるスタンプがありません");
+    return;
+  }
+
+  stampPreviewContext = {
+    ...context,
+    totalBefore: stats.total,
+  };
   stampPreviewCounts = Object.fromEntries(stamps.map((stamp) => [stamp.id, 0]));
-  els.stampPreviewStudent.textContent = source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
+  els.stampPreviewStudent.textContent = context.source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
   renderStampPreview();
   els.stampPreviewLayer.hidden = false;
   els.stampPreviewLayer.classList.remove("is-showing");
@@ -1185,11 +1285,14 @@ function renderStampPreview() {
   const stats = student ? studentStats(student.id) : emptyStats();
   const childMode = stampPreviewContext?.source === "child";
   const totalCount = stampPreviewTotalCount();
+  const plannedCount = Number(stampPreviewContext?.plannedCount || 0);
+  const unit = childMode ? "こ" : "個";
 
   els.stampPreviewList.innerHTML = activeStampAssets()
     .map((stamp) => {
       const locked = !stampIsAvailableForStudent(stamp, student, stats.total);
       const count = Number(stampPreviewCounts[stamp.id] || 0);
+      const plusDisabled = locked || (plannedCount > 0 && totalCount >= plannedCount);
       const label = locked
         ? stamp.purchaseOnly
           ? childMode
@@ -1207,19 +1310,24 @@ function renderStampPreview() {
           <div class="preview-stepper" aria-label="${escapeHtml(stamp.name)}の数">
             <button type="button" data-preview-count="${stamp.id}" data-delta="-1" ${locked || count === 0 ? "disabled" : ""}>-</button>
             <output>${count}</output>
-            <button type="button" data-preview-count="${stamp.id}" data-delta="1" ${locked ? "disabled" : ""}>+</button>
+            <button type="button" data-preview-count="${stamp.id}" data-delta="1" ${plusDisabled ? "disabled" : ""}>+</button>
           </div>
         </article>
       `;
     })
     .join("");
 
-  els.stampPreviewTotal.textContent = `合計 ${totalCount}${childMode ? "こ" : "個"}`;
-  els.stampPreviewConfirmButton.disabled = totalCount === 0;
+  els.stampPreviewTotal.textContent = plannedCount > 0
+    ? `合計 ${totalCount}/${plannedCount}${unit}`
+    : `合計 ${totalCount}${unit}`;
+  els.stampPreviewConfirmButton.disabled = plannedCount > 0 ? totalCount !== plannedCount : totalCount === 0;
   els.stampPreviewList.querySelectorAll("[data-preview-count]").forEach((button) => {
     button.addEventListener("click", () => {
       const stampId = button.dataset.previewCount;
       const delta = Number(button.dataset.delta || 0);
+      if (delta > 0 && plannedCount > 0 && stampPreviewTotalCount() >= plannedCount) {
+        return;
+      }
       stampPreviewCounts[stampId] = Math.max(0, Number(stampPreviewCounts[stampId] || 0) + delta);
       renderStampPreview();
     });
@@ -1250,6 +1358,13 @@ function confirmStampPreview() {
   const selections = stampPreviewSelections();
   if (!selections.length) {
     showToast("押すスタンプを選んでください");
+    return;
+  }
+  const plannedCount = Number(stampPreviewContext.plannedCount || 0);
+  const totalCount = stampPreviewTotalCount();
+  if (plannedCount > 0 && totalCount !== plannedCount) {
+    showToast(`決めた数と同じ ${plannedCount} 個にしてください`);
+    renderStampPreview();
     return;
   }
 

@@ -373,6 +373,27 @@
       </main>
     </div>
 
+    <div class="preview-layer" id="stampCountLayer" hidden>
+      <div class="preview-card" role="dialog" aria-modal="true" aria-labelledby="stampCountTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="stampCountStudent">スタンプ</p>
+            <h2 id="stampCountTitle">いくつおす？</h2>
+          </div>
+        </div>
+        <div class="count-picker" aria-label="押すスタンプの合計数">
+          <button type="button" id="stampCountMinus" aria-label="スタンプを減らす">-</button>
+          <output id="stampCountValue" aria-live="polite">0こ</output>
+          <button type="button" id="stampCountPlus" aria-label="スタンプを増やす">+</button>
+        </div>
+        <p class="count-hint" id="stampCountHint">先に、全部で押す数を決めます。</p>
+        <div class="preview-actions">
+          <button class="soft-button" type="button" id="stampCountCancelButton">戻る</button>
+          <button class="primary-button" type="button" id="stampCountNextButton">つぎへ</button>
+        </div>
+      </div>
+    </div>
+
     <div class="preview-layer" id="stampPreviewLayer" hidden>
       <div class="preview-card" role="dialog" aria-modal="true" aria-labelledby="stampPreviewTitle">
         <div class="section-head compact">

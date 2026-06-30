@@ -1105,6 +1105,45 @@ input:focus,
   gap: 12px;
 }
 
+.count-picker {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+
+.count-picker button {
+  width: 58px;
+  height: 58px;
+  border: 0;
+  border-radius: var(--radius);
+  background: #e8f6ed;
+  color: var(--green-deep);
+  font-size: 1.55rem;
+  font-weight: 900;
+}
+
+.count-picker output {
+  display: grid;
+  min-height: 74px;
+  place-items: center;
+  border: 2px solid rgba(48, 165, 73, 0.28);
+  border-radius: var(--radius);
+  background: #f7fff9;
+  color: var(--green-deep);
+  font-size: 2rem;
+  font-weight: 900;
+}
+
+.count-hint {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .preview-list {
   display: grid;
   gap: 10px;
