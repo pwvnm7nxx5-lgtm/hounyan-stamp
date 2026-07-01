@@ -215,9 +215,9 @@ const defaultLevelRules = [
   { level: 5, requiredSheets: 4, name: "ブロンズ王冠", image: "assets/hounyan-levels/hounyan-lv05-bronze-crown.png" },
   { level: 6, requiredSheets: 5, name: "ブロンズ王冠＋小さな星", image: "assets/hounyan-levels/hounyan-lv06-bronze-star-crown.png" },
   { level: 7, requiredSheets: 6, name: "ブロンズ王冠＋宝石1つ", image: "assets/hounyan-levels/hounyan-lv07-bronze-jewel-crown.png" },
-  { level: 8, requiredSheets: 7, name: "シルバー王冠", image: "assets/hounyan-home.png" },
-  { level: 9, requiredSheets: 8, name: "シルバー王冠＋星", image: "assets/hounyan-home.png" },
-  { level: 10, requiredSheets: 9, name: "シルバー王冠＋宝石", image: "assets/hounyan-home.png" },
+  { level: 8, requiredSheets: 7, name: "シルバー王冠", image: "assets/hounyan-levels/hounyan-lv08-silver-crown.png" },
+  { level: 9, requiredSheets: 8, name: "シルバー王冠＋星", image: "assets/hounyan-levels/hounyan-lv09-silver-star-crown.png" },
+  { level: 10, requiredSheets: 9, name: "シルバー王冠＋宝石", image: "assets/hounyan-levels/hounyan-lv10-silver-jewel-crown.png" },
   { level: 11, requiredSheets: 11, name: "ゴールド王冠", image: "assets/hounyan-home.png" },
   { level: 12, requiredSheets: 13, name: "ゴールド王冠＋星2つ", image: "assets/hounyan-home.png" },
   { level: 13, requiredSheets: 15, name: "ゴールド王冠＋宝石2つ", image: "assets/hounyan-home.png" },
@@ -932,7 +932,7 @@ function renderHounyanLevel(student, stats) {
   }
   if (els.childLevelRequirement) {
     els.childLevelRequirement.textContent = level.nextRule
-      ? `あと${level.remainingStamps}こで「${level.nextRule.name}」`
+      ? `あと${level.remainingStamps}こでレベルアップ！`
       : "いまのせっていではさいだいレベルです";
   }
   if (els.childLevelProgressBar) {
@@ -944,9 +944,11 @@ function renderHounyanLevel(student, stats) {
       : "さいだいレベル";
   }
   if (els.childNextLevelPreview) {
-    const previewRule = level.nextRule || currentRule;
-    els.childNextLevelPreview.src = previewRule.image || image;
-    els.childNextLevelPreview.alt = `${previewRule.name}のプレビュー`;
+    els.childNextLevelPreview.textContent = level.nextRule ? "?" : "★";
+    els.childNextLevelPreview.setAttribute(
+      "aria-label",
+      level.nextRule ? "つぎのかぶりものはひみつ" : "さいだいレベル"
+    );
   }
 }
 
