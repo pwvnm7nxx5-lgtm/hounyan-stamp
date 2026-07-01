@@ -18,6 +18,7 @@
           <button class="page-tab" type="button" data-view-button="shop">おかいもの</button>
           <button class="page-tab" type="button" data-view-button="timer">タイマー</button>
           <button class="page-tab" type="button" data-view-button="teacher">先生</button>
+          <button class="page-tab" type="button" data-view-button="settings">設定</button>
         </div>
       </header>
 
@@ -34,7 +35,7 @@
           <div class="child-grid">
             <section class="hero-panel child-hero">
               <div class="hounyan-stage">
-                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image" id="childHounyanImage">
               </div>
               <div class="hero-stats">
                 <div>
@@ -123,7 +124,7 @@
                   <p class="eyebrow">ごほうび</p>
                   <h2 id="shop-title"><ruby>お買い物<rt>おかいもの</rt></ruby></h2>
                 </div>
-                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="shop-hounyan">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="shop-hounyan" id="shopHounyanImage">
               </div>
               <label>
                 <ruby>児童<rt>じどう</rt></ruby>をえらぶ
@@ -276,6 +277,15 @@
                 </div>
               </div>
 
+              <div class="level-current-card">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" id="teacherLevelImage">
+                <div>
+                  <p class="eyebrow">ほうにゃんレベル</p>
+                  <strong id="teacherLevelName">Lv.1 いつものほうにゃん</strong>
+                  <span id="teacherLevelRequirement">次の条件を確認します</span>
+                </div>
+              </div>
+
               <div class="sheet-head">
                 <h3 id="teacherSheetTitle">シート 1</h3>
                 <p id="teacherSheetProgress">あと20個でシートが埋まります</p>
@@ -291,6 +301,10 @@
                     </div>
                   </div>
                   <button class="primary-button wide stamp-press-button" type="button" id="addStampButton">スタンプを押す</button>
+                  <label class="field">
+                    <span>一気に押す数</span>
+                    <input id="teacherStampBatchCount" type="number" min="1" max="20" step="1" value="1">
+                  </label>
                   <label class="field">
                     <span>メモ</span>
                     <input id="stampMemo" type="text" placeholder="例: 国語プリント、計算プリント">
@@ -433,6 +447,43 @@
                 <p class="hint">追加した画像は自動で小さくして、このブラウザ内に保存します。別端末で使う時はJSONを書き出してください。</p>
               </form>
               <div id="stampAssetsList" class="asset-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view settings-page" data-view="settings" aria-labelledby="settings-title">
+          <div class="settings-grid">
+            <section class="work-panel level-settings-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">先生用設定</p>
+                  <h2 id="settings-title">ほうにゃんレベル設定</h2>
+                </div>
+                <button class="soft-button compact-button" type="button" id="resetLevelRulesButton">既定に戻す</button>
+              </div>
+
+              <form id="levelRuleForm" class="form-grid level-rule-form">
+                <label>
+                  レベル
+                  <select id="levelRuleLevel" class="select"></select>
+                </label>
+                <label>
+                  かぶりもの名
+                  <input id="levelRuleName" type="text" required>
+                </label>
+                <label>
+                  必要な完成シート数
+                  <input id="levelRuleRequiredSheets" type="number" min="0" step="1" value="0" required>
+                </label>
+                <label>
+                  画像パス
+                  <input id="levelRuleImage" type="text" placeholder="assets/hounyan-levels/hounyan-lv02-paper-crown.png">
+                </label>
+                <button class="primary-button wide" type="submit">レベル条件を保存</button>
+                <p class="hint">Lv.1は0シート固定です。画像を追加したら、ここに画像パスを入れると表示を差し替えられます。</p>
+              </form>
+
+              <div id="levelRulesList" class="level-rule-list"></div>
             </section>
           </div>
         </section>

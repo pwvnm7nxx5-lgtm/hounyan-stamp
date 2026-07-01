@@ -133,6 +133,29 @@ const hounyanOutfits = {
   },
 };
 
+const defaultLevelRules = [
+  { level: 1, requiredSheets: 0, name: "いつものほうにゃん", image: "assets/hounyan-home.png" },
+  { level: 2, requiredSheets: 1, name: "小さな紙の王冠", image: "assets/hounyan-levels/hounyan-lv02-paper-crown.png" },
+  { level: 3, requiredSheets: 2, name: "色つき紙王冠", image: "assets/hounyan-levels/hounyan-lv03-colored-paper-crown.png" },
+  { level: 4, requiredSheets: 3, name: "星つき紙王冠", image: "assets/hounyan-levels/hounyan-lv04-star-paper-crown.png" },
+  { level: 5, requiredSheets: 4, name: "ブロンズ王冠", image: "assets/hounyan-home.png" },
+  { level: 6, requiredSheets: 5, name: "ブロンズ王冠＋小さな星", image: "assets/hounyan-home.png" },
+  { level: 7, requiredSheets: 6, name: "ブロンズ王冠＋宝石1つ", image: "assets/hounyan-home.png" },
+  { level: 8, requiredSheets: 7, name: "シルバー王冠", image: "assets/hounyan-home.png" },
+  { level: 9, requiredSheets: 8, name: "シルバー王冠＋星", image: "assets/hounyan-home.png" },
+  { level: 10, requiredSheets: 9, name: "シルバー王冠＋宝石", image: "assets/hounyan-home.png" },
+  { level: 11, requiredSheets: 11, name: "ゴールド王冠", image: "assets/hounyan-home.png" },
+  { level: 12, requiredSheets: 13, name: "ゴールド王冠＋星2つ", image: "assets/hounyan-home.png" },
+  { level: 13, requiredSheets: 15, name: "ゴールド王冠＋宝石2つ", image: "assets/hounyan-home.png" },
+  { level: 14, requiredSheets: 17, name: "ゴールド王冠＋羽飾り", image: "assets/hounyan-home.png" },
+  { level: 15, requiredSheets: 19, name: "大きめゴールド王冠", image: "assets/hounyan-home.png" },
+  { level: 16, requiredSheets: 22, name: "レインボー宝石王冠", image: "assets/hounyan-home.png" },
+  { level: 17, requiredSheets: 25, name: "レインボー王冠＋羽", image: "assets/hounyan-home.png" },
+  { level: 18, requiredSheets: 28, name: "星のクラウン", image: "assets/hounyan-home.png" },
+  { level: 19, requiredSheets: 30, name: "星のクラウン＋大宝石", image: "assets/hounyan-home.png" },
+  { level: 20, requiredSheets: 32, name: "ほうにゃんマスタークラウン", image: "assets/hounyan-home.png" },
+];
+
 const defaultRewards = [
   {
     id: "unlock-yokudekimashita",
@@ -185,6 +208,7 @@ const defaultState = {
   redemptions: [],
   settings: {
     activeOutfit: "default",
+    levelRules: defaultLevelRules,
   },
   ownedOutfits: ["default"],
   ownedStampIdsByStudent: {},
@@ -219,6 +243,7 @@ const els = {
   timerPage: document.querySelector('[data-view="timer"]'),
   currentStudentLabel: document.querySelector("#currentStudentLabel"),
   studentSwitchList: document.querySelector("#studentSwitchList"),
+  childHounyanImage: document.querySelector("#childHounyanImage"),
   totalStudents: document.querySelector("#totalStudents"),
   todayStamps: document.querySelector("#todayStamps"),
   allStamps: document.querySelector("#allStamps"),
@@ -241,7 +266,11 @@ const els = {
   selectedAvailable: document.querySelector("#selectedAvailable"),
   selectedLevel: document.querySelector("#selectedLevel"),
   nextLevelText: document.querySelector("#nextLevelText"),
+  teacherLevelImage: document.querySelector("#teacherLevelImage"),
+  teacherLevelName: document.querySelector("#teacherLevelName"),
+  teacherLevelRequirement: document.querySelector("#teacherLevelRequirement"),
   shopStudentSelect: document.querySelector("#shopStudentSelect"),
+  shopHounyanImage: document.querySelector("#shopHounyanImage"),
   shopSelectedName: document.querySelector("#shopSelectedName"),
   shopAvailableSheets: document.querySelector("#shopAvailableSheets"),
   shopCompletedSheets: document.querySelector("#shopCompletedSheets"),
@@ -249,6 +278,7 @@ const els = {
   teacherSheetProgress: document.querySelector("#teacherSheetProgress"),
   teacherSheetGrid: document.querySelector("#teacherSheetGrid"),
   stampMemo: document.querySelector("#stampMemo"),
+  teacherStampBatchCount: document.querySelector("#teacherStampBatchCount"),
   addStampButton: document.querySelector("#addStampButton"),
   historyList: document.querySelector("#historyList"),
   editStudentButton: document.querySelector("#editStudentButton"),
@@ -277,6 +307,13 @@ const els = {
   prizeEnabled: document.querySelector("#prizeEnabled"),
   clearPrizeForm: document.querySelector("#clearPrizeForm"),
   prizeSettingsList: document.querySelector("#prizeSettingsList"),
+  levelRuleForm: document.querySelector("#levelRuleForm"),
+  levelRuleLevel: document.querySelector("#levelRuleLevel"),
+  levelRuleName: document.querySelector("#levelRuleName"),
+  levelRuleRequiredSheets: document.querySelector("#levelRuleRequiredSheets"),
+  levelRuleImage: document.querySelector("#levelRuleImage"),
+  levelRulesList: document.querySelector("#levelRulesList"),
+  resetLevelRulesButton: document.querySelector("#resetLevelRulesButton"),
   studentForm: document.querySelector("#studentForm"),
   studentId: document.querySelector("#studentId"),
   studentName: document.querySelector("#studentName"),
@@ -352,6 +389,12 @@ function bindEvents() {
     savePrize();
   });
   els.clearPrizeForm.addEventListener("click", clearPrizeForm);
+  els.levelRuleForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveLevelRule();
+  });
+  els.levelRuleLevel.addEventListener("change", () => editLevelRule(Number(els.levelRuleLevel.value || 1)));
+  els.resetLevelRulesButton.addEventListener("click", resetLevelRules);
 
   els.childAddStampButton.addEventListener("click", () => openStampCountChoice({ source: "child" }));
   els.addStampButton.addEventListener("click", openTeacherStampPreview);
@@ -462,11 +505,53 @@ function normalizeState(input) {
     ...defaultState.settings,
     ...(input.settings || {}),
   };
+  merged.settings.levelRules = normalizeLevelRules(merged.settings.levelRules || input.levelRules);
   merged.ownedOutfits = Array.isArray(input.ownedOutfits) && input.ownedOutfits.length
     ? input.ownedOutfits
     : [...defaultState.ownedOutfits];
   merged.ownedStampIdsByStudent = normalizeOwnedStampIdsByStudent(input.ownedStampIdsByStudent);
   return merged;
+}
+
+function normalizeLevelRules(inputRules) {
+  const byLevel = new Map(defaultLevelRules.map((rule) => [rule.level, structuredClone(rule)]));
+  if (Array.isArray(inputRules)) {
+    inputRules.forEach((rule) => {
+      const level = Math.floor(Number(rule?.level || 0));
+      const base = byLevel.get(level);
+      if (!base) {
+        return;
+      }
+      byLevel.set(level, {
+        ...base,
+        name: String(rule.name || base.name).trim(),
+        requiredSheets: Math.max(0, Math.floor(Number(rule.requiredSheets ?? base.requiredSheets))),
+        image: String(rule.image || base.image).trim(),
+      });
+    });
+  }
+
+  let minimumSheets = 0;
+  const rules = Array.from(byLevel.values())
+    .sort((a, b) => a.level - b.level)
+    .map((rule, index) => {
+      const requiredSheets = index === 0 ? 0 : Math.max(minimumSheets, rule.requiredSheets);
+      minimumSheets = requiredSheets;
+      return {
+        ...rule,
+        requiredSheets,
+      };
+    });
+  rules[0].requiredSheets = 0;
+  return rules;
+}
+
+function activeLevelRules() {
+  if (!state.settings) {
+    state.settings = structuredClone(defaultState.settings);
+  }
+  state.settings.levelRules = normalizeLevelRules(state.settings.levelRules);
+  return state.settings.levelRules;
 }
 
 function normalizeRewards(inputRewards) {
@@ -582,6 +667,7 @@ function render() {
   renderRewards();
   renderRedemptions();
   renderStampAssets();
+  renderLevelSettings();
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === activeView());
   });
@@ -670,11 +756,13 @@ function renderStudentDetails() {
   els.teacherStudentDetail.hidden = !student;
 
   if (!student) {
+    renderHounyanLevel(null, emptyStats());
     return;
   }
 
   const stats = studentStats(student.id);
-  const level = mascotLevel(stats.total);
+  const level = mascotLevel(stats);
+  renderHounyanLevel(student, stats);
 
   els.childSelectedName.textContent = student.name;
   els.childTotal.textContent = stats.total;
@@ -694,7 +782,7 @@ function renderStudentDetails() {
   els.selectedTotal.textContent = stats.total;
   els.selectedAvailable.textContent = stats.availableSheets;
   els.selectedLevel.textContent = level.current;
-  els.nextLevelText.textContent = level.remaining === 0 ? "最大" : `あと${level.remaining}`;
+  els.nextLevelText.textContent = level.remainingSheets === 0 ? "最大" : `あと${level.remainingSheets}シート`;
   renderSheet({
     grid: els.teacherSheetGrid,
     title: els.teacherSheetTitle,
@@ -727,6 +815,35 @@ function renderChildNextUnlock(total) {
     <img class="next-unlock-preview" src="${escapeHtml(nextStamp.src)}" alt="${escapeHtml(nextStamp.name)}のプレビュー">
   `;
   els.childNextUnlock.classList.remove("is-complete");
+}
+
+function renderHounyanLevel(student, stats) {
+  const level = mascotLevel(stats);
+  const currentRule = level.currentRule || defaultLevelRules[0];
+  const image = currentRule.image || defaultLevelRules[0].image;
+  const alt = `${currentRule.name}のほうにゃん`;
+  if (els.childHounyanImage) {
+    els.childHounyanImage.src = image;
+    els.childHounyanImage.alt = alt;
+  }
+  if (els.shopHounyanImage) {
+    els.shopHounyanImage.src = image;
+    els.shopHounyanImage.alt = alt;
+  }
+  if (els.teacherLevelImage) {
+    els.teacherLevelImage.src = image;
+    els.teacherLevelImage.alt = alt;
+  }
+  if (els.teacherLevelName) {
+    els.teacherLevelName.textContent = student
+      ? `Lv.${level.current} ${currentRule.name}`
+      : "Lv.1 いつものほうにゃん";
+  }
+  if (els.teacherLevelRequirement) {
+    els.teacherLevelRequirement.textContent = level.nextRule
+      ? `次はあと${level.remainingSheets}シートで「${level.nextRule.name}」`
+      : "今の設定では最大レベルです";
+  }
 }
 
 function nextUnlockStamp(total) {
@@ -929,6 +1046,33 @@ function renderPrizeSettings() {
 
   els.prizeSettingsList.querySelectorAll("[data-edit-prize]").forEach((button) => {
     button.addEventListener("click", () => editPrize(button.dataset.editPrize));
+  });
+}
+
+function renderLevelSettings() {
+  const rules = activeLevelRules();
+  if (!els.levelRuleLevel.options.length) {
+    els.levelRuleLevel.innerHTML = rules
+      .map((rule) => `<option value="${rule.level}">Lv.${rule.level}</option>`)
+      .join("");
+    editLevelRule(1);
+  }
+
+  els.levelRulesList.innerHTML = rules
+    .map((rule) => `
+      <article class="level-rule-card">
+        <img src="${escapeHtml(rule.image)}" alt="${escapeHtml(rule.name)}">
+        <div>
+          <strong>Lv.${rule.level} ${escapeHtml(rule.name)}</strong>
+          <p>${rule.requiredSheets}シート完成でレベルアップ</p>
+        </div>
+        <button class="soft-button compact-button" type="button" data-edit-level-rule="${rule.level}">編集</button>
+      </article>
+    `)
+    .join("");
+
+  els.levelRulesList.querySelectorAll("[data-edit-level-rule]").forEach((button) => {
+    button.addEventListener("click", () => editLevelRule(Number(button.dataset.editLevelRule)));
   });
 }
 
@@ -1249,6 +1393,47 @@ function savePrize() {
   showToast(existing ? "景品を更新しました" : "景品を追加しました");
 }
 
+function editLevelRule(level) {
+  const rule = activeLevelRules().find((item) => item.level === level) || activeLevelRules()[0];
+  els.levelRuleLevel.value = String(rule.level);
+  els.levelRuleName.value = rule.name;
+  els.levelRuleRequiredSheets.value = String(rule.requiredSheets);
+  els.levelRuleImage.value = rule.image;
+}
+
+function saveLevelRule() {
+  const level = Math.floor(Number(els.levelRuleLevel.value || 1));
+  const name = els.levelRuleName.value.trim();
+  const requiredSheets = Math.max(0, Math.floor(Number(els.levelRuleRequiredSheets.value || 0)));
+  const image = els.levelRuleImage.value.trim() || defaultLevelRules.find((rule) => rule.level === level)?.image || defaultLevelRules[0].image;
+  if (!name) {
+    showToast("レベル名を入力してください");
+    return;
+  }
+
+  state.settings.levelRules = normalizeLevelRules(activeLevelRules().map((rule) => (
+    rule.level === level
+      ? { ...rule, name, requiredSheets: level === 1 ? 0 : requiredSheets, image }
+      : rule
+  )));
+  persist();
+  render();
+  editLevelRule(level);
+  showToast(`Lv.${level}の条件を保存しました`);
+}
+
+function resetLevelRules() {
+  const ok = confirm("ほうにゃんレベル設定を既定に戻します。よろしいですか？");
+  if (!ok) {
+    return;
+  }
+  state.settings.levelRules = structuredClone(defaultLevelRules);
+  persist();
+  render();
+  editLevelRule(1);
+  showToast("レベル設定を既定に戻しました");
+}
+
 function showView(viewName) {
   els.views.forEach((view) => {
     view.classList.toggle("is-active", view.dataset.view === viewName);
@@ -1531,12 +1716,17 @@ function openTeacherStampPreview() {
     showToast("先に児童を登録してください");
     return;
   }
+  const plannedCount = Math.min(
+    STAMP_BATCH_MAX,
+    Math.max(1, Math.floor(Number(els.teacherStampBatchCount.value || 1)))
+  );
+  els.teacherStampBatchCount.value = String(plannedCount);
 
   openStampPreview({
     source: "teacher",
     studentId: student.id,
     memo: els.stampMemo.value.trim(),
-    plannedCount: 0,
+    plannedCount,
   });
 }
 
@@ -1638,6 +1828,10 @@ function openStampPreview(context) {
     totalBefore: stats.total,
   };
   stampPreviewCounts = Object.fromEntries(stamps.map((stamp) => [stamp.id, 0]));
+  if (context.source === "teacher" && Number(context.plannedCount || 0) > 0) {
+    const defaultStamp = availableStamps.find((stamp) => stamp.id === state.selectedStampId) || availableStamps[0];
+    stampPreviewCounts[defaultStamp.id] = Math.min(STAMP_BATCH_MAX, Number(context.plannedCount || 0));
+  }
   els.stampPreviewStudent.textContent = context.source === "child" ? `${student.name}のスタンプ` : `${student.name} / スタンプ`;
   renderStampPreview();
   els.stampPreviewLayer.hidden = false;
@@ -2272,12 +2466,20 @@ function stampsToSheets(value) {
   return Math.max(1, Math.ceil(stamps / SHEET_SIZE));
 }
 
-function mascotLevel(total) {
-  const current = Math.min(10, Math.floor(total / 5) + 1);
-  const nextAt = current >= 10 ? total : current * 5;
+function mascotLevel(statsOrTotal) {
+  const completedSheets = typeof statsOrTotal === "object"
+    ? Number(statsOrTotal.completedSheets || 0)
+    : Math.floor(Number(statsOrTotal || 0) / SHEET_SIZE);
+  const rules = activeLevelRules();
+  const currentRule = rules
+    .filter((rule) => rule.requiredSheets <= completedSheets)
+    .at(-1) || rules[0];
+  const nextRule = rules.find((rule) => rule.requiredSheets > completedSheets) || null;
   return {
-    current,
-    remaining: current >= 10 ? 0 : Math.max(0, nextAt - total),
+    current: currentRule.level,
+    currentRule,
+    nextRule,
+    remainingSheets: nextRule ? Math.max(0, nextRule.requiredSheets - completedSheets) : 0,
   };
 }
 
