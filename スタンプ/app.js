@@ -199,6 +199,8 @@ let timerRemainingSeconds = TIMER_DEFAULT_SECONDS;
 let timerEndAt = 0;
 let timerIntervalId = 0;
 let timerIsRunning = false;
+let timerAudioContext = null;
+let timerFinishedSoundPlayed = false;
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -1252,6 +1254,7 @@ function setTimerDuration(seconds) {
   timerRemainingSeconds = nextSeconds;
   timerIsRunning = false;
   timerEndAt = 0;
+  timerFinishedSoundPlayed = false;
   syncTimerInputs();
   renderTimer();
 }
@@ -1264,8 +1267,10 @@ function setTimerFromInputs() {
 
 function startTimer() {
   showView("timer");
+  unlockTimerSound();
   if (timerRemainingSeconds <= 0) {
     timerRemainingSeconds = timerDurationSeconds;
+    timerFinishedSoundPlayed = false;
   }
   if (timerRemainingSeconds <= 0) {
     setTimerDuration(TIMER_DEFAULT_SECONDS);
@@ -1294,6 +1299,7 @@ function resetTimer() {
   timerIsRunning = false;
   timerEndAt = 0;
   timerRemainingSeconds = timerDurationSeconds;
+  timerFinishedSoundPlayed = false;
   syncTimerInputs();
   renderTimer();
 }
@@ -1307,8 +1313,59 @@ function updateTimerTick() {
     timerIsRunning = false;
     timerEndAt = 0;
     stopTimerInterval();
+    playTimerFinishedSound();
   }
   renderTimer();
+}
+
+function unlockTimerSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return;
+  }
+  if (!timerAudioContext) {
+    timerAudioContext = new AudioContextClass();
+  }
+  if (timerAudioContext.state === "suspended") {
+    const resumeResult = timerAudioContext.resume?.();
+    if (resumeResult?.catch) {
+      resumeResult.catch(() => {});
+    }
+  }
+}
+
+function playTimerFinishedSound() {
+  if (timerFinishedSoundPlayed) {
+    return;
+  }
+  timerFinishedSoundPlayed = true;
+  unlockTimerSound();
+  if (!timerAudioContext) {
+    return;
+  }
+
+  const startAt = timerAudioContext.currentTime;
+  const notes = [
+    { frequency: 523.25, start: 0, duration: 0.16 },
+    { frequency: 659.25, start: 0.16, duration: 0.16 },
+    { frequency: 783.99, start: 0.32, duration: 0.32 },
+  ];
+
+  notes.forEach((note) => {
+    const oscillator = timerAudioContext.createOscillator();
+    const gain = timerAudioContext.createGain();
+    const noteStart = startAt + note.start;
+    const noteEnd = noteStart + note.duration;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(note.frequency, noteStart);
+    gain.gain.setValueAtTime(0.0001, noteStart);
+    gain.gain.exponentialRampToValueAtTime(0.18, noteStart + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+    oscillator.connect(gain);
+    gain.connect(timerAudioContext.destination);
+    oscillator.start(noteStart);
+    oscillator.stop(noteEnd + 0.02);
+  });
 }
 
 function stopTimerInterval() {
