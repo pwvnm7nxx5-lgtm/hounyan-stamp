@@ -223,11 +223,11 @@ const defaultLevelRules = [
   { level: 13, requiredSheets: 15, name: "ゴールド王冠＋宝石2つ", image: "assets/hounyan-levels/hounyan-lv13-gold-jewel-crown.png" },
   { level: 14, requiredSheets: 17, name: "ゴールド王冠＋羽飾り", image: "assets/hounyan-levels/hounyan-lv14-gold-feather-crown.png" },
   { level: 15, requiredSheets: 19, name: "大きめゴールド王冠", image: "assets/hounyan-levels/hounyan-lv15-large-gold-crown.png" },
-  { level: 16, requiredSheets: 22, name: "レインボー宝石王冠", image: "assets/hounyan-home.png" },
-  { level: 17, requiredSheets: 25, name: "レインボー王冠＋羽", image: "assets/hounyan-home.png" },
-  { level: 18, requiredSheets: 28, name: "星のクラウン", image: "assets/hounyan-home.png" },
-  { level: 19, requiredSheets: 30, name: "星のクラウン＋大宝石", image: "assets/hounyan-home.png" },
-  { level: 20, requiredSheets: 32, name: "ほうにゃんマスタークラウン", image: "assets/hounyan-home.png" },
+  { level: 16, requiredSheets: 22, name: "レインボー宝石王冠", image: "assets/hounyan-levels/hounyan-lv16-rainbow-jewel-crown.png" },
+  { level: 17, requiredSheets: 25, name: "レインボー王冠＋羽", image: "assets/hounyan-levels/hounyan-lv17-rainbow-feather-crown.png" },
+  { level: 18, requiredSheets: 28, name: "星のクラウン", image: "assets/hounyan-levels/hounyan-lv18-star-crown.png" },
+  { level: 19, requiredSheets: 30, name: "星のクラウン＋大宝石", image: "assets/hounyan-levels/hounyan-lv19-star-jewel-crown.png" },
+  { level: 20, requiredSheets: 32, name: "ほうにゃんマスタークラウン", image: "assets/hounyan-levels/hounyan-lv20-master-crown.png" },
 ];
 
 const defaultRewards = [
