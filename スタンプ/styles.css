@@ -972,6 +972,60 @@ input:focus,
   gap: 12px;
 }
 
+.auto-backup-box {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(66, 180, 51, 0.24);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #ffffff, #f4fbf8);
+}
+
+.auto-backup-box h3,
+.auto-backup-box p {
+  margin: 0;
+}
+
+.auto-backup-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.auto-backup-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.auto-backup-card strong,
+.auto-backup-card span {
+  display: block;
+}
+
+.auto-backup-card span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.auto-backup-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .shop-summary {
   display: grid;
   gap: 16px;
@@ -1971,6 +2025,23 @@ input:focus,
   .shop-hounyan {
     width: 86px;
     height: 86px;
+  }
+
+  .auto-backup-box,
+  .auto-backup-card {
+    grid-template-columns: 1fr;
+  }
+
+  .auto-backup-box {
+    display: grid;
+  }
+
+  .auto-backup-actions {
+    justify-content: stretch;
+  }
+
+  .auto-backup-actions .compact-button {
+    flex: 1;
   }
 
   .timer-hero {

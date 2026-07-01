@@ -420,7 +420,16 @@
                   <input id="importInput" type="file" accept="application/json">
                 </label>
               </div>
-              <p class="hint">保存はこのPCのブラウザ内です。共有PCでは利用者を確認してください。</p>
+              <div class="auto-backup-box">
+                <div>
+                  <p class="eyebrow">自動バックアップ</p>
+                  <h3>保存履歴</h3>
+                  <p class="hint" id="autoBackupStatus">保存すると自動でバックアップを作成します。</p>
+                </div>
+                <button class="soft-button" type="button" id="createAutoBackupButton">今すぐバックアップ</button>
+              </div>
+              <div id="autoBackupList" class="auto-backup-list"></div>
+              <p class="hint">保存はこのPCのブラウザ内です。ブラウザのデータを削除すると自動バックアップも消えるため、大事な節目ではJSONを書き出してください。</p>
             </section>
 
             <section class="work-panel stamp-assets-panel">

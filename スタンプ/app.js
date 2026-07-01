@@ -1,5 +1,8 @@
 const STORAGE_KEY = "hounyan-stamp-ledger-v1";
 const BACKUP_STORAGE_KEY = `${STORAGE_KEY}-broken-backup`;
+const AUTO_BACKUP_STORAGE_KEY = `${STORAGE_KEY}-auto-backups`;
+const AUTO_BACKUP_LIMIT = 6;
+const AUTO_BACKUP_BUCKET_MS = 3 * 60 * 1000;
 const SHEET_SIZE = 20;
 const STAMP_BATCH_MAX = SHEET_SIZE;
 const TIMER_DEFAULT_SECONDS = 5 * 60;
@@ -401,6 +404,9 @@ const els = {
   studentNote: document.querySelector("#studentNote"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
+  createAutoBackupButton: document.querySelector("#createAutoBackupButton"),
+  autoBackupStatus: document.querySelector("#autoBackupStatus"),
+  autoBackupList: document.querySelector("#autoBackupList"),
   redemptionList: document.querySelector("#redemptionList"),
   stampAssetForm: document.querySelector("#stampAssetForm"),
   stampAssetId: document.querySelector("#stampAssetId"),
@@ -519,6 +525,11 @@ function bindEvents() {
   els.timerResetButton.addEventListener("click", resetTimer);
   els.exportButton.addEventListener("click", exportData);
   els.importInput.addEventListener("change", importData);
+  els.createAutoBackupButton.addEventListener("click", () => {
+    const created = createAutoBackup("manual", { force: true });
+    renderAutoBackups();
+    showToast(created ? "自動バックアップを作成しました" : "自動バックアップを更新できませんでした");
+  });
   els.exchangeCancelButton.addEventListener("click", closeExchangeConfirm);
   els.exchangeConfirmButton.addEventListener("click", confirmExchange);
   els.exchangeConfirmLayer.addEventListener("click", (event) => {
@@ -763,6 +774,7 @@ function persist() {
   }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    createAutoBackup("auto");
     return true;
   } catch (error) {
     console.error(error);
@@ -780,6 +792,7 @@ function render() {
   renderRedemptions();
   renderStampAssets();
   renderLevelSettings();
+  renderAutoBackups();
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === activeView());
   });
@@ -2456,6 +2469,7 @@ function deleteSelectedStudent() {
     return;
   }
 
+  createAutoBackup("before-delete", { force: true });
   state.students = state.students.filter((item) => item.id !== student.id);
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
   state.redemptions = state.redemptions.filter((redemption) => redemption.studentId !== student.id);
@@ -2468,16 +2482,162 @@ function deleteSelectedStudent() {
   showToast("児童データを削除しました");
 }
 
-function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+function readAutoBackups() {
+  try {
+    const raw = localStorage.getItem(AUTO_BACKUP_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter((backup) => backup && backup.id && backup.createdAt && backup.state)
+      .slice(0, AUTO_BACKUP_LIMIT);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
+}
+
+function writeAutoBackups(backups) {
+  localStorage.setItem(AUTO_BACKUP_STORAGE_KEY, JSON.stringify(backups.slice(0, AUTO_BACKUP_LIMIT)));
+}
+
+function createAutoBackup(reason = "auto", options = {}) {
+  if (stateLoadFailed) {
+    return false;
+  }
+
+  try {
+    const rawState = JSON.stringify(state);
+    const backups = readAutoBackups();
+    const now = new Date();
+    const newest = backups[0];
+    if (newest && JSON.stringify(newest.state) === rawState) {
+      return true;
+    }
+
+    const createdAt = now.toISOString();
+    const snapshot = {
+      id: crypto.randomUUID(),
+      createdAt,
+      reason,
+      summary: backupSummary(state),
+      state: JSON.parse(rawState),
+    };
+
+    if (!options.force && newest) {
+      const newestTime = new Date(newest.createdAt).getTime();
+      if (Number.isFinite(newestTime) && now.getTime() - newestTime < AUTO_BACKUP_BUCKET_MS) {
+        backups[0] = {
+          ...snapshot,
+          id: newest.id,
+        };
+        writeAutoBackups(backups);
+        return true;
+      }
+    }
+
+    backups.unshift(snapshot);
+    writeAutoBackups(backups);
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
+function backupSummary(sourceState) {
+  return {
+    students: Array.isArray(sourceState.students) ? sourceState.students.length : 0,
+    stamps: Array.isArray(sourceState.stampEvents) ? sourceState.stampEvents.length : 0,
+    redemptions: Array.isArray(sourceState.redemptions) ? sourceState.redemptions.length : 0,
+  };
+}
+
+function renderAutoBackups() {
+  const backups = readAutoBackups();
+  if (!backups.length) {
+    els.autoBackupStatus.textContent = "まだ自動バックアップはありません。データを保存すると自動で作成されます。";
+    els.autoBackupList.innerHTML = '<p class="empty-state">バックアップはまだありません。</p>';
+    return;
+  }
+
+  els.autoBackupStatus.textContent = `最新: ${formatDateTime(backups[0].createdAt)} / ${backups.length}件保存中`;
+  els.autoBackupList.innerHTML = backups
+    .map((backup) => {
+      const summary = backup.summary || backupSummary(backup.state || {});
+      return `
+        <article class="auto-backup-card">
+          <div>
+            <strong>${escapeHtml(formatDateTime(backup.createdAt))}</strong>
+            <span>${escapeHtml(summary.students)}人 / スタンプ${escapeHtml(summary.stamps)}個 / 交換${escapeHtml(summary.redemptions)}件</span>
+          </div>
+          <div class="auto-backup-actions">
+            <button class="soft-button compact-button" type="button" data-download-backup="${backup.id}">JSON保存</button>
+            <button class="danger-button compact-button" type="button" data-restore-backup="${backup.id}">復元</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  els.autoBackupList.querySelectorAll("[data-download-backup]").forEach((button) => {
+    button.addEventListener("click", () => downloadAutoBackup(button.dataset.downloadBackup));
+  });
+  els.autoBackupList.querySelectorAll("[data-restore-backup]").forEach((button) => {
+    button.addEventListener("click", () => restoreAutoBackup(button.dataset.restoreBackup));
+  });
+}
+
+function findAutoBackup(id) {
+  return readAutoBackups().find((backup) => backup.id === id) || null;
+}
+
+function downloadAutoBackup(id) {
+  const backup = findAutoBackup(id);
+  if (!backup) {
+    showToast("バックアップが見つかりません");
+    return;
+  }
+  downloadJson(backup.state, `hounyan-stamps-backup-${backup.createdAt.slice(0, 10)}.json`);
+  showToast("バックアップを書き出しました");
+}
+
+function restoreAutoBackup(id) {
+  const backup = findAutoBackup(id);
+  if (!backup) {
+    showToast("バックアップが見つかりません");
+    return;
+  }
+
+  const ok = confirm(`${formatDateTime(backup.createdAt)}の自動バックアップに戻します。現在の状態も復元前バックアップとして残します。`);
+  if (!ok) {
+    return;
+  }
+
+  createAutoBackup("before-restore", { force: true });
+  state = normalizeState(backup.state);
+  stateLoadFailed = false;
+  ensureSelection();
+  persist();
+  render();
+  showToast("自動バックアップから復元しました");
+}
+
+function downloadJson(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `hounyan-stamps-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.download = filename;
   document.body.append(anchor);
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+function exportData() {
+  downloadJson(state, `hounyan-stamps-${new Date().toISOString().slice(0, 10)}.json`);
   showToast("JSONを書き出しました");
 }
 
@@ -2491,6 +2651,7 @@ function importData(event) {
   reader.addEventListener("load", () => {
     try {
       const imported = JSON.parse(String(reader.result));
+      createAutoBackup("before-import", { force: true });
       state = normalizeState(imported);
       stateLoadFailed = false;
       ensureSelection();
