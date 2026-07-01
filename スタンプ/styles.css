@@ -988,6 +988,19 @@ input:focus,
     linear-gradient(160deg, #ffffff, #eefaf4);
 }
 
+.timer-cheer {
+  justify-self: start;
+  max-width: 280px;
+  padding: 12px 14px;
+  border: 2px solid rgba(66, 180, 51, 0.2);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--green-deep);
+  font-weight: 900;
+  line-height: 1.5;
+  box-shadow: 0 12px 26px rgba(36, 84, 76, 0.12);
+}
+
 .timer-hounyan {
   width: min(100%, 260px);
   justify-self: center;
@@ -1066,6 +1079,60 @@ input:focus,
   gap: 6px;
   color: var(--muted);
   font-weight: 900;
+}
+
+.timer-page.is-running .timer-grid,
+.timer-page.is-finished .timer-grid {
+  grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.2fr);
+}
+
+.timer-page.is-running .timer-hero,
+.timer-page.is-finished .timer-hero {
+  min-height: 520px;
+  background:
+    radial-gradient(circle at 72% 18%, rgba(247, 198, 0, 0.34), transparent 34%),
+    linear-gradient(160deg, #fffef2, #eefaf4);
+}
+
+.timer-page.is-running .timer-hounyan {
+  animation: timerHounyanCheer 0.9s ease-in-out infinite;
+  transform-origin: 50% 92%;
+}
+
+.timer-page.is-running .timer-cheer {
+  border-color: rgba(247, 198, 0, 0.48);
+  color: #866600;
+  background: #fffbe8;
+}
+
+.timer-page.is-running .timer-presets,
+.timer-page.is-running .timer-inputs,
+.timer-page.is-finished .timer-presets,
+.timer-page.is-finished .timer-inputs {
+  display: none;
+}
+
+.timer-page.is-running .timer-panel,
+.timer-page.is-finished .timer-panel {
+  min-height: 520px;
+  background:
+    radial-gradient(circle at 50% 16%, rgba(66, 180, 51, 0.12), transparent 32%),
+    rgba(255, 255, 255, 0.96);
+}
+
+.timer-page.is-running .timer-ring,
+.timer-page.is-finished .timer-ring {
+  width: min(420px, 82vw);
+}
+
+@keyframes timerHounyanCheer {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
 }
 
 .stamp-asset-form,
@@ -1581,6 +1648,18 @@ input:focus,
 
   .timer-hero {
     min-height: 260px;
+  }
+
+  .timer-page.is-running .timer-hero,
+  .timer-page.is-finished .timer-hero,
+  .timer-page.is-running .timer-panel,
+  .timer-page.is-finished .timer-panel {
+    min-height: 0;
+  }
+
+  .timer-page.is-running .timer-grid,
+  .timer-page.is-finished .timer-grid {
+    grid-template-columns: 1fr;
   }
 
   .timer-hounyan {

@@ -203,6 +203,7 @@ let timerIsRunning = false;
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
   views: document.querySelectorAll("[data-view]"),
+  timerPage: document.querySelector('[data-view="timer"]'),
   currentStudentLabel: document.querySelector("#currentStudentLabel"),
   studentSwitchList: document.querySelector("#studentSwitchList"),
   totalStudents: document.querySelector("#totalStudents"),
@@ -245,6 +246,8 @@ const els = {
   timerRing: document.querySelector("#timerRing"),
   timerTime: document.querySelector("#timerTime"),
   timerStatus: document.querySelector("#timerStatus"),
+  timerTitle: document.querySelector("#timer-title"),
+  timerCheerText: document.querySelector("#timerCheerText"),
   timerMinutes: document.querySelector("#timerMinutes"),
   timerSeconds: document.querySelector("#timerSeconds"),
   timerSetButton: document.querySelector("#timerSetButton"),
@@ -1260,6 +1263,7 @@ function setTimerFromInputs() {
 }
 
 function startTimer() {
+  showView("timer");
   if (timerRemainingSeconds <= 0) {
     timerRemainingSeconds = timerDurationSeconds;
   }
@@ -1316,9 +1320,12 @@ function stopTimerInterval() {
 
 function renderTimer() {
   const progress = timerDurationSeconds > 0 ? timerRemainingSeconds / timerDurationSeconds : 0;
+  const isFinished = !timerIsRunning && timerRemainingSeconds <= 0;
   els.timerTime.textContent = formatTimerTime(timerRemainingSeconds);
   els.timerRing.style.setProperty("--timer-progress", String(Math.max(0, Math.min(1, progress))));
   els.timerRing.classList.toggle("is-low", timerDurationSeconds > 0 && progress <= 0.2);
+  els.timerPage.classList.toggle("is-running", timerIsRunning);
+  els.timerPage.classList.toggle("is-finished", isFinished);
   els.timerStatus.textContent = timerIsRunning
     ? "カウントダウン中"
     : timerRemainingSeconds <= 0
@@ -1326,6 +1333,18 @@ function renderTimer() {
       : timerRemainingSeconds === timerDurationSeconds
         ? "じゅんびOK"
         : "一時停止中";
+  els.timerTitle.textContent = timerIsRunning
+    ? "ほうにゃんとがんばる"
+    : isFinished
+      ? "おしまい！"
+      : "じかんをきめる";
+  els.timerCheerText.textContent = timerIsRunning
+    ? progress <= 0.2
+      ? "あとすこし！ほうにゃんが見てるよ"
+      : "そのちょうし！いっしょにがんばろう"
+    : isFinished
+      ? "よくがんばったね。ひとやすみしよう"
+      : "ほうにゃんもいっしょに見てるよ";
   els.timerStartButton.disabled = timerIsRunning;
   els.timerPauseButton.disabled = !timerIsRunning;
 }
