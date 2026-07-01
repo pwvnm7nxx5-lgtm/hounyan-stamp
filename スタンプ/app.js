@@ -4,6 +4,10 @@ const SHEET_SIZE = 20;
 const STAMP_BATCH_MAX = SHEET_SIZE;
 const TIMER_DEFAULT_SECONDS = 5 * 60;
 const TIMER_MAX_SECONDS = 99 * 60 + 59;
+const TIMER_FINISH_SOUNDS = {
+  study: "assets/timer-sounds/study-finish.mp3",
+  play: "assets/timer-sounds/play-finish.mp3",
+};
 const REMOVED_PURCHASABLE_STAMP_IDS = new Set([
   "shop-hanamaru",
   "shop-sugoi",
@@ -201,6 +205,7 @@ let timerIntervalId = 0;
 let timerIsRunning = false;
 let timerAudioContext = null;
 let timerFinishedSoundPlayed = false;
+let timerMode = "study";
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -256,6 +261,7 @@ const els = {
   timerStartButton: document.querySelector("#timerStartButton"),
   timerPauseButton: document.querySelector("#timerPauseButton"),
   timerResetButton: document.querySelector("#timerResetButton"),
+  timerModeButtons: document.querySelectorAll("[data-timer-mode]"),
   timerPresetButtons: document.querySelectorAll("[data-timer-preset]"),
   prizeForm: document.querySelector("#prizeForm"),
   prizeId: document.querySelector("#prizeId"),
@@ -365,6 +371,9 @@ function bindEvents() {
     state.selectedStudentId = els.shopStudentSelect.value;
     persist();
     render();
+  });
+  els.timerModeButtons.forEach((button) => {
+    button.addEventListener("click", () => setTimerMode(button.dataset.timerMode));
   });
   els.timerPresetButtons.forEach((button) => {
     button.addEventListener("click", () => setTimerDuration(Number(button.dataset.timerPreset || TIMER_DEFAULT_SECONDS)));
@@ -1247,6 +1256,14 @@ function activeView() {
   return document.querySelector(".view.is-active")?.dataset.view || "child";
 }
 
+function setTimerMode(mode) {
+  if (!TIMER_FINISH_SOUNDS[mode] || timerIsRunning) {
+    return;
+  }
+  timerMode = mode;
+  renderTimer();
+}
+
 function setTimerDuration(seconds) {
   const nextSeconds = clampTimerSeconds(seconds);
   stopTimerInterval();
@@ -1339,6 +1356,37 @@ function playTimerFinishedSound() {
     return;
   }
   timerFinishedSoundPlayed = true;
+  if (playTimerFinishAudioFile()) {
+    return;
+  }
+  playBuiltInTimerChime();
+}
+
+function playTimerFinishAudioFile() {
+  const src = TIMER_FINISH_SOUNDS[timerMode];
+  if (!src) {
+    return false;
+  }
+
+  const audio = new Audio(src);
+  let fallbackPlayed = false;
+  const playFallback = () => {
+    if (fallbackPlayed) {
+      return;
+    }
+    fallbackPlayed = true;
+    playBuiltInTimerChime();
+  };
+  audio.preload = "auto";
+  audio.addEventListener("error", playFallback, { once: true });
+  const playResult = audio.play();
+  if (playResult?.catch) {
+    playResult.catch(playFallback);
+  }
+  return true;
+}
+
+function playBuiltInTimerChime() {
   unlockTimerSound();
   if (!timerAudioContext) {
     return;
@@ -1386,6 +1434,10 @@ function renderTimer() {
   els.timerRing.classList.toggle("is-low", timerDurationSeconds > 0 && progress <= 0.2);
   els.timerPage.classList.toggle("is-running", timerIsRunning);
   els.timerPage.classList.toggle("is-finished", isFinished);
+  els.timerPage.dataset.timerMode = timerMode;
+  els.timerModeButtons.forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.timerMode === timerMode);
+  });
   els.timerStatus.textContent = timerIsRunning
     ? "カウントダウン中"
     : timerRemainingSeconds <= 0

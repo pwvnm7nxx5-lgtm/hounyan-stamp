@@ -1060,6 +1060,28 @@ input:focus,
   font-weight: 900;
 }
 
+.timer-mode-choice {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.timer-mode-button {
+  min-height: 52px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--green-deep);
+  font-weight: 900;
+}
+
+.timer-mode-button.is-selected {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(66, 180, 51, 0.2);
+}
+
 .timer-presets,
 .timer-actions {
   display: grid;
@@ -1106,8 +1128,10 @@ input:focus,
 }
 
 .timer-page.is-running .timer-presets,
+.timer-page.is-running .timer-mode-choice,
 .timer-page.is-running .timer-inputs,
 .timer-page.is-finished .timer-presets,
+.timer-page.is-finished .timer-mode-choice,
 .timer-page.is-finished .timer-inputs {
   display: none;
 }
