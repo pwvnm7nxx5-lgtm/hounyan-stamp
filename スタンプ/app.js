@@ -8,6 +8,12 @@ const TIMER_FINISH_SOUNDS = {
   study: "assets/timer-sounds/study-finish.wav",
   play: "assets/timer-sounds/play-finish.wav",
 };
+const TIMER_FINISH_MESSAGES = {
+  study:
+    '<ruby>時間<rt>じかん</rt></ruby>だよ、<ruby>勉強<rt>べんきょう</rt></ruby><ruby>お疲れ様<rt>おつかれさま</rt></ruby>。がんばったね！',
+  play:
+    '<ruby>時間<rt>じかん</rt></ruby>だよ、<ruby>席<rt>せき</rt></ruby>に<ruby>戻<rt>もど</rt></ruby>って<ruby>勉強<rt>べんきょう</rt></ruby>を<ruby>頑張ろう<rt>がんばろう</rt></ruby>！',
+};
 const REMOVED_PURCHASABLE_STAMP_IDS = new Set([
   "shop-hanamaru",
   "shop-sugoi",
@@ -1450,13 +1456,15 @@ function renderTimer() {
     : isFinished
       ? "おしまい！"
       : "じかんをきめる";
-  els.timerCheerText.textContent = timerIsRunning
-    ? progress <= 0.2
-      ? "あとすこし！ほうにゃんが見てるよ"
-      : "そのちょうし！いっしょにがんばろう"
-    : isFinished
-      ? "よくがんばったね。ひとやすみしよう"
+  if (isFinished) {
+    els.timerCheerText.innerHTML = TIMER_FINISH_MESSAGES[timerMode] || TIMER_FINISH_MESSAGES.study;
+  } else {
+    els.timerCheerText.textContent = timerIsRunning
+      ? progress <= 0.2
+        ? "あとすこし！ほうにゃんが見てるよ"
+        : "そのちょうし！いっしょにがんばろう"
       : "ほうにゃんもいっしょに見てるよ";
+  }
   els.timerStartButton.disabled = timerIsRunning;
   els.timerPauseButton.disabled = !timerIsRunning;
 }

@@ -1001,6 +1001,16 @@ input:focus,
   box-shadow: 0 12px 26px rgba(36, 84, 76, 0.12);
 }
 
+.timer-cheer ruby {
+  ruby-align: center;
+}
+
+.timer-cheer rt {
+  color: var(--green);
+  font-size: 0.62em;
+  font-weight: 800;
+}
+
 .timer-hounyan {
   width: min(100%, 260px);
   justify-self: center;
