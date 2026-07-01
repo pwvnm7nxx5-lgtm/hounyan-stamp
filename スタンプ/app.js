@@ -218,11 +218,11 @@ const defaultLevelRules = [
   { level: 8, requiredSheets: 7, name: "シルバー王冠", image: "assets/hounyan-levels/hounyan-lv08-silver-crown.png" },
   { level: 9, requiredSheets: 8, name: "シルバー王冠＋星", image: "assets/hounyan-levels/hounyan-lv09-silver-star-crown.png" },
   { level: 10, requiredSheets: 9, name: "シルバー王冠＋宝石", image: "assets/hounyan-levels/hounyan-lv10-silver-jewel-crown.png" },
-  { level: 11, requiredSheets: 11, name: "ゴールド王冠", image: "assets/hounyan-home.png" },
-  { level: 12, requiredSheets: 13, name: "ゴールド王冠＋星2つ", image: "assets/hounyan-home.png" },
-  { level: 13, requiredSheets: 15, name: "ゴールド王冠＋宝石2つ", image: "assets/hounyan-home.png" },
-  { level: 14, requiredSheets: 17, name: "ゴールド王冠＋羽飾り", image: "assets/hounyan-home.png" },
-  { level: 15, requiredSheets: 19, name: "大きめゴールド王冠", image: "assets/hounyan-home.png" },
+  { level: 11, requiredSheets: 11, name: "ゴールド王冠", image: "assets/hounyan-levels/hounyan-lv11-gold-crown.png" },
+  { level: 12, requiredSheets: 13, name: "ゴールド王冠＋星2つ", image: "assets/hounyan-levels/hounyan-lv12-gold-star-crown.png" },
+  { level: 13, requiredSheets: 15, name: "ゴールド王冠＋宝石2つ", image: "assets/hounyan-levels/hounyan-lv13-gold-jewel-crown.png" },
+  { level: 14, requiredSheets: 17, name: "ゴールド王冠＋羽飾り", image: "assets/hounyan-levels/hounyan-lv14-gold-feather-crown.png" },
+  { level: 15, requiredSheets: 19, name: "大きめゴールド王冠", image: "assets/hounyan-levels/hounyan-lv15-large-gold-crown.png" },
   { level: 16, requiredSheets: 22, name: "レインボー宝石王冠", image: "assets/hounyan-home.png" },
   { level: 17, requiredSheets: 25, name: "レインボー王冠＋羽", image: "assets/hounyan-home.png" },
   { level: 18, requiredSheets: 28, name: "星のクラウン", image: "assets/hounyan-home.png" },
@@ -286,6 +286,7 @@ const defaultState = {
   },
   ownedOutfits: ["default"],
   ownedStampIdsByStudent: {},
+  equippedHounyanLevelByStudent: {},
   selectedStudentId: "",
   selectedStampId: "sonochoshi",
 };
@@ -317,6 +318,7 @@ const els = {
   timerPage: document.querySelector('[data-view="timer"]'),
   currentStudentLabel: document.querySelector("#currentStudentLabel"),
   studentSwitchList: document.querySelector("#studentSwitchList"),
+  childHounyanButton: document.querySelector("#childHounyanButton"),
   childHounyanImage: document.querySelector("#childHounyanImage"),
   totalStudents: document.querySelector("#totalStudents"),
   todayStamps: document.querySelector("#todayStamps"),
@@ -428,6 +430,10 @@ const els = {
   exchangeConfirmMessage: document.querySelector("#exchangeConfirmMessage"),
   exchangeCancelButton: document.querySelector("#exchangeCancelButton"),
   exchangeConfirmButton: document.querySelector("#exchangeConfirmButton"),
+  hounyanClosetLayer: document.querySelector("#hounyanClosetLayer"),
+  hounyanClosetStudent: document.querySelector("#hounyanClosetStudent"),
+  hounyanClosetList: document.querySelector("#hounyanClosetList"),
+  hounyanClosetCloseButton: document.querySelector("#hounyanClosetCloseButton"),
   hounyanAnimationLayer: document.querySelector("#hounyanAnimationLayer"),
   animationHounyan: document.querySelector("#animationHounyan"),
   animationFeatureImage: document.querySelector("#animationFeatureImage"),
@@ -475,6 +481,7 @@ function bindEvents() {
   els.levelRuleLevel.addEventListener("change", () => editLevelRule(Number(els.levelRuleLevel.value || 1)));
   els.resetLevelRulesButton.addEventListener("click", resetLevelRules);
 
+  els.childHounyanButton.addEventListener("click", openHounyanCloset);
   els.childAddStampButton.addEventListener("click", () => openStampCountChoice({ source: "child" }));
   els.addStampButton.addEventListener("click", openTeacherStampPreview);
   els.stampCountMinus.addEventListener("click", () => updateStampCountTarget(-1));
@@ -519,6 +526,12 @@ function bindEvents() {
       closeExchangeConfirm();
     }
   });
+  els.hounyanClosetCloseButton.addEventListener("click", closeHounyanCloset);
+  els.hounyanClosetLayer.addEventListener("click", (event) => {
+    if (event.target === els.hounyanClosetLayer) {
+      closeHounyanCloset();
+    }
+  });
   els.animationCloseButton.addEventListener("click", hideHounyanAnimation);
   els.hounyanAnimationLayer.addEventListener("click", (event) => {
     if (event.target === els.hounyanAnimationLayer) {
@@ -536,6 +549,10 @@ function bindEvents() {
     }
     if (event.key === "Escape" && !els.exchangeConfirmLayer.hidden) {
       closeExchangeConfirm();
+      return;
+    }
+    if (event.key === "Escape" && !els.hounyanClosetLayer.hidden) {
+      closeHounyanCloset();
       return;
     }
     if (event.key === "Escape" && !els.hounyanAnimationLayer.hidden) {
@@ -589,6 +606,7 @@ function normalizeState(input) {
     ? input.ownedOutfits
     : [...defaultState.ownedOutfits];
   merged.ownedStampIdsByStudent = normalizeOwnedStampIdsByStudent(input.ownedStampIdsByStudent);
+  merged.equippedHounyanLevelByStudent = normalizeEquippedHounyanLevels(input.equippedHounyanLevelByStudent);
   return merged;
 }
 
@@ -717,6 +735,17 @@ function normalizeOwnedStampIdsByStudent(input) {
         ? [...new Set(stampIds.map(String).filter((stampId) => !REMOVED_PURCHASABLE_STAMP_IDS.has(stampId)))]
         : [],
     ]),
+  );
+}
+
+function normalizeEquippedHounyanLevels(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(input)
+      .map(([studentId, level]) => [studentId, Math.floor(Number(level))])
+      .filter(([, level]) => Number.isFinite(level) && level >= 1)
   );
 }
 
@@ -903,18 +932,20 @@ function renderChildNextUnlock(total) {
 function renderHounyanLevel(student, stats) {
   const level = mascotLevel(stats);
   const currentRule = level.currentRule || defaultLevelRules[0];
-  const image = currentRule.image || defaultLevelRules[0].image;
+  const displayRule = equippedHounyanRule(student, level);
+  const image = displayRule.image || defaultLevelRules[0].image;
+  const actualImage = currentRule.image || defaultLevelRules[0].image;
   const alt = `${currentRule.name}のほうにゃん`;
   if (els.childHounyanImage) {
     els.childHounyanImage.src = image;
-    els.childHounyanImage.alt = alt;
+    els.childHounyanImage.alt = `${displayRule.name}のほうにゃん`;
   }
   if (els.shopHounyanImage) {
     els.shopHounyanImage.src = image;
-    els.shopHounyanImage.alt = alt;
+    els.shopHounyanImage.alt = `${displayRule.name}のほうにゃん`;
   }
   if (els.teacherLevelImage) {
-    els.teacherLevelImage.src = image;
+    els.teacherLevelImage.src = actualImage;
     els.teacherLevelImage.alt = alt;
   }
   if (els.teacherLevelName) {
@@ -950,6 +981,90 @@ function renderHounyanLevel(student, stats) {
       level.nextRule ? "つぎのかぶりものはひみつ" : "さいだいレベル"
     );
   }
+}
+
+function equippedHounyanRule(student, level) {
+  if (!student) {
+    return level.currentRule || defaultLevelRules[0];
+  }
+  if (!state.equippedHounyanLevelByStudent) {
+    state.equippedHounyanLevelByStudent = {};
+  }
+  const hasChoice = Object.prototype.hasOwnProperty.call(state.equippedHounyanLevelByStudent, student.id);
+  const choice = hasChoice ? Math.floor(Number(state.equippedHounyanLevelByStudent[student.id])) : level.current;
+  const chosenLevel = Math.max(1, Math.min(level.current, Number.isFinite(choice) ? choice : level.current));
+  return activeLevelRules().find((rule) => rule.level === chosenLevel) || level.currentRule || defaultLevelRules[0];
+}
+
+function unlockedHounyanRules(level) {
+  return activeLevelRules().filter((rule) => rule.level <= level.current);
+}
+
+function openHounyanCloset() {
+  const student = selectedStudent();
+  if (!student) {
+    showToast("先に児童をえらんでね");
+    return;
+  }
+  renderHounyanCloset();
+  els.hounyanClosetLayer.hidden = false;
+  els.hounyanClosetLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.hounyanClosetLayer.classList.add("is-showing");
+    els.hounyanClosetList.querySelector(".is-selected, .hounyan-closet-option")?.focus();
+  });
+}
+
+function renderHounyanCloset() {
+  const student = selectedStudent();
+  if (!student) {
+    return;
+  }
+  const stats = studentStats(student.id);
+  const level = mascotLevel(stats);
+  const equippedRule = equippedHounyanRule(student, level);
+  els.hounyanClosetStudent.textContent = `${student.name}のほうにゃん`;
+  els.hounyanClosetList.innerHTML = unlockedHounyanRules(level)
+    .map((rule) => {
+      const selected = rule.level === equippedRule.level;
+      return `
+        <button class="hounyan-closet-option${selected ? " is-selected" : ""}" type="button" data-equip-hounyan-level="${rule.level}" aria-pressed="${selected ? "true" : "false"}">
+          <img src="${escapeHtml(rule.image)}" alt="${escapeHtml(rule.name)}のほうにゃん">
+          <strong>Lv.${rule.level} ${escapeHtml(rule.name)}</strong>
+          <span>${selected ? "いま" : "えらぶ"}</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  els.hounyanClosetList.querySelectorAll("[data-equip-hounyan-level]").forEach((button) => {
+    button.addEventListener("click", () => equipHounyanLevel(Number(button.dataset.equipHounyanLevel)));
+  });
+}
+
+function equipHounyanLevel(levelNumber) {
+  const student = selectedStudent();
+  if (!student) {
+    return;
+  }
+  const level = mascotLevel(studentStats(student.id));
+  const rule = activeLevelRules().find((item) => item.level === levelNumber && item.level <= level.current);
+  if (!rule) {
+    showToast("まだえらべないかぶりものです");
+    return;
+  }
+  state.equippedHounyanLevelByStudent[student.id] = rule.level;
+  persist();
+  render();
+  closeHounyanCloset();
+  showToast(`${rule.name}にきがえたよ`);
+}
+
+function closeHounyanCloset() {
+  els.hounyanClosetLayer.classList.remove("is-showing");
+  setTimeout(() => {
+    els.hounyanClosetLayer.hidden = true;
+  }, 180);
 }
 
 function nextUnlockStamp(total) {
@@ -2339,6 +2454,7 @@ function deleteSelectedStudent() {
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
   state.redemptions = state.redemptions.filter((redemption) => redemption.studentId !== student.id);
   delete state.ownedStampIdsByStudent[student.id];
+  delete state.equippedHounyanLevelByStudent[student.id];
   state.selectedStudentId = state.students[0]?.id || "";
   clearStudentForm();
   persist();

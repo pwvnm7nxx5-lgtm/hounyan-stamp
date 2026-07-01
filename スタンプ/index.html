@@ -35,7 +35,9 @@
           <div class="child-grid">
             <section class="hero-panel child-hero">
               <div class="hounyan-stage">
-                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image" id="childHounyanImage">
+                <button class="hounyan-change-button" type="button" id="childHounyanButton" aria-label="かぶりものをえらぶ">
+                  <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image" id="childHounyanImage">
+                </button>
               </div>
               <div class="hero-stats">
                 <div>
@@ -549,6 +551,21 @@
         <div class="confirm-actions">
           <button class="soft-button" type="button" id="exchangeCancelButton">やめる</button>
           <button class="primary-button" type="button" id="exchangeConfirmButton">こうかんする</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-layer" id="hounyanClosetLayer" hidden>
+      <div class="preview-card hounyan-closet-card" role="dialog" aria-modal="true" aria-labelledby="hounyanClosetTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="hounyanClosetStudent">ほうにゃん</p>
+            <h2 id="hounyanClosetTitle">かぶりものをえらぶ</h2>
+          </div>
+        </div>
+        <div class="hounyan-closet-list" id="hounyanClosetList"></div>
+        <div class="preview-actions single">
+          <button class="primary-button" type="button" id="hounyanClosetCloseButton">とじる</button>
         </div>
       </div>
     </div>
