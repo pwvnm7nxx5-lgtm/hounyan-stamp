@@ -212,9 +212,9 @@ const defaultLevelRules = [
   { level: 2, requiredSheets: 1, name: "小さな紙の王冠", image: "assets/hounyan-levels/hounyan-lv02-paper-crown.png" },
   { level: 3, requiredSheets: 2, name: "色つき紙王冠", image: "assets/hounyan-levels/hounyan-lv03-colored-paper-crown.png" },
   { level: 4, requiredSheets: 3, name: "星つき紙王冠", image: "assets/hounyan-levels/hounyan-lv04-star-paper-crown.png" },
-  { level: 5, requiredSheets: 4, name: "ブロンズ王冠", image: "assets/hounyan-home.png" },
-  { level: 6, requiredSheets: 5, name: "ブロンズ王冠＋小さな星", image: "assets/hounyan-home.png" },
-  { level: 7, requiredSheets: 6, name: "ブロンズ王冠＋宝石1つ", image: "assets/hounyan-home.png" },
+  { level: 5, requiredSheets: 4, name: "ブロンズ王冠", image: "assets/hounyan-levels/hounyan-lv05-bronze-crown.png" },
+  { level: 6, requiredSheets: 5, name: "ブロンズ王冠＋小さな星", image: "assets/hounyan-levels/hounyan-lv06-bronze-star-crown.png" },
+  { level: 7, requiredSheets: 6, name: "ブロンズ王冠＋宝石1つ", image: "assets/hounyan-levels/hounyan-lv07-bronze-jewel-crown.png" },
   { level: 8, requiredSheets: 7, name: "シルバー王冠", image: "assets/hounyan-home.png" },
   { level: 9, requiredSheets: 8, name: "シルバー王冠＋星", image: "assets/hounyan-home.png" },
   { level: 10, requiredSheets: 9, name: "シルバー王冠＋宝石", image: "assets/hounyan-home.png" },
@@ -601,11 +601,15 @@ function normalizeLevelRules(inputRules) {
       if (!base) {
         return;
       }
+      const inputImage = String(rule.image || base.image).trim();
+      const image = inputImage === "assets/hounyan-home.png" && base.image !== "assets/hounyan-home.png"
+        ? base.image
+        : inputImage;
       byLevel.set(level, {
         ...base,
         name: String(rule.name || base.name).trim(),
         requiredSheets: Math.max(0, Math.floor(Number(rule.requiredSheets ?? base.requiredSheets))),
-        image: String(rule.image || base.image).trim(),
+        image,
       });
     });
   }
@@ -2069,6 +2073,7 @@ function addStampBatch({ student, selections, source, memo }) {
   const nextTotal = stats.total + totalAdded;
   const completedSheets = sheetsCompletedBetween(stats.total, nextTotal);
   const unlockedStamps = stampsUnlockedBetween(stats.total, nextTotal);
+  const unlockedLevels = levelsUnlockedBetween(stats.total, nextTotal);
   const dominantStamp = dominantStampFromSelections(selections);
   state.stampEvents.push(...events);
   lastStampedEventIds = new Set(events.map((event) => event.id));
@@ -2089,6 +2094,12 @@ function addStampBatch({ student, selections, source, memo }) {
     showHounyanAnimation("sheet-completed", {
       studentName: student.name,
       sheetNumber,
+    });
+  });
+  unlockedLevels.forEach((levelRule) => {
+    showHounyanAnimation("level-up", {
+      studentName: student.name,
+      levelRule,
     });
   });
 
@@ -2385,8 +2396,8 @@ function playNextHounyanAnimation() {
   const { type, options } = hounyanAnimationQueue.shift();
   const outfit = activeOutfit();
   const animation = animationContent(type, options);
-  els.animationHounyan.src = outfitAsset(outfit, animation.pose);
-  els.animationHounyan.alt = outfit.name;
+  els.animationHounyan.src = animation.hounyanSrc || outfitAsset(outfit, animation.pose);
+  els.animationHounyan.alt = animation.hounyanAlt || outfit.name;
   if (animation.featureImage) {
     els.animationFeatureImage.src = animation.featureImage.src;
     els.animationFeatureImage.alt = animation.featureImage.alt;
@@ -2440,6 +2451,18 @@ function animationContent(type, options) {
     };
   }
 
+  if (type === "level-up") {
+    const levelRule = options.levelRule || defaultLevelRules[0];
+    return {
+      pose: "happy",
+      hounyanSrc: levelRule.image,
+      hounyanAlt: `${levelRule.name}のほうにゃん`,
+      eyebrow: options.studentName ? `${options.studentName}のほうにゃん` : "ほうにゃん",
+      title: `Lv.${levelRule.level}になったよ！`,
+      message: `${levelRule.name}にへんしん！あたらしいほうにゃんで、つぎもがんばろう。`,
+    };
+  }
+
   return {
     pose: "happy",
     eyebrow: "ほうにゃん",
@@ -2459,6 +2482,17 @@ function outfitAsset(outfit, pose) {
 
 function stampsUnlockedBetween(beforeTotal, afterTotal) {
   return activeStampAssets().filter((stamp) => !stamp.purchaseOnly && stamp.unlockAt > 0 && beforeTotal < stamp.unlockAt && afterTotal >= stamp.unlockAt);
+}
+
+function levelsUnlockedBetween(beforeTotal, afterTotal) {
+  const beforeSheets = Math.floor(beforeTotal / SHEET_SIZE);
+  const afterSheets = Math.floor(afterTotal / SHEET_SIZE);
+  if (afterSheets <= beforeSheets) {
+    return [];
+  }
+  return activeLevelRules()
+    .filter((rule) => rule.level > 1 && beforeSheets < rule.requiredSheets && afterSheets >= rule.requiredSheets)
+    .sort((a, b) => a.level - b.level);
 }
 
 function sheetsCompletedBetween(beforeTotal, afterTotal) {
