@@ -996,10 +996,6 @@ function equippedHounyanRule(student, level) {
   return activeLevelRules().find((rule) => rule.level === chosenLevel) || level.currentRule || defaultLevelRules[0];
 }
 
-function unlockedHounyanRules(level) {
-  return activeLevelRules().filter((rule) => rule.level <= level.current);
-}
-
 function openHounyanCloset() {
   const student = selectedStudent();
   if (!student) {
@@ -1024,9 +1020,19 @@ function renderHounyanCloset() {
   const level = mascotLevel(stats);
   const equippedRule = equippedHounyanRule(student, level);
   els.hounyanClosetStudent.textContent = `${student.name}のほうにゃん`;
-  els.hounyanClosetList.innerHTML = unlockedHounyanRules(level)
+  els.hounyanClosetList.innerHTML = activeLevelRules()
     .map((rule) => {
+      const unlocked = rule.level <= level.current;
       const selected = rule.level === equippedRule.level;
+      if (!unlocked) {
+        return `
+          <button class="hounyan-closet-option is-locked" type="button" disabled aria-disabled="true">
+            <span class="hounyan-closet-mystery" aria-hidden="true">?</span>
+            <strong>Lv.${rule.level} ${escapeHtml(rule.name)}</strong>
+            <span>まだひみつ</span>
+          </button>
+        `;
+      }
       return `
         <button class="hounyan-closet-option${selected ? " is-selected" : ""}" type="button" data-equip-hounyan-level="${rule.level}" aria-pressed="${selected ? "true" : "false"}">
           <img src="${escapeHtml(rule.image)}" alt="${escapeHtml(rule.name)}のほうにゃん">
