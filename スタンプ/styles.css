@@ -1038,6 +1038,15 @@ input:focus,
   align-items: center;
 }
 
+.asset-card.is-hidden {
+  background: #f4f6f5;
+  opacity: 0.72;
+}
+
+.asset-card.is-hidden img {
+  filter: grayscale(1);
+}
+
 .shop-hounyan {
   width: 112px;
   height: 112px;
