@@ -2226,6 +2226,7 @@ function addStampBatch({ student, selections, source, memo }) {
   const unlockedLevels = levelsUnlockedBetween(stats.total, nextTotal);
   const dominantStamp = dominantStampFromSelections(selections);
   state.stampEvents.push(...events);
+  autoEquipLatestUnlockedHounyan(student.id, unlockedLevels);
   lastStampedEventIds = new Set(events.map((event) => event.id));
   if (source === "teacher") {
     els.stampMemo.value = "";
@@ -2258,6 +2259,21 @@ function addStampBatch({ student, selections, source, memo }) {
     lastStampedEventIds.clear();
     renderStudentDetails();
   }, 900);
+}
+
+function autoEquipLatestUnlockedHounyan(studentId, unlockedLevels) {
+  if (!studentId || !unlockedLevels.length) {
+    return;
+  }
+  if (!state.equippedHounyanLevelByStudent) {
+    state.equippedHounyanLevelByStudent = {};
+  }
+  const latestLevel = unlockedLevels.reduce((latest, rule) =>
+    !latest || rule.level > latest.level ? rule : latest
+  , null);
+  if (latestLevel) {
+    state.equippedHounyanLevelByStudent[studentId] = latestLevel.level;
+  }
 }
 
 function stampPreviewSelections() {
