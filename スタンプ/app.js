@@ -6,6 +6,8 @@ const AUTO_BACKUP_BUCKET_MS = 3 * 60 * 1000;
 const SHEET_SIZE = 20;
 const STAMP_BATCH_MAX = SHEET_SIZE;
 const STAMP_SET_MAX_MEMBERS = 12;
+const TEST_STUDENT_NAME = "テスト児童";
+const TEST_AVAILABLE_SHEETS = Number.MAX_SAFE_INTEGER;
 const TIMER_DEFAULT_SECONDS = 5 * 60;
 const TIMER_MAX_SECONDS = 99 * 60 + 59;
 const TIMER_FINISH_SOUNDS = {
@@ -409,6 +411,7 @@ const els = {
   studentId: document.querySelector("#studentId"),
   studentName: document.querySelector("#studentName"),
   studentNote: document.querySelector("#studentNote"),
+  createTestStudentButton: document.querySelector("#createTestStudentButton"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   createAutoBackupButton: document.querySelector("#createAutoBackupButton"),
@@ -495,6 +498,7 @@ function bindEvents() {
     event.preventDefault();
     saveStudent();
   });
+  els.createTestStudentButton.addEventListener("click", createTestStudent);
   els.stampAssetForm.addEventListener("submit", (event) => {
     event.preventDefault();
     saveStampAsset();
@@ -900,7 +904,9 @@ function render() {
 
 function renderStudentSwitch() {
   const student = selectedStudent();
-  els.currentStudentLabel.textContent = student ? `選択中：${student.name}` : "選択中：児童未選択";
+  els.currentStudentLabel.textContent = student
+    ? `選択中：${student.name}${isTestStudent(student) ? "（テスト）" : ""}`
+    : "選択中：児童未選択";
 
   if (!state.students.length) {
     els.studentSwitchList.innerHTML = '<p class="empty-state switch-empty">先生ページで児童を追加してください。</p>';
@@ -913,9 +919,9 @@ function renderStudentSwitch() {
       const selected = studentItem.id === state.selectedStudentId ? " is-selected" : "";
       const selectedText = studentItem.id === state.selectedStudentId ? "true" : "false";
       return `
-        <button class="student-tab-button${selected}" type="button" role="tab" aria-selected="${selectedText}" data-switch-student="${studentItem.id}">
+        <button class="student-tab-button${selected}${isTestStudent(studentItem) ? " is-test" : ""}" type="button" role="tab" aria-selected="${selectedText}" data-switch-student="${studentItem.id}">
           <strong>${escapeHtml(studentItem.name)}</strong>
-          <span>${stats.currentSheet.count}/${SHEET_SIZE}</span>
+          <span>${isTestStudent(studentItem) ? "テスト" : `${stats.currentSheet.count}/${SHEET_SIZE}`}</span>
         </button>
       `;
     })
@@ -929,9 +935,13 @@ function renderStudentSwitch() {
 }
 
 function renderTopStats() {
-  els.totalStudents.textContent = state.students.length;
-  els.todayStamps.textContent = eventsForToday().filter((event) => !event.canceled).length;
-  els.allStamps.textContent = state.students.reduce((sum, student) => sum + studentStats(student.id).total, 0);
+  const regularStudents = state.students.filter((student) => !isTestStudent(student));
+  const regularStudentIds = new Set(regularStudents.map((student) => student.id));
+  els.totalStudents.textContent = regularStudents.length;
+  els.todayStamps.textContent = eventsForToday()
+    .filter((event) => !event.canceled && regularStudentIds.has(event.studentId))
+    .length;
+  els.allStamps.textContent = regularStudents.reduce((sum, student) => sum + studentStats(student.id).total, 0);
 }
 
 function renderStudentLists() {
@@ -951,14 +961,17 @@ function renderStudentList(container, { childMode }) {
     .map((student) => {
       const stats = studentStats(student.id);
       const selected = student.id === state.selectedStudentId ? " is-selected" : "";
-      const sheetText = childMode
+      const testStudent = isTestStudent(student);
+      const sheetText = testStudent
+        ? childMode ? "テスト / つかいほうだい" : "テスト / 制限なし"
+        : childMode
         ? `シート ${stats.currentSheet.count}/${SHEET_SIZE}`
         : `累計 ${stats.total} / 使えるシート ${stats.availableSheets}`;
       return `
-        <button class="student-card${selected}" type="button" data-select-student="${student.id}">
+        <button class="student-card${selected}${testStudent ? " is-test" : ""}" type="button" data-select-student="${student.id}">
           <span>
-            <span class="student-name">${escapeHtml(student.name)}</span>
-            <span class="student-meta">${escapeHtml(student.note || (childMode ? "がんばり中" : "メモなし"))}</span>
+            <span class="student-name">${escapeHtml(student.name)}${testStudent ? '<span class="test-student-badge">テスト</span>' : ""}</span>
+            <span class="student-meta">${escapeHtml(student.note || (testStudent ? "制限なし・集計に入らない" : childMode ? "がんばり中" : "メモなし"))}</span>
           </span>
           <span class="student-meta">${escapeHtml(sheetText)}</span>
         </button>
@@ -987,16 +1000,16 @@ function renderStudentDetails() {
   }
 
   const stats = studentStats(student.id);
-  const level = mascotLevel(stats);
+  const level = studentMascotLevel(student, stats);
   renderHounyanLevel(student, stats);
 
   els.childSelectedName.textContent = student.name;
   els.childTotal.textContent = stats.total;
-  els.childAvailableSheets.textContent = stats.availableSheets;
+  els.childAvailableSheets.textContent = testSheetBalanceText(student, stats);
   els.childCurrentSheetCount.textContent = `${stats.currentSheet.count}/${SHEET_SIZE}`;
   els.childRemainingText.textContent = `${stats.currentSheet.remaining}こ`;
   els.childCompletedSheets.textContent = stats.completedSheets;
-  renderChildNextUnlock(stats.total);
+  renderChildNextUnlock(stats.total, student);
   renderSheet({
     grid: els.childSheetGrid,
     title: els.childSheetTitle,
@@ -1007,7 +1020,7 @@ function renderStudentDetails() {
 
   els.selectedStudentName.textContent = student.name;
   els.selectedTotal.textContent = stats.total;
-  els.selectedAvailable.textContent = stats.availableSheets;
+  els.selectedAvailable.textContent = testSheetBalanceText(student, stats);
   els.selectedLevel.textContent = level.current;
   els.nextLevelText.textContent = level.remainingSheets === 0 ? "最大" : `あと${level.remainingSheets}シート`;
   renderSheet({
@@ -1020,7 +1033,17 @@ function renderStudentDetails() {
   renderHistory(student.id);
 }
 
-function renderChildNextUnlock(total) {
+function renderChildNextUnlock(total, student) {
+  if (isTestStudent(student)) {
+    els.childNextUnlock.innerHTML = `
+      <div>
+        <span>テスト</span>
+        <strong>スタンプはぜんぶつかえるよ！</strong>
+      </div>
+    `;
+    els.childNextUnlock.classList.add("is-complete");
+    return;
+  }
   const nextStamp = nextUnlockStamp(total);
   if (!nextStamp) {
     els.childNextUnlock.innerHTML = `
@@ -1045,7 +1068,7 @@ function renderChildNextUnlock(total) {
 }
 
 function renderHounyanLevel(student, stats) {
-  const level = mascotLevel(stats);
+  const level = studentMascotLevel(student, stats);
   const currentRule = level.currentRule || defaultLevelRules[0];
   const displayRule = equippedHounyanRule(student, level);
   const image = displayRule.image || defaultLevelRules[0].image;
@@ -1132,7 +1155,7 @@ function renderHounyanCloset() {
     return;
   }
   const stats = studentStats(student.id);
-  const level = mascotLevel(stats);
+  const level = studentMascotLevel(student, stats);
   const equippedRule = equippedHounyanRule(student, level);
   els.hounyanClosetStudent.textContent = `${student.name}のほうにゃん`;
   els.hounyanClosetList.innerHTML = activeLevelRules()
@@ -1168,7 +1191,7 @@ function equipHounyanLevel(levelNumber) {
   if (!student) {
     return;
   }
-  const level = mascotLevel(studentStats(student.id));
+  const level = studentMascotLevel(student, studentStats(student.id));
   const rule = activeLevelRules().find((item) => item.level === levelNumber && item.level <= level.current);
   if (!rule) {
     showToast("まだえらべないかぶりものです");
@@ -1344,7 +1367,7 @@ function renderRewards() {
   const shopRewards = state.rewards.filter((reward) => reward.enabled && reward.type === "shop");
   renderShopSummary(student, stats);
   els.unlockRewards.innerHTML = unlockRewards.length
-    ? unlockRewards.map((stamp) => unlockStampCard(stamp, stats)).join("")
+    ? unlockRewards.map((stamp) => unlockStampCard(stamp, stats, student)).join("")
     : '<p class="empty-state">解放条件つきのスタンプはありません。</p>';
   els.shopRewards.innerHTML = shopRewards.length
     ? shopRewards.map((reward) => rewardCard(reward, stats, student)).join("")
@@ -1362,14 +1385,15 @@ function renderRewards() {
 
 function renderShopSummary(student, stats) {
   els.shopSelectedName.textContent = student ? student.name : "未選択";
-  els.shopAvailableSheets.textContent = stats.availableSheets;
+  els.shopAvailableSheets.textContent = testSheetBalanceText(student, stats);
   els.shopCompletedSheets.textContent = stats.completedSheets;
 }
 
-function unlockStampCard(stamp, stats) {
+function unlockStampCard(stamp, stats, student) {
   const value = stats.total;
-  const done = value >= stamp.unlockAt;
-  const percent = stamp.unlockAt > 0 ? Math.min(100, Math.round((value / stamp.unlockAt) * 100)) : 100;
+  const testStudent = isTestStudent(student);
+  const done = testStudent || value >= stamp.unlockAt;
+  const percent = testStudent ? 100 : stamp.unlockAt > 0 ? Math.min(100, Math.round((value / stamp.unlockAt) * 100)) : 100;
   return `
     <article class="reward-card">
       <div class="reward-top">
@@ -1955,6 +1979,9 @@ function stampIsAvailableForStudent(stamp, student, total) {
   if (stamp.hidden) {
     return false;
   }
+  if (isTestStudent(student)) {
+    return true;
+  }
   if (student && studentOwnsStamp(student.id, stamp.id)) {
     return true;
   }
@@ -2517,6 +2544,30 @@ function clearStudentForm() {
   els.studentId.value = "";
   els.studentName.value = "";
   els.studentNote.value = "";
+}
+
+function createTestStudent() {
+  const existing = state.students.find((student) => isTestStudent(student));
+  if (existing) {
+    state.selectedStudentId = existing.id;
+    persist();
+    render();
+    showToast("テスト児童を選びました");
+    return;
+  }
+
+  const student = {
+    id: crypto.randomUUID(),
+    name: TEST_STUDENT_NAME,
+    note: "動作テスト用",
+    isTest: true,
+    createdAt: new Date().toISOString(),
+  };
+  state.students.push(student);
+  state.selectedStudentId = student.id;
+  persist();
+  render();
+  showToast("テスト児童を追加しました。制限なしで試せます");
 }
 
 function openTeacherStampPreview() {
@@ -3485,6 +3536,7 @@ function ensureSelection() {
 }
 
 function studentStats(studentId) {
+  const student = state.students.find((item) => item.id === studentId) || null;
   const activeEvents = state.stampEvents
     .filter((event) => event.studentId === studentId && !event.canceled)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -3499,9 +3551,20 @@ function studentStats(studentId) {
     total,
     completedSheets,
     spentSheets,
-    availableSheets: Math.max(0, completedSheets - spentSheets),
+    availableSheets: isTestStudent(student) ? TEST_AVAILABLE_SHEETS : Math.max(0, completedSheets - spentSheets),
     currentSheet,
   };
+}
+
+function isTestStudent(studentOrId) {
+  const student = typeof studentOrId === "string"
+    ? state.students.find((item) => item.id === studentOrId)
+    : studentOrId;
+  return Boolean(student?.isTest);
+}
+
+function testSheetBalanceText(student, stats) {
+  return isTestStudent(student) ? "∞" : stats.availableSheets;
 }
 
 function currentSheetInfo(activeEvents) {
@@ -3574,6 +3637,23 @@ function mascotLevel(statsOrTotal) {
     progressCurrent,
     progressNeeded,
     progressPercent: nextRule ? Math.round((progressCurrent / progressNeeded) * 100) : 100,
+  };
+}
+
+function studentMascotLevel(student, stats) {
+  if (!isTestStudent(student)) {
+    return mascotLevel(stats);
+  }
+  const currentRule = activeLevelRules().at(-1) || defaultLevelRules[0];
+  return {
+    current: currentRule.level,
+    currentRule,
+    nextRule: null,
+    remainingSheets: 0,
+    remainingStamps: 0,
+    progressCurrent: 0,
+    progressNeeded: 0,
+    progressPercent: 100,
   };
 }
 
