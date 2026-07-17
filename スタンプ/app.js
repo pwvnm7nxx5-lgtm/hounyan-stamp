@@ -791,6 +791,7 @@ const els = {
   stampPreviewLayer: document.querySelector("#stampPreviewLayer"),
   stampPreviewStudent: document.querySelector("#stampPreviewStudent"),
   stampPreviewTabs: document.querySelector("#stampPreviewTabs"),
+  stampPreviewRandomButton: document.querySelector("#stampPreviewRandomButton"),
   stampPreviewList: document.querySelector("#stampPreviewList"),
   stampPreviewTotal: document.querySelector("#stampPreviewTotal"),
   stampPreviewCancelButton: document.querySelector("#stampPreviewCancelButton"),
@@ -881,6 +882,7 @@ function bindEvents() {
     }
   });
   els.stampPreviewCancelButton.addEventListener("click", closeStampPreview);
+  els.stampPreviewRandomButton.addEventListener("click", chooseRandomPreviewStamps);
   els.stampPreviewConfirmButton.addEventListener("click", confirmStampPreview);
   els.stampPreviewLayer.addEventListener("click", (event) => {
     if (event.target === els.stampPreviewLayer) {
@@ -3318,6 +3320,28 @@ function closeStampPreview() {
     stampPreviewCounts = {};
     stampPreviewCategoryId = "all";
   }, 160);
+}
+
+function chooseRandomPreviewStamps() {
+  const student = selectedStudent();
+  if (!student || !stampPreviewContext) {
+    return;
+  }
+  const stats = studentStats(student.id);
+  const availableStamps = visibleStampAssets().filter((stamp) => stampIsAvailableForStudent(stamp, student, stats.total));
+  if (!availableStamps.length) {
+    showToast("使えるスタンプがありません");
+    return;
+  }
+
+  const plannedCount = Math.max(1, Number(stampPreviewContext.plannedCount || 1));
+  stampPreviewCounts = Object.fromEntries(visibleStampAssets().map((stamp) => [stamp.id, 0]));
+  for (let index = 0; index < plannedCount; index += 1) {
+    const stamp = availableStamps[Math.floor(Math.random() * availableStamps.length)];
+    stampPreviewCounts[stamp.id] += 1;
+  }
+  renderStampPreview();
+  showToast(`ランダムに ${plannedCount} ${stampPreviewContext.source === "child" ? "こ" : "個"}えらびました`);
 }
 
 function stampPreviewCategories(stamps) {

@@ -2167,6 +2167,12 @@ input:focus,
   padding-bottom: 4px;
 }
 
+.stamp-preview-random {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}
+
 .stamp-preview-tab {
   display: inline-flex;
   align-items: center;
