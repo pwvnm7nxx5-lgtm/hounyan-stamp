@@ -1525,7 +1525,8 @@ input:focus,
   transform-origin: 50% 92%;
 }
 
-.timer-hounyan-study {
+.timer-hounyan-study,
+.timer-hounyan-break {
   border-radius: var(--radius);
   opacity: 0;
   object-fit: cover;
@@ -1640,11 +1641,8 @@ input:focus,
     linear-gradient(160deg, #fffef2, #eefaf4);
 }
 
+.timer-page.is-running[data-timer-mode="study"] .timer-hounyan-default,
 .timer-page.is-running[data-timer-mode="play"] .timer-hounyan-default {
-  animation: timerHounyanCheer 0.9s ease-in-out infinite;
-}
-
-.timer-page.is-running[data-timer-mode="study"] .timer-hounyan-default {
   opacity: 0;
 }
 
@@ -1657,6 +1655,18 @@ input:focus,
 }
 
 .timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study-3 {
+  animation: timerStudyFrameThree 9s ease-in-out infinite;
+}
+
+.timer-page.is-running[data-timer-mode="play"] .timer-hounyan-break-1 {
+  animation: timerStudyFrameOne 9s ease-in-out infinite;
+}
+
+.timer-page.is-running[data-timer-mode="play"] .timer-hounyan-break-2 {
+  animation: timerStudyFrameTwo 9s ease-in-out infinite;
+}
+
+.timer-page.is-running[data-timer-mode="play"] .timer-hounyan-break-3 {
   animation: timerStudyFrameThree 9s ease-in-out infinite;
 }
 
@@ -1747,13 +1757,18 @@ input:focus,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study {
+  .timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study,
+  .timer-page.is-running[data-timer-mode="play"] .timer-hounyan-break {
     animation: none;
     opacity: 0;
     transform: none;
   }
 
   .timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study-1 {
+    opacity: 1;
+  }
+
+  .timer-page.is-running[data-timer-mode="play"] .timer-hounyan-break-1 {
     opacity: 1;
   }
 }

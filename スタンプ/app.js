@@ -2461,7 +2461,9 @@ function renderTimer() {
   els.timerRing.classList.toggle("is-low", timerDurationSeconds > 0 && progress <= 0.2);
   els.timerPage.classList.toggle("is-running", timerIsRunning);
   els.timerPage.classList.toggle("is-finished", isFinished);
-  els.timerPage.dataset.timerMode = timerMode;
+  if (els.timerPage.dataset.timerMode !== timerMode) {
+    els.timerPage.dataset.timerMode = timerMode;
+  }
   els.timerModeButtons.forEach((button) => {
     button.classList.toggle("is-selected", button.dataset.timerMode === timerMode);
   });
@@ -2473,7 +2475,9 @@ function renderTimer() {
         ? "じゅんびOK"
         : "一時停止中";
   els.timerTitle.textContent = timerIsRunning
-    ? "ほうにゃんとがんばる"
+    ? timerMode === "play"
+      ? "ほうにゃんとひとやすみ"
+      : "ほうにゃんとがんばる"
     : isFinished
       ? "おしまい！"
       : "じかんをきめる";
@@ -2481,10 +2485,16 @@ function renderTimer() {
     els.timerCheerText.innerHTML = TIMER_FINISH_MESSAGES[timerMode] || TIMER_FINISH_MESSAGES.study;
   } else {
     els.timerCheerText.textContent = timerIsRunning
-      ? progress <= 0.2
-        ? "あとすこし！ほうにゃんが見てるよ"
-        : "そのちょうし！いっしょにがんばろう"
-      : "ほうにゃんもいっしょに見てるよ";
+      ? timerMode === "play"
+        ? progress <= 0.2
+          ? "あとすこしで きゅうけい おしまい"
+          : "のんびり きゅうけい しよう"
+        : progress <= 0.2
+          ? "あとすこし！ほうにゃんが見てるよ"
+          : "そのちょうし！いっしょにがんばろう"
+      : timerMode === "play"
+        ? "ほうにゃんと ひとやすみ しよう"
+        : "ほうにゃんもいっしょに見てるよ";
   }
   els.timerStartButton.disabled = timerIsRunning;
   els.timerPauseButton.disabled = !timerIsRunning;
