@@ -5,6 +5,7 @@ const AUTO_BACKUP_LIMIT = 6;
 const AUTO_BACKUP_BUCKET_MS = 3 * 60 * 1000;
 const SHEET_SIZE = 20;
 const STAMP_BATCH_MAX = SHEET_SIZE;
+const STAMP_SET_MAX_MEMBERS = 12;
 const TIMER_DEFAULT_SECONDS = 5 * 60;
 const TIMER_MAX_SECONDS = 99 * 60 + 59;
 const TIMER_FINISH_SOUNDS = {
@@ -282,6 +283,7 @@ const defaultState = {
   stampEvents: [],
   rewards: defaultRewards,
   stampAssets: defaultStampAssets,
+  stampSets: [],
   redemptions: [],
   settings: {
     activeOutfit: "default",
@@ -314,6 +316,7 @@ let timerIsRunning = false;
 let timerAudioContext = null;
 let timerFinishedSoundPlayed = false;
 let timerMode = "study";
+let stampSetDraftMembers = [];
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -418,6 +421,15 @@ const els = {
   stampAssetImage: document.querySelector("#stampAssetImage"),
   clearStampAssetForm: document.querySelector("#clearStampAssetForm"),
   stampAssetsList: document.querySelector("#stampAssetsList"),
+  stampSetForm: document.querySelector("#stampSetForm"),
+  stampSetId: document.querySelector("#stampSetId"),
+  stampSetName: document.querySelector("#stampSetName"),
+  stampSetPriceSheets: document.querySelector("#stampSetPriceSheets"),
+  stampSetVisible: document.querySelector("#stampSetVisible"),
+  stampSetImages: document.querySelector("#stampSetImages"),
+  stampSetMembersDraft: document.querySelector("#stampSetMembersDraft"),
+  clearStampSetForm: document.querySelector("#clearStampSetForm"),
+  stampSetsList: document.querySelector("#stampSetsList"),
   stampCountLayer: document.querySelector("#stampCountLayer"),
   stampCountStudent: document.querySelector("#stampCountStudent"),
   stampCountMinus: document.querySelector("#stampCountMinus"),
@@ -476,6 +488,12 @@ function bindEvents() {
   });
   els.stampAssetUnlockMode.addEventListener("change", updateStampAssetModeFields);
   els.clearStampAssetForm.addEventListener("click", clearStampAssetForm);
+  els.stampSetForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveStampSet();
+  });
+  els.stampSetImages.addEventListener("change", addStampSetImages);
+  els.clearStampSetForm.addEventListener("click", clearStampSetForm);
   els.prizeForm.addEventListener("submit", (event) => {
     event.preventDefault();
     savePrize();
@@ -609,6 +627,7 @@ function normalizeState(input) {
     : [];
   merged.rewards = normalizeRewards(input.rewards);
   merged.stampAssets = normalizeStampAssets(input.stampAssets || input.stamps || input.stampSettings);
+  merged.stampSets = normalizeStampSets(input.stampSets, merged.stampAssets);
   merged.settings = {
     ...defaultState.settings,
     ...(input.settings || {}),
@@ -726,6 +745,7 @@ function normalizeStampAssets(inputAssets) {
         shopPriceSheets: Math.max(1, Math.floor(Number(stamp.shopPriceSheets ?? base.shopPriceSheets ?? 1))),
         rarity: String(stamp.rarity || base.rarity || "normal"),
         hidden: Boolean(stamp.hidden ?? base.hidden ?? false),
+        setId: stamp.setId ? String(stamp.setId) : "",
       });
     });
   }
@@ -735,6 +755,31 @@ function normalizeStampAssets(inputAssets) {
     stampPriceSheets(a) - stampPriceSheets(b) ||
     a.name.localeCompare(b.name, "ja")
   );
+}
+
+function normalizeStampSets(inputSets, stampAssets = []) {
+  if (!Array.isArray(inputSets)) {
+    return [];
+  }
+
+  const knownStampIds = new Set(stampAssets.map((stamp) => stamp.id));
+  return inputSets
+    .filter((stampSet) => stampSet && stampSet.id)
+    .map((stampSet) => {
+      const id = String(stampSet.id);
+      const memberIds = Array.isArray(stampSet.memberIds)
+        ? stampSet.memberIds.map(String).filter((stampId) => knownStampIds.has(stampId))
+        : stampAssets.filter((stamp) => stamp.setId === id).map((stamp) => stamp.id);
+      return {
+        id,
+        name: String(stampSet.name || "あたらしいスタンプセット").trim(),
+        priceSheets: Math.max(1, Math.floor(Number(stampSet.priceSheets || 1))),
+        memberIds: [...new Set(memberIds)],
+        hidden: Boolean(stampSet.hidden),
+      };
+    })
+    .filter((stampSet) => stampSet.memberIds.length)
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"));
 }
 
 function normalizeOwnedStampIdsByStudent(input) {
@@ -770,7 +815,34 @@ function activeStampAssets() {
 }
 
 function visibleStampAssets() {
-  return activeStampAssets().filter((stamp) => !stamp.hidden);
+  return activeStampAssets().filter((stamp) => !stamp.hidden && stampSetIsVisible(stamp));
+}
+
+function activeStampSets() {
+  if (!Array.isArray(state.stampSets)) {
+    state.stampSets = [];
+  }
+  return state.stampSets;
+}
+
+function visibleStampSets() {
+  return activeStampSets().filter((stampSet) => !stampSet.hidden && stampSetMembers(stampSet).length);
+}
+
+function stampSetMembers(stampSet) {
+  if (!stampSet) {
+    return [];
+  }
+  const ids = new Set(stampSet.memberIds || []);
+  return activeStampAssets().filter((stamp) => ids.has(stamp.id));
+}
+
+function stampSetIsVisible(stamp) {
+  if (!stamp?.setId) {
+    return true;
+  }
+  const stampSet = activeStampSets().find((item) => item.id === stamp.setId);
+  return Boolean(stampSet && !stampSet.hidden);
 }
 
 function persist() {
@@ -797,6 +869,7 @@ function render() {
   renderRewards();
   renderRedemptions();
   renderStampAssets();
+  renderStampSets();
   renderLevelSettings();
   renderAutoBackups();
   els.viewButtons.forEach((button) => {
@@ -1324,6 +1397,7 @@ function renderLevelSettings() {
 
 function renderStampAssets() {
   els.stampAssetsList.innerHTML = activeStampAssets()
+    .filter((stamp) => !stamp.setId)
     .map((stamp) => {
       const text = stamp.purchaseOnly
         ? `買い物で購入（${stampPriceSheets(stamp)}シート）`
@@ -1347,6 +1421,44 @@ function renderStampAssets() {
   els.stampAssetsList.querySelectorAll("[data-edit-stamp]").forEach((button) => {
     button.addEventListener("click", () => editStampAsset(button.dataset.editStamp));
   });
+}
+
+function renderStampSets() {
+  const sets = activeStampSets();
+  if (!sets.length) {
+    els.stampSetsList.innerHTML = '<p class="empty-state">スタンプセットはまだありません。</p>';
+    return;
+  }
+
+  els.stampSetsList.innerHTML = sets
+    .map((stampSet) => {
+      const members = stampSetMembers(stampSet);
+      const visibility = stampSet.hidden ? "非表示" : "表示中";
+      return `
+        <article class="stamp-set-settings-card${stampSet.hidden ? " is-hidden" : ""}">
+          ${stampSetCover(stampSet, members)}
+          <div>
+            <strong>${escapeHtml(stampSet.name)}</strong>
+            <p>${members.length}こ / ${stampSet.priceSheets}シート / ${visibility}</p>
+          </div>
+          <button class="soft-button compact-button" type="button" data-edit-stamp-set="${stampSet.id}">編集</button>
+        </article>
+      `;
+    })
+    .join("");
+
+  els.stampSetsList.querySelectorAll("[data-edit-stamp-set]").forEach((button) => {
+    button.addEventListener("click", () => editStampSet(button.dataset.editStampSet));
+  });
+}
+
+function stampSetCover(stampSet, members) {
+  const previews = members.slice(0, 4);
+  return `
+    <div class="stamp-set-cover" aria-label="${escapeHtml(stampSet.name)}のスタンプ">
+      ${previews.map((stamp) => `<img src="${escapeHtml(stamp.src)}" alt="">`).join("")}
+    </div>
+  `;
 }
 
 function renderRedemptions() {
@@ -1417,6 +1529,170 @@ function clearStampAssetForm() {
   els.stampAssetVisible.checked = true;
   els.stampAssetImage.value = "";
   updateStampAssetModeFields();
+}
+
+function editStampSet(stampSetId) {
+  const stampSet = activeStampSets().find((item) => item.id === stampSetId);
+  if (!stampSet) {
+    return;
+  }
+  els.stampSetId.value = stampSet.id;
+  els.stampSetName.value = stampSet.name;
+  els.stampSetPriceSheets.value = String(stampSet.priceSheets);
+  els.stampSetVisible.checked = !stampSet.hidden;
+  els.stampSetImages.value = "";
+  stampSetDraftMembers = stampSetMembers(stampSet).map((stamp) => ({
+    stampId: stamp.id,
+    name: stamp.name,
+    src: stamp.src,
+  }));
+  renderStampSetDraft();
+  els.stampSetName.focus();
+}
+
+function clearStampSetForm() {
+  els.stampSetId.value = "";
+  els.stampSetName.value = "";
+  els.stampSetPriceSheets.value = "1";
+  els.stampSetVisible.checked = true;
+  els.stampSetImages.value = "";
+  stampSetDraftMembers = [];
+  renderStampSetDraft();
+}
+
+async function addStampSetImages() {
+  const files = Array.from(els.stampSetImages.files || []);
+  els.stampSetImages.value = "";
+  if (!files.length) {
+    return;
+  }
+  const remaining = STAMP_SET_MAX_MEMBERS - stampSetDraftMembers.length;
+  if (remaining <= 0) {
+    showToast(`スタンプセットは${STAMP_SET_MAX_MEMBERS}こまでです`);
+    return;
+  }
+  const accepted = files.slice(0, remaining);
+  if (accepted.some((file) => !file.type.startsWith("image/"))) {
+    showToast("画像ファイルを選んでください");
+    return;
+  }
+  try {
+    const members = await Promise.all(accepted.map(async (file) => ({
+      draftId: crypto.randomUUID(),
+      name: stampNameFromFileName(file.name),
+      src: await imageFileToStampDataUrl(file),
+    })));
+    stampSetDraftMembers = [...stampSetDraftMembers, ...members];
+    renderStampSetDraft();
+    if (files.length > accepted.length) {
+      showToast(`最初の${remaining}こを追加しました`);
+    }
+  } catch (error) {
+    console.error(error);
+    showToast("画像を読み込めませんでした");
+  }
+}
+
+function stampNameFromFileName(fileName) {
+  return String(fileName || "スタンプ")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[-_]+/g, " ")
+    .trim() || "スタンプ";
+}
+
+function renderStampSetDraft() {
+  if (!stampSetDraftMembers.length) {
+    els.stampSetMembersDraft.innerHTML = '<p class="empty-state">画像をえらぶと、ここにスタンプがならびます。</p>';
+    return;
+  }
+
+  els.stampSetMembersDraft.innerHTML = stampSetDraftMembers
+    .map((member, index) => `
+      <div class="stamp-set-draft-item">
+        <img src="${escapeHtml(member.src)}" alt="">
+        <input type="text" value="${escapeHtml(member.name)}" data-stamp-set-member-name="${index}" aria-label="スタンプ${index + 1}の名前">
+        <button class="icon-button" type="button" data-remove-stamp-set-member="${index}" aria-label="スタンプ${index + 1}を外す">×</button>
+      </div>
+    `)
+    .join("");
+
+  els.stampSetMembersDraft.querySelectorAll("[data-stamp-set-member-name]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const index = Number(input.dataset.stampSetMemberName);
+      if (stampSetDraftMembers[index]) {
+        stampSetDraftMembers[index].name = input.value;
+      }
+    });
+  });
+  els.stampSetMembersDraft.querySelectorAll("[data-remove-stamp-set-member]").forEach((button) => {
+    button.addEventListener("click", () => {
+      stampSetDraftMembers.splice(Number(button.dataset.removeStampSetMember), 1);
+      renderStampSetDraft();
+    });
+  });
+}
+
+function saveStampSet() {
+  const name = els.stampSetName.value.trim();
+  const priceSheets = Math.max(1, Math.floor(Number(els.stampSetPriceSheets.value || 1)));
+  const hidden = !els.stampSetVisible.checked;
+  const stampSetId = els.stampSetId.value;
+  const existing = activeStampSets().find((item) => item.id === stampSetId);
+  if (!name) {
+    showToast("セットの名前を入力してください");
+    return;
+  }
+  if (!stampSetDraftMembers.length) {
+    showToast("セットに入れるスタンプ画像を選んでください");
+    return;
+  }
+  if (stampSetDraftMembers.some((member) => !member.name.trim())) {
+    showToast("スタンプの名前を入力してください");
+    return;
+  }
+
+  const id = existing?.id || `stamp-set-${crypto.randomUUID()}`;
+  const nextMembers = stampSetDraftMembers.map((member) => ({
+    id: member.stampId || `set-stamp-${crypto.randomUUID()}`,
+    name: member.name.trim(),
+    reading: member.name.trim(),
+    src: member.src,
+    unlockAt: 0,
+    custom: true,
+    purchaseOnly: true,
+    shopPriceSheets: priceSheets,
+    rarity: "normal",
+    hidden: false,
+    setId: id,
+  }));
+  const nextById = new Map(nextMembers.map((stamp) => [stamp.id, stamp]));
+  const previousAssets = state.stampAssets;
+  const previousSets = state.stampSets;
+  const existingMemberIds = new Set(existing?.memberIds || []);
+  const untouchedAssets = activeStampAssets().map((stamp) => {
+    if (!existingMemberIds.has(stamp.id)) {
+      return stamp;
+    }
+    return nextById.get(stamp.id) || { ...stamp, setId: "", hidden: true };
+  });
+  const addedMembers = nextMembers.filter((stamp) => !existingMemberIds.has(stamp.id));
+
+  state.stampAssets = normalizeStampAssets([...untouchedAssets, ...addedMembers]);
+  state.stampSets = normalizeStampSets([
+    ...activeStampSets().filter((item) => item.id !== id),
+    { id, name, priceSheets, memberIds: nextMembers.map((stamp) => stamp.id), hidden },
+  ], state.stampAssets);
+  if (!visibleStampAssets().some((stamp) => stamp.id === state.selectedStampId)) {
+    state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
+  }
+  if (!persist()) {
+    state.stampAssets = previousAssets;
+    state.stampSets = previousSets;
+    return;
+  }
+  clearStampSetForm();
+  render();
+  showToast(existing ? "スタンプセットを更新しました" : "スタンプセットを追加しました");
 }
 
 function updateStampAssetModeFields() {
@@ -1533,15 +1809,47 @@ async function saveStampAsset() {
 }
 
 function renderStampShop(student, stats) {
-  const stamps = visibleStampAssets().filter((stamp) => stamp.purchaseOnly);
-  if (!stamps.length) {
+  const stampSets = visibleStampSets();
+  const stamps = visibleStampAssets().filter((stamp) => stamp.purchaseOnly && !stamp.setId);
+  if (!stampSets.length && !stamps.length) {
     els.shopStampRewards.innerHTML = '<p class="empty-state">買えるスタンプはまだありません。</p>';
     return;
   }
 
   els.shopStampRewards.innerHTML = stamps
     .map((stamp) => stampShopCard(stamp, stats, student))
+    .concat(stampSets.map((stampSet) => stampSetShopCard(stampSet, stats, student)))
     .join("");
+  els.shopStampRewards.querySelectorAll("[data-buy-stamp-set]").forEach((button) => {
+    button.addEventListener("click", () => openStampSetPurchaseConfirm(button.dataset.buyStampSet));
+  });
+}
+
+function stampSetShopCard(stampSet, stats, student) {
+  const members = stampSetMembers(stampSet);
+  const owned = student ? stampSetIsOwned(student.id, stampSet) : false;
+  const canBuy = Boolean(student) && !owned && stats.availableSheets >= stampSet.priceSheets;
+  const label = owned ? "購入済み" : canBuy ? "セットを買う" : `あと${Math.max(0, stampSet.priceSheets - stats.availableSheets)}シート`;
+  return `
+    <article class="stamp-shop-card stamp-set-shop-card${owned ? " is-owned" : ""}">
+      ${stampSetCover(stampSet, members)}
+      <div>
+        <span>${members.length}こスタンプセット</span>
+        <strong>${escapeHtml(stampSet.name)}</strong>
+        <p>${stampSet.priceSheets}シート</p>
+      </div>
+      <button class="primary-button" type="button" data-buy-stamp-set="${stampSet.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
+    </article>
+  `;
+}
+
+function stampSetIsOwned(studentId, stampSet) {
+  const members = stampSetMembers(stampSet);
+  return Boolean(members.length) && members.every((stamp) => studentOwnsStamp(studentId, stamp.id));
+}
+
+function stampSetPriceSheets(stampSet) {
+  return Math.max(1, Math.floor(Number(stampSet?.priceSheets || 1)));
 }
 
 function stampShopCard(stamp, stats, student) {
@@ -2358,6 +2666,10 @@ function confirmExchange() {
     buyStamp(action.id);
     return;
   }
+  if (action.type === "stamp-set") {
+    buyStampSet(action.id);
+    return;
+  }
   redeemReward(action.id);
 }
 
@@ -2379,6 +2691,33 @@ function openStampPurchaseConfirm(stampId) {
   exchangeConfirmAction = { type: "stamp", id: stampId };
   els.exchangeConfirmTitle.textContent = "こうにゅうする？";
   els.exchangeConfirmMessage.textContent = `${student.name}の使えるシート${costSheets}枚で「${stamp.name}」スタンプを購入します。`;
+  els.exchangeConfirmLayer.hidden = false;
+  els.exchangeConfirmLayer.classList.remove("is-showing");
+  requestAnimationFrame(() => {
+    els.exchangeConfirmLayer.classList.add("is-showing");
+    els.exchangeConfirmButton.focus();
+  });
+}
+
+function openStampSetPurchaseConfirm(stampSetId) {
+  const student = selectedStudent();
+  const stampSet = visibleStampSets().find((item) => item.id === stampSetId);
+  const members = stampSetMembers(stampSet);
+  if (!student || !stampSet || !members.length || stampSetIsOwned(student.id, stampSet)) {
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const costSheets = stampSetPriceSheets(stampSet);
+  if (stats.availableSheets < costSheets) {
+    showToast("使えるシートが足りません");
+    return;
+  }
+
+  exchangeConfirmRewardId = "";
+  exchangeConfirmAction = { type: "stamp-set", id: stampSetId };
+  els.exchangeConfirmTitle.textContent = "こうにゅうする？";
+  els.exchangeConfirmMessage.textContent = `${student.name}の使えるシート${costSheets}枚で、「${stampSet.name}」のスタンプ${members.length}こをまとめて買います。`;
   els.exchangeConfirmLayer.hidden = false;
   els.exchangeConfirmLayer.classList.remove("is-showing");
   requestAnimationFrame(() => {
@@ -2449,6 +2788,45 @@ function buyStamp(stampId) {
   showToast(`${stamp.name}スタンプを購入しました`);
 }
 
+function buyStampSet(stampSetId) {
+  const student = selectedStudent();
+  const stampSet = visibleStampSets().find((item) => item.id === stampSetId);
+  const members = stampSetMembers(stampSet);
+  if (!student || !stampSet || !members.length || stampSetIsOwned(student.id, stampSet)) {
+    return;
+  }
+
+  const stats = studentStats(student.id);
+  const costSheets = stampSetPriceSheets(stampSet);
+  if (stats.availableSheets < costSheets) {
+    showToast("使えるシートが足りません");
+    return;
+  }
+
+  const previousOwnedStampIds = [...ownedStampIdsForStudent(student.id)];
+  const stampIds = members.map((stamp) => stamp.id);
+  const redemption = {
+    id: crypto.randomUUID(),
+    studentId: student.id,
+    rewardId: `stamp-set:${stampSet.id}`,
+    type: "stamp-set-purchase",
+    stampSetId: stampSet.id,
+    stampIds,
+    sheetCost: costSheets,
+    createdAt: new Date().toISOString(),
+    memo: `${stampSet.name} スタンプセット（${members.length}こ）`,
+  };
+  state.ownedStampIdsByStudent[student.id] = [...new Set([...previousOwnedStampIds, ...stampIds])];
+  state.redemptions.push(redemption);
+  if (!persist()) {
+    state.ownedStampIdsByStudent[student.id] = previousOwnedStampIds;
+    state.redemptions = state.redemptions.filter((item) => item.id !== redemption.id);
+    return;
+  }
+  render();
+  showToast(`${stampSet.name}を購入しました`);
+}
+
 function cancelRedemption(redemptionId) {
   const redemption = state.redemptions.find((item) => item.id === redemptionId);
   if (!redemption || redemption.canceled) {
@@ -2457,18 +2835,27 @@ function cancelRedemption(redemptionId) {
 
   redemption.canceled = true;
   redemption.canceledAt = new Date().toISOString();
-  if (redemption.type === "stamp-purchase" && redemption.stampId) {
-    const stillOwned = state.redemptions.some((item) =>
-      item.id !== redemption.id &&
-      item.studentId === redemption.studentId &&
-      item.type === "stamp-purchase" &&
-      item.stampId === redemption.stampId &&
-      !item.canceled
-    );
-    if (!stillOwned) {
-      state.ownedStampIdsByStudent[redemption.studentId] = ownedStampIdsForStudent(redemption.studentId)
-        .filter((stampId) => stampId !== redemption.stampId);
-    }
+  const purchasedStampIds = redemption.type === "stamp-purchase" && redemption.stampId
+    ? [redemption.stampId]
+    : redemption.type === "stamp-set-purchase" && Array.isArray(redemption.stampIds)
+      ? redemption.stampIds
+      : [];
+  if (purchasedStampIds.length) {
+    purchasedStampIds.forEach((stampId) => {
+      const stillOwned = state.redemptions.some((item) =>
+        item.id !== redemption.id &&
+        item.studentId === redemption.studentId &&
+        !item.canceled &&
+        (
+          (item.type === "stamp-purchase" && item.stampId === stampId) ||
+          (item.type === "stamp-set-purchase" && Array.isArray(item.stampIds) && item.stampIds.includes(stampId))
+        )
+      );
+      if (!stillOwned) {
+        state.ownedStampIdsByStudent[redemption.studentId] = ownedStampIdsForStudent(redemption.studentId)
+          .filter((ownedStampId) => ownedStampId !== stampId);
+      }
+    });
   }
   persist();
   render();

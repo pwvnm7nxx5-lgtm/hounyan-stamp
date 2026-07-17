@@ -476,6 +476,41 @@
               </form>
               <div id="stampAssetsList" class="asset-list"></div>
             </section>
+
+            <section class="work-panel stamp-sets-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">スタンプセット</p>
+                  <h2>セットで売るスタンプ</h2>
+                </div>
+              </div>
+              <form id="stampSetForm" class="form-grid stamp-set-form">
+                <input id="stampSetId" type="hidden">
+                <label>
+                  セットの名前
+                  <input id="stampSetName" type="text" placeholder="例: でんしゃセット" required>
+                </label>
+                <label>
+                  買うのに必要なシート
+                  <input id="stampSetPriceSheets" type="number" min="1" step="1" value="1" required>
+                </label>
+                <label class="check-row">
+                  <input id="stampSetVisible" type="checkbox" checked>
+                  <span>おかいものページに表示する</span>
+                </label>
+                <label class="file-button stamp-file-button stamp-set-file-button">
+                  スタンプ画像をまとめて選ぶ
+                  <input id="stampSetImages" type="file" accept="image/*" multiple>
+                </label>
+                <div id="stampSetMembersDraft" class="stamp-set-draft"></div>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">スタンプセットを保存</button>
+                  <button class="soft-button" type="button" id="clearStampSetForm">新規入力</button>
+                </div>
+                <p class="hint">画像を選ぶと、ファイル名をもとにスタンプ名が入ります。名前はあとから変えられます。</p>
+              </form>
+              <div id="stampSetsList" class="stamp-sets-list"></div>
+            </section>
           </div>
         </section>
 
