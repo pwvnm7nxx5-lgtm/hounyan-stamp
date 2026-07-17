@@ -4101,7 +4101,6 @@ function hideHounyanAnimation() {
 function animationContent(type, options) {
   if (type === "stamps-purchased") {
     const stamps = Array.isArray(options.stamps) ? options.stamps : [];
-    const count = stamps.length;
     const setName = options.stampSet?.name;
     const firstStamp = stamps[0];
     return {
@@ -4112,10 +4111,6 @@ function animationContent(type, options) {
         ? `「${setName}」を こうにゅうしたよ。つぎにスタンプをおすとき、えらべるよ！`
         : `${firstStamp?.name || "あたらしい"}スタンプを こうにゅうしたよ。つぎのプリントで つかってみよう！`,
       stamps,
-      milestone: {
-        value: count > 1 ? `${count}こ` : "NEW",
-        label: "スタンプ かいほう！",
-      },
     };
   }
 
