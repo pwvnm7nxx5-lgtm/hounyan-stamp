@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ほうにゃんスタンプ台帳</title>
-    <link rel="stylesheet" href="styles.css?v=purchase-unlock-v2">
+    <link rel="stylesheet" href="styles.css?v=reward-goal-v1">
   </head>
   <body>
     <div class="app-shell">
@@ -32,7 +32,7 @@
       </div>
 
       <main>
-        <section class="view is-active child-page" data-view="child" aria-labelledby="child-title">
+        <section class="view is-active child-page" data-view="child" aria-label="児童ページ">
           <div class="child-grid">
             <section class="hero-panel child-hero">
               <div class="hounyan-stage">
@@ -40,30 +40,7 @@
                   <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image" id="childHounyanImage">
                 </button>
               </div>
-              <div class="hero-stats">
-                <div>
-                  <span class="stat-label"><ruby>児童<rt>じどう</rt></ruby></span>
-                  <strong id="totalStudents">0</strong>
-                </div>
-                <div>
-                  <span class="stat-label"><ruby>今日<rt>きょう</rt></ruby></span>
-                  <strong id="todayStamps">0</strong>
-                </div>
-                <div>
-                  <span class="stat-label"><ruby>全部<rt>ぜんぶ</rt></ruby></span>
-                  <strong id="allStamps">0</strong>
-                </div>
-              </div>
-            </section>
-
-            <section class="work-panel">
-              <div class="section-head">
-                <div>
-                  <p class="eyebrow">こどもページ</p>
-                  <h2 id="child-title"><ruby>児童<rt>じどう</rt></ruby>をえらぶ</h2>
-                </div>
-              </div>
-              <div class="student-list child-student-list" id="childStudentList"></div>
+              <section class="reward-goal-card" id="childRewardGoal" aria-label="いまのねらい"></section>
             </section>
           </div>
 
@@ -722,6 +699,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=purchase-unlock-v2"></script>
+    <script src="app.js?v=reward-goal-v1"></script>
   </body>
 </html>

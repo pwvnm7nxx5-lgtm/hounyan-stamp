@@ -631,6 +631,7 @@ const defaultState = {
   },
   ownedOutfits: ["default"],
   ownedStampIdsByStudent: {},
+  rewardGoalsByStudent: {},
   equippedHounyanLevelByStudent: {},
   selectedStudentId: "",
   selectedStampId: "sonochoshi",
@@ -685,6 +686,7 @@ const els = {
   childLevelProgressText: document.querySelector("#childLevelProgressText"),
   childNextLevelPreview: document.querySelector("#childNextLevelPreview"),
   childNextUnlock: document.querySelector("#childNextUnlock"),
+  childRewardGoal: document.querySelector("#childRewardGoal"),
   childSheetTitle: document.querySelector("#childSheetTitle"),
   childSheetProgress: document.querySelector("#childSheetProgress"),
   childSheetGrid: document.querySelector("#childSheetGrid"),
@@ -1012,8 +1014,21 @@ function normalizeState(input) {
     ? input.ownedOutfits
     : [...defaultState.ownedOutfits];
   merged.ownedStampIdsByStudent = normalizeOwnedStampIdsByStudent(input.ownedStampIdsByStudent);
+  merged.rewardGoalsByStudent = normalizeRewardGoalsByStudent(input.rewardGoalsByStudent);
   merged.equippedHounyanLevelByStudent = normalizeEquippedHounyanLevels(input.equippedHounyanLevelByStudent);
   return merged;
+}
+
+function normalizeRewardGoalsByStudent(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+  return Object.fromEntries(Object.entries(input).flatMap(([studentId, goal]) => {
+    if (!goal || typeof goal !== "object" || !["stamp", "stamp-set"].includes(goal.type) || !goal.id) {
+      return [];
+    }
+    return [[studentId, { type: goal.type, id: String(goal.id) }]];
+  }));
 }
 
 function normalizeLevelRules(inputRules) {
@@ -1335,15 +1350,23 @@ function renderStudentSwitch() {
 function renderTopStats() {
   const regularStudents = state.students.filter((student) => !isTestStudent(student));
   const regularStudentIds = new Set(regularStudents.map((student) => student.id));
-  els.totalStudents.textContent = regularStudents.length;
-  els.todayStamps.textContent = eventsForToday()
-    .filter((event) => !event.canceled && regularStudentIds.has(event.studentId))
-    .length;
-  els.allStamps.textContent = regularStudents.reduce((sum, student) => sum + studentStats(student.id).total, 0);
+  if (els.totalStudents) {
+    els.totalStudents.textContent = regularStudents.length;
+  }
+  if (els.todayStamps) {
+    els.todayStamps.textContent = eventsForToday()
+      .filter((event) => !event.canceled && regularStudentIds.has(event.studentId))
+      .length;
+  }
+  if (els.allStamps) {
+    els.allStamps.textContent = regularStudents.reduce((sum, student) => sum + studentStats(student.id).total, 0);
+  }
 }
 
 function renderStudentLists() {
-  renderStudentList(els.childStudentList, { childMode: true });
+  if (els.childStudentList) {
+    renderStudentList(els.childStudentList, { childMode: true });
+  }
   renderStudentList(els.teacherStudentList, { childMode: false });
 }
 
@@ -1394,6 +1417,7 @@ function renderStudentDetails() {
   if (!student) {
     els.childCompletedSheets.textContent = "0";
     renderHounyanLevel(null, emptyStats());
+    renderChildRewardGoal(null, emptyStats());
     return;
   }
 
@@ -1408,6 +1432,7 @@ function renderStudentDetails() {
   els.childRemainingText.textContent = `${stats.currentSheet.remaining}こ`;
   els.childCompletedSheets.textContent = stats.completedSheets;
   renderChildNextUnlock(stats.total, student);
+  renderChildRewardGoal(student, stats);
   renderSheet({
     grid: els.childSheetGrid,
     title: els.childSheetTitle,
@@ -1463,6 +1488,64 @@ function renderChildNextUnlock(total, student) {
     <img class="next-unlock-preview" src="${escapeHtml(nextStamp.src)}" alt="${escapeHtml(nextStamp.name)}のプレビュー">
   `;
   els.childNextUnlock.classList.remove("is-complete");
+}
+
+function rewardGoalForStudent(student) {
+  const goal = state.rewardGoalsByStudent?.[student?.id];
+  if (!goal) {
+    return null;
+  }
+  if (goal.type === "stamp") {
+    const stamp = activeStampAssets().find((item) => item.id === goal.id && item.purchaseOnly && !item.hidden);
+    return stamp ? { type: "stamp", item: stamp, costSheets: stampPriceSheets(stamp) } : null;
+  }
+  if (goal.type === "stamp-set") {
+    const stampSet = visibleStampSets().find((item) => item.id === goal.id);
+    return stampSet ? { type: "stamp-set", item: stampSet, costSheets: stampSetPriceSheets(stampSet) } : null;
+  }
+  return null;
+}
+
+function renderChildRewardGoal(student, stats) {
+  const goal = rewardGoalForStudent(student);
+  if (!goal) {
+    els.childRewardGoal.innerHTML = `
+      <div class="reward-goal-preview reward-goal-placeholder" aria-hidden="true">?</div>
+      <div class="reward-goal-copy">
+        <span>いまのねらい</span>
+        <strong>おかいもので えらぼう！</strong>
+        <p>スタンプかセットを ねらいにできるよ。</p>
+      </div>
+    `;
+    els.childRewardGoal.classList.remove("is-ready");
+    els.childRewardGoal.removeAttribute("hidden");
+    return;
+  }
+
+  const availableSheets = stats.availableSheets;
+  const ready = availableSheets >= goal.costSheets;
+  const remaining = Math.max(0, goal.costSheets - availableSheets);
+  const preview = goal.type === "stamp"
+    ? `<img class="reward-goal-stamp" src="${escapeHtml(goal.item.src)}" alt="${escapeHtml(goal.item.name)}スタンプ">`
+    : `<div class="reward-goal-set-preview" aria-label="${escapeHtml(goal.item.name)}のスタンプ">
+        ${stampSetMembers(goal.item).slice(0, 6).map((stamp) => `<img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}">`).join("")}
+      </div>`;
+  const progressText = isTestStudent(student)
+    ? "テストなら いつでも こうにゅうできるよ！"
+    : ready
+      ? "いま こうにゅうできるよ！"
+      : `あと${remaining}まいで こうにゅうできるよ！`;
+
+  els.childRewardGoal.innerHTML = `
+    <div class="reward-goal-preview">${preview}</div>
+    <div class="reward-goal-copy">
+      <span>いまのねらい</span>
+      <strong>${escapeHtml(goal.item.name)}</strong>
+      <p>${goal.costSheets}シート / ${progressText}</p>
+    </div>
+  `;
+  els.childRewardGoal.removeAttribute("hidden");
+  els.childRewardGoal.classList.toggle("is-ready", ready || isTestStudent(student));
 }
 
 function renderHounyanLevel(student, stats) {
@@ -2497,12 +2580,16 @@ function renderStampShop(student, stats) {
   els.shopStampRewards.querySelectorAll("[data-buy-stamp-set]").forEach((button) => {
     button.addEventListener("click", () => openStampSetPurchaseConfirm(button.dataset.buyStampSet));
   });
+  els.shopStampRewards.querySelectorAll("[data-set-reward-goal]").forEach((button) => {
+    button.addEventListener("click", () => setRewardGoal(button.dataset.setRewardGoalType, button.dataset.setRewardGoal));
+  });
 }
 
 function stampSetShopCard(stampSet, stats, student) {
   const members = stampSetMembers(stampSet);
   const owned = student ? stampSetIsOwned(student.id, stampSet) : false;
   const unlocked = stampSetIsUnlockedForStudent(student, stampSet);
+  const isGoal = rewardGoalForStudent(student)?.type === "stamp-set" && rewardGoalForStudent(student)?.item.id === stampSet.id;
   const priceSheets = stampSetPriceSheets(stampSet);
   const canBuy = Boolean(student) && unlocked && !owned && stats.availableSheets >= priceSheets;
   const label = owned
@@ -2523,7 +2610,10 @@ function stampSetShopCard(stampSet, stats, student) {
         <strong>${escapeHtml(stampSet.name)}</strong>
         <p>${locked ? escapeHtml(stampSetLockText(stampSet)) : `${priceSheets}シート`}</p>
       </div>
-      <button class="primary-button" type="button" data-buy-stamp-set="${stampSet.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
+      <div class="shop-card-actions">
+        <button class="primary-button" type="button" data-buy-stamp-set="${stampSet.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
+        ${student && !owned && unlocked ? `<button class="soft-button" type="button" data-set-reward-goal="${stampSet.id}" data-set-reward-goal-type="stamp-set" ${isGoal ? "disabled" : ""}>${isGoal ? "ねらい中" : "ねらいにする"}</button>` : ""}
+      </div>
     </article>
   `;
 }
@@ -2555,6 +2645,48 @@ function stampSetLockText(stampSet) {
 
 function nextStampSetInSeries(stampSet) {
   return activeStampSets().find((item) => item.requiresSetId === stampSet?.id && !item.hidden) || null;
+}
+
+function setRewardGoal(type, id) {
+  const student = selectedStudent();
+  if (!student || !["stamp", "stamp-set"].includes(type) || !id) {
+    return;
+  }
+
+  if (type === "stamp") {
+    const stamp = activeStampAssets().find((item) => item.id === id && item.purchaseOnly && !item.hidden);
+    if (!stamp || studentOwnsStamp(student.id, stamp.id)) {
+      return;
+    }
+  } else {
+    const stampSet = visibleStampSets().find((item) => item.id === id);
+    if (!stampSet || !stampSetIsUnlockedForStudent(student, stampSet) || stampSetIsOwned(student.id, stampSet)) {
+      return;
+    }
+  }
+
+  const previousGoal = state.rewardGoalsByStudent[student.id];
+  state.rewardGoalsByStudent[student.id] = { type, id };
+  if (!persist()) {
+    if (previousGoal) {
+      state.rewardGoalsByStudent[student.id] = previousGoal;
+    } else {
+      delete state.rewardGoalsByStudent[student.id];
+    }
+    return;
+  }
+  render();
+  showToast(type === "stamp-set" ? "スタンプセットをねらいにしたよ！" : "スタンプをねらいにしたよ！");
+}
+
+function clearRewardGoalIfMatches(studentId, type, id) {
+  const goal = state.rewardGoalsByStudent?.[studentId];
+  if (!goal || goal.type !== type || goal.id !== id) {
+    return null;
+  }
+  const previousGoal = { ...goal };
+  delete state.rewardGoalsByStudent[studentId];
+  return previousGoal;
 }
 
 function lockedStampSetCover(stampSet) {
@@ -2626,6 +2758,7 @@ function stampBookSetCard(stampSet, student) {
 
 function stampShopCard(stamp, stats, student) {
   const owned = student ? studentOwnsStamp(student.id, stamp.id) : false;
+  const isGoal = rewardGoalForStudent(student)?.type === "stamp" && rewardGoalForStudent(student)?.item.id === stamp.id;
   const price = stampPriceSheets(stamp);
   const canBuy = Boolean(student) && !owned && stats.availableSheets >= price;
   const special = stamp.rarity === "special";
@@ -2638,7 +2771,10 @@ function stampShopCard(stamp, stats, student) {
         <strong>${escapeHtml(stamp.name)}</strong>
         <p>${price}シート</p>
       </div>
-      <button class="primary-button" type="button" data-buy-stamp="${stamp.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
+      <div class="shop-card-actions">
+        <button class="primary-button" type="button" data-buy-stamp="${stamp.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
+        ${student && !owned ? `<button class="soft-button" type="button" data-set-reward-goal="${stamp.id}" data-set-reward-goal-type="stamp" ${isGoal ? "disabled" : ""}>${isGoal ? "ねらい中" : "ねらいにする"}</button>` : ""}
+      </div>
     </article>
   `;
 }
@@ -3696,6 +3832,7 @@ function buyStamp(stampId) {
     return;
   }
 
+  const previousGoal = clearRewardGoalIfMatches(student.id, "stamp", stamp.id);
   ownedStampIdsForStudent(student.id).push(stamp.id);
   state.ownedStampIdsByStudent[student.id] = [...new Set(ownedStampIdsForStudent(student.id))];
   state.redemptions.push({
@@ -3711,6 +3848,9 @@ function buyStamp(stampId) {
   if (!persist()) {
     state.ownedStampIdsByStudent[student.id] = ownedStampIdsForStudent(student.id).filter((id) => id !== stamp.id);
     state.redemptions = state.redemptions.filter((redemption) => redemption.stampId !== stamp.id || redemption.studentId !== student.id || redemption.type !== "stamp-purchase");
+    if (previousGoal) {
+      state.rewardGoalsByStudent[student.id] = previousGoal;
+    }
     return;
   }
   render();
@@ -3741,6 +3881,7 @@ function buyStampSet(stampSetId) {
   }
 
   const previousOwnedStampIds = [...ownedStampIdsForStudent(student.id)];
+  const previousGoal = clearRewardGoalIfMatches(student.id, "stamp-set", stampSet.id);
   const stampIds = members.map((stamp) => stamp.id);
   const redemption = {
     id: crypto.randomUUID(),
@@ -3758,6 +3899,9 @@ function buyStampSet(stampSetId) {
   if (!persist()) {
     state.ownedStampIdsByStudent[student.id] = previousOwnedStampIds;
     state.redemptions = state.redemptions.filter((item) => item.id !== redemption.id);
+    if (previousGoal) {
+      state.rewardGoalsByStudent[student.id] = previousGoal;
+    }
     return;
   }
   render();
@@ -3836,6 +3980,7 @@ function deleteSelectedStudent() {
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
   state.redemptions = state.redemptions.filter((redemption) => redemption.studentId !== student.id);
   delete state.ownedStampIdsByStudent[student.id];
+  delete state.rewardGoalsByStudent[student.id];
   delete state.equippedHounyanLevelByStudent[student.id];
   state.selectedStudentId = state.students[0]?.id || "";
   clearStudentForm();
