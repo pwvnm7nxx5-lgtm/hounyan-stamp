@@ -2515,6 +2515,10 @@ input:focus,
   animation: milestonePop 0.65s cubic-bezier(0.16, 0.86, 0.27, 1.22) both;
 }
 
+.animation-milestone[hidden] {
+  display: none;
+}
+
 .animation-milestone strong {
   color: #a16c00;
   font-size: 1.45rem;
