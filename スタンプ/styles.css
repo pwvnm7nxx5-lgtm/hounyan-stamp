@@ -1068,9 +1068,36 @@ input:focus,
   background: #fff;
 }
 
+.stamp-set-cover-locked {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  border-color: rgba(101, 113, 111, 0.45);
+  background: #e8eeeb;
+  color: #65716f;
+}
+
+.stamp-set-cover-locked span {
+  display: grid;
+  width: 56%;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 50%;
+  background: #65716f;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 900;
+}
+
 .stamp-set-shop-card {
   border-color: rgba(66, 180, 51, 0.48);
   background: linear-gradient(145deg, #ffffff, #edf9f0);
+}
+
+.stamp-set-shop-card.is-locked {
+  border-style: dashed;
+  border-color: rgba(101, 113, 111, 0.42);
+  background: #f5f7f6;
 }
 
 .stamp-set-settings-card {
@@ -1437,6 +1464,133 @@ input:focus,
 .stamp-shop-card p {
   margin-top: 4px;
   color: var(--green-dark);
+  font-weight: 900;
+}
+
+.stamp-book-page {
+  display: grid;
+  gap: 16px;
+}
+
+.stamp-book-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.stamp-book-hero > div:first-child > p:last-child {
+  margin-top: 7px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.stamp-book-total {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 12px 18px;
+  border: 2px solid rgba(66, 180, 51, 0.28);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--green-deep);
+}
+
+.stamp-book-total strong {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.stamp-book-total span {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.stamp-book-set-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stamp-book-set-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.stamp-book-set-card.is-complete {
+  border-color: rgba(66, 180, 51, 0.58);
+  background: linear-gradient(145deg, #fff, #ebf9ed);
+}
+
+.stamp-book-set-card.is-locked {
+  border-style: dashed;
+  border-color: rgba(101, 113, 111, 0.42);
+  background: #f7f8f8;
+}
+
+.stamp-book-set-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stamp-book-set-head span,
+.stamp-book-set-head strong,
+.stamp-book-note {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.stamp-book-set-head h3 {
+  margin-top: 2px;
+  font-size: 1.08rem;
+}
+
+.stamp-book-set-head strong {
+  color: var(--green-deep);
+  text-align: right;
+}
+
+.stamp-book-set-card.is-locked .stamp-book-set-head strong,
+.stamp-book-set-card.is-locked .stamp-book-note {
+  color: #65716f;
+}
+
+.stamp-book-stamp-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.stamp-book-stamp {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(66, 180, 51, 0.2);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.stamp-book-stamp img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.stamp-book-stamp.is-unknown {
+  border-style: dashed;
+  border-color: rgba(101, 113, 111, 0.38);
+  background: #e8eeeb;
+  color: #65716f;
+  font-size: 1.35rem;
   font-weight: 900;
 }
 

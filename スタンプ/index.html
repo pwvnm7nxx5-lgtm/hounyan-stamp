@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ほうにゃんスタンプ台帳</title>
-    <link rel="stylesheet" href="styles.css?v=timer-break-v3">
+    <link rel="stylesheet" href="styles.css?v=stamp-book-v1">
   </head>
   <body>
     <div class="app-shell">
@@ -16,6 +16,7 @@
         <div class="top-actions" aria-label="ページ切り替え">
           <button class="page-tab is-active" type="button" data-view-button="child">児童</button>
           <button class="page-tab" type="button" data-view-button="shop">おかいもの</button>
+          <button class="page-tab" type="button" data-view-button="book">ずかん</button>
           <button class="page-tab" type="button" data-view-button="timer">タイマー</button>
           <button class="page-tab" type="button" data-view-button="teacher">先生</button>
           <button class="page-tab" type="button" data-view-button="settings">設定</button>
@@ -189,6 +190,30 @@
               <div id="shopStampRewards" class="stamp-shop-list"></div>
             </section>
           </div>
+        </section>
+
+        <section class="view stamp-book-page" data-view="book" aria-labelledby="stamp-book-title">
+          <section class="hero-panel stamp-book-hero">
+            <div>
+              <p class="eyebrow">スタンプずかん</p>
+              <h2 id="stamp-book-title">あつめた スタンプ</h2>
+              <p id="stampBookLead">じどうを えらぶと、あつめた スタンプが みられるよ</p>
+            </div>
+            <div class="stamp-book-total" aria-label="あつめたスタンプの数">
+              <strong id="stampBookOwnedCount">0</strong>
+              <span>/ <span id="stampBookTotalCount">0</span> こ</span>
+            </div>
+          </section>
+
+          <section class="work-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">コレクション</p>
+                <h2>スタンプセット</h2>
+              </div>
+            </div>
+            <div id="stampBookSetList" class="stamp-book-set-list"></div>
+          </section>
         </section>
 
         <section class="view timer-page" data-view="timer" aria-labelledby="timer-title">
@@ -684,6 +709,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=stamp-book-v1"></script>
   </body>
 </html>
