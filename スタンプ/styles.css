@@ -1508,11 +1508,28 @@ input:focus,
   font-weight: 800;
 }
 
-.timer-hounyan {
-  width: min(100%, 260px);
+.timer-hounyan-scene {
+  position: relative;
+  width: min(100%, 300px);
+  aspect-ratio: 4 / 3;
   justify-self: center;
   align-self: end;
+}
+
+.timer-hounyan {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  transform-origin: 50% 92%;
+}
+
+.timer-hounyan-study {
+  border-radius: var(--radius);
+  opacity: 0;
+  object-fit: cover;
+  will-change: opacity, transform;
 }
 
 .timer-panel {
@@ -1623,9 +1640,24 @@ input:focus,
     linear-gradient(160deg, #fffef2, #eefaf4);
 }
 
-.timer-page.is-running .timer-hounyan {
+.timer-page.is-running[data-timer-mode="play"] .timer-hounyan-default {
   animation: timerHounyanCheer 0.9s ease-in-out infinite;
-  transform-origin: 50% 92%;
+}
+
+.timer-page.is-running[data-timer-mode="study"] .timer-hounyan-default {
+  opacity: 0;
+}
+
+.timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study-1 {
+  animation: timerStudyFrameOne 9s ease-in-out infinite;
+}
+
+.timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study-2 {
+  animation: timerStudyFrameTwo 9s ease-in-out infinite;
+}
+
+.timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study-3 {
+  animation: timerStudyFrameThree 9s ease-in-out infinite;
 }
 
 .timer-page.is-running .timer-cheer {
@@ -1663,6 +1695,66 @@ input:focus,
   }
   50% {
     transform: translateY(-10px) rotate(2deg);
+  }
+}
+
+@keyframes timerStudyFrameOne {
+  0%,
+  29% {
+    opacity: 1;
+    transform: translateY(0) rotate(-0.5deg);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: translateY(4px) rotate(0.5deg);
+  }
+}
+
+@keyframes timerStudyFrameTwo {
+  0%,
+  29% {
+    opacity: 0;
+    transform: translateY(4px) rotate(0.5deg);
+  }
+  34%,
+  62% {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+  67%,
+  100% {
+    opacity: 0;
+    transform: translateY(3px) rotate(-0.5deg);
+  }
+}
+
+@keyframes timerStudyFrameThree {
+  0%,
+  62% {
+    opacity: 0;
+    transform: translateY(4px) rotate(-0.5deg);
+  }
+  67%,
+  95% {
+    opacity: 1;
+    transform: translateY(-5px) rotate(0.6deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(0) rotate(-0.5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study {
+    animation: none;
+    opacity: 0;
+    transform: none;
+  }
+
+  .timer-page.is-running[data-timer-mode="study"] .timer-hounyan-study-1 {
+    opacity: 1;
   }
 }
 
@@ -2357,8 +2449,8 @@ input:focus,
     grid-template-columns: 1fr;
   }
 
-  .timer-hounyan {
-    width: min(72vw, 210px);
+  .timer-hounyan-scene {
+    width: min(72vw, 250px);
   }
 
   .timer-presets,
