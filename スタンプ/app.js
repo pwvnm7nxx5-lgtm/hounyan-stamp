@@ -290,7 +290,7 @@ const builtInStampSetDefinitions = [
     seriesName: "でんしゃのたび",
     tier: 1,
     members: [
-      ["local", "ローカルせん"], ["express", "とっきゅう"], ["bullet", "しんかんせん"],
+      ["local", "ローカルでんしゃ"], ["express", "とっきゅう"], ["bullet", "しんかんせん"],
       ["electric-locomotive", "でんききかんしゃ"], ["monorail", "モノレール"], ["steam", "エスエル"],
     ],
   },
@@ -304,7 +304,7 @@ const builtInStampSetDefinitions = [
     seriesName: "でんしゃのたび",
     tier: 2,
     members: [
-      ["red-express", "あかいとっきゅう"], ["blue-sleeper", "あおいねっしゃ"], ["observation", "ながめでんしゃ"],
+      ["red-express", "あかいとっきゅう"], ["blue-sleeper", "ブルートレイン"], ["observation", "ながめでんしゃ"],
       ["mountain", "やまでんしゃ"], ["coast", "うみでんしゃ"], ["gold-express", "きんいろでんしゃ"],
     ],
   },
@@ -358,8 +358,8 @@ const builtInStampSetDefinitions = [
     seriesName: "えきのぼうけん",
     tier: 3,
     members: [
-      ["gold-ticket", "きんのきっぷ"], ["jewel-lantern", "ほうせきらんたん"], ["pocket-watch", "ぎんのどけい"],
-      ["conductor-cap", "しゃしょうぼう"], ["bell", "きんのべる"], ["royal-trunk", "おうさまのとらんく"],
+      ["gold-ticket", "きんのきっぷ"], ["jewel-lantern", "ほうせきランタン"], ["pocket-watch", "ぎんのどけい"],
+      ["conductor-cap", "しゃしょうぼう"], ["bell", "きんのベル"], ["royal-trunk", "おうさまのトランク"],
     ],
   },
   {
@@ -494,12 +494,16 @@ const builtInStampLegacyNames = new Map([
   ["built-in-vehicles-dream-future-bus", "みらいばす"],
   ["built-in-vehicles-dream-shuttle", "すぺーすしゃとる"],
   ["built-in-vehicles-dream-expedition-truck", "ぼうけんとらっく"],
-  ["built-in-trains-local", "ろーかるせん"],
+  ["built-in-trains-local", ["ろーかるせん", "ローカルせん"]],
   ["built-in-trains-monorail", "ものれーる"],
   ["built-in-trains-steam", "えすえる"],
+  ["built-in-trains-special-blue-sleeper", "あおいねっしゃ"],
   ["built-in-train-items-platform", "ほーむ"],
   ["built-in-train-items-special-suitcase", "すーつけーす"],
   ["built-in-train-items-special-lantern", "らんたん"],
+  ["built-in-train-items-dream-jewel-lantern", "ほうせきらんたん"],
+  ["built-in-train-items-dream-bell", "きんのべる"],
+  ["built-in-train-items-dream-royal-trunk", "おうさまのとらんく"],
   ["built-in-sweets-cake", "けーき"],
   ["built-in-sweets-donut", "どーなつ"],
   ["built-in-sweets-pudding", "ぷりん"],
@@ -1095,7 +1099,10 @@ function normalizeStampAssets(inputAssets) {
         return;
       }
       const base = byId.get(stamp.id) || {};
-      const useUpdatedBuiltInName = builtInStampLegacyNames.get(String(stamp.id)) === String(stamp.name || "");
+      const legacyNames = builtInStampLegacyNames.get(String(stamp.id));
+      const useUpdatedBuiltInName = Array.isArray(legacyNames)
+        ? legacyNames.includes(String(stamp.name || ""))
+        : legacyNames === String(stamp.name || "");
       const name = useUpdatedBuiltInName
         ? String(base.name || "新しいスタンプ").trim()
         : String(stamp.name || base.name || "新しいスタンプ").trim();
@@ -3326,7 +3333,10 @@ function stampPreviewCategories(stamps) {
     }
     const stampSet = stampSetsById.get(stamp.setId);
     const categoryId = stampSet?.seriesId ? `series:${stampSet.seriesId}` : `set:${stamp.setId}`;
-    const categoryName = stampSet?.seriesName || stampSet?.name || "そのほか";
+    const firstSetInSeries = stampSet?.seriesId
+      ? stampSets.find((item) => item.seriesId === stampSet.seriesId && Number(item.tier || 1) === 1)
+      : null;
+    const categoryName = firstSetInSeries?.name || stampSet?.name || "そのほか";
     const order = stampSetOrder.get(stamp.setId) ?? Number.MAX_SAFE_INTEGER;
     const category = categoriesById.get(categoryId) || {
       id: categoryId,

@@ -2160,9 +2160,11 @@ input:focus,
 
 .stamp-preview-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   margin: 2px 0 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .stamp-preview-tab {
@@ -2179,6 +2181,8 @@ input:focus,
   font: inherit;
   font-size: 0.86rem;
   font-weight: 900;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .stamp-preview-tab:hover {
