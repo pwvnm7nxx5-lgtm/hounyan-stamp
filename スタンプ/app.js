@@ -226,7 +226,7 @@ const builtInStampSetDefinitions = [
     slug: "trains",
     members: [
       ["local", "ろーかるせん"], ["express", "とっきゅう"], ["bullet", "しんかんせん"],
-      ["electric-locomotive", "でんききかんしゃ"], ["monorail", "ものれーる"], ["steam", "SL"],
+      ["electric-locomotive", "でんききかんしゃ"], ["monorail", "ものれーる"], ["steam", "えすえる"],
     ],
   },
   {
