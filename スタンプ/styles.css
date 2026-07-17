@@ -965,6 +965,13 @@ input:focus,
   width: 76px;
 }
 
+.asset-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .stamp-set-settings-card strong,
 .stamp-set-settings-card p {
   display: block;
@@ -2295,6 +2302,14 @@ input:focus,
   .mascot-upgrade {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .asset-card-actions {
+    justify-content: stretch;
+  }
+
+  .asset-card-actions .compact-button {
+    flex: 1;
   }
 
   .history-card {

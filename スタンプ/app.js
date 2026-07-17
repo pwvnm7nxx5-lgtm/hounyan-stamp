@@ -1411,6 +1411,8 @@ function renderStampAssets() {
           ? "最初から使用可"
           : `累計${stamp.unlockAt}個で解放`;
       const visibilityText = stamp.hidden ? "非表示" : "表示中";
+      const deletionReason = stampDeletionReason(stamp.id);
+      const canDelete = stamp.custom && !deletionReason;
       return `
         <article class="asset-card${stamp.hidden ? " is-hidden" : ""}">
           <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
@@ -1418,7 +1420,10 @@ function renderStampAssets() {
             <strong>${escapeHtml(stamp.name)}</strong>
             <p>${text} / ${visibilityText}</p>
           </div>
-          <button class="soft-button compact-button" type="button" data-edit-stamp="${stamp.id}">編集</button>
+          <div class="asset-card-actions">
+            <button class="soft-button compact-button" type="button" data-edit-stamp="${stamp.id}">編集</button>
+            ${stamp.custom ? `<button class="danger-button compact-button" type="button" data-delete-stamp="${stamp.id}" ${canDelete ? "" : "disabled"} title="${escapeHtml(deletionReason || "追加したスタンプを完全に削除します")}">${canDelete ? "削除" : "使用中"}</button>` : ""}
+          </div>
         </article>
       `;
     })
@@ -1426,6 +1431,9 @@ function renderStampAssets() {
 
   els.stampAssetsList.querySelectorAll("[data-edit-stamp]").forEach((button) => {
     button.addEventListener("click", () => editStampAsset(button.dataset.editStamp));
+  });
+  els.stampAssetsList.querySelectorAll("[data-delete-stamp]").forEach((button) => {
+    button.addEventListener("click", () => deleteStampAsset(button.dataset.deleteStamp));
   });
 }
 
@@ -1440,6 +1448,8 @@ function renderStampSets() {
     .map((stampSet) => {
       const members = stampSetMembers(stampSet);
       const visibility = stampSet.hidden ? "非表示" : "表示中";
+      const deletionReason = members.map((stamp) => stampDeletionReason(stamp.id)).find(Boolean);
+      const canDelete = !deletionReason;
       return `
         <article class="stamp-set-settings-card${stampSet.hidden ? " is-hidden" : ""}">
           ${stampSetCover(stampSet, members)}
@@ -1447,7 +1457,10 @@ function renderStampSets() {
             <strong>${escapeHtml(stampSet.name)}</strong>
             <p>${members.length}こ / ${stampSet.priceSheets}シート / ${visibility}</p>
           </div>
-          <button class="soft-button compact-button" type="button" data-edit-stamp-set="${stampSet.id}">編集</button>
+          <div class="asset-card-actions">
+            <button class="soft-button compact-button" type="button" data-edit-stamp-set="${stampSet.id}">編集</button>
+            <button class="danger-button compact-button" type="button" data-delete-stamp-set="${stampSet.id}" ${canDelete ? "" : "disabled"} title="${escapeHtml(deletionReason || "セットと中の画像を完全に削除します")}">${canDelete ? "削除" : "使用中"}</button>
+          </div>
         </article>
       `;
     })
@@ -1455,6 +1468,9 @@ function renderStampSets() {
 
   els.stampSetsList.querySelectorAll("[data-edit-stamp-set]").forEach((button) => {
     button.addEventListener("click", () => editStampSet(button.dataset.editStampSet));
+  });
+  els.stampSetsList.querySelectorAll("[data-delete-stamp-set]").forEach((button) => {
+    button.addEventListener("click", () => deleteStampSet(button.dataset.deleteStampSet));
   });
 }
 
@@ -1535,6 +1551,128 @@ function clearStampAssetForm() {
   els.stampAssetVisible.checked = true;
   els.stampAssetImage.value = "";
   updateStampAssetModeFields();
+}
+
+function stampDeletionReason(stampId) {
+  if (state.stampEvents.some((event) => event.stampId === stampId)) {
+    return "児童のスタンプ履歴に使われています";
+  }
+  if (Object.values(state.ownedStampIdsByStudent).some((stampIds) => stampIds.includes(stampId))) {
+    return "児童が購入済みです";
+  }
+  if (state.redemptions.some((redemption) =>
+    (redemption.type === "stamp-purchase" && redemption.stampId === stampId) ||
+    (redemption.type === "stamp-set-purchase" && Array.isArray(redemption.stampIds) && redemption.stampIds.includes(stampId))
+  )) {
+    return "交換履歴に残っています";
+  }
+  return "";
+}
+
+function deleteStampAsset(stampId) {
+  const stamp = activeStampAssets().find((item) => item.id === stampId);
+  const deletionReason = stampDeletionReason(stampId);
+  if (!stamp?.custom || deletionReason) {
+    showToast(deletionReason || "最初からあるスタンプは削除できません");
+    return;
+  }
+  if (!confirm(`「${stamp.name}」を完全に削除します。画像データは自動バックアップからも消え、元に戻せません。よろしいですか？`)) {
+    return;
+  }
+
+  const previousStampAssets = state.stampAssets;
+  state.stampAssets = normalizeStampAssets(activeStampAssets().filter((item) => item.id !== stampId));
+  if (state.selectedStampId === stampId) {
+    state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
+  }
+  if (!persist()) {
+    state.stampAssets = previousStampAssets;
+    return;
+  }
+  if (els.stampAssetId.value === stampId) {
+    clearStampAssetForm();
+  }
+  purgeDeletedStampData([stampId]);
+  render();
+  showToast("スタンプと画像を削除しました");
+}
+
+function deleteStampSet(stampSetId) {
+  const stampSet = activeStampSets().find((item) => item.id === stampSetId);
+  if (!stampSet) {
+    return;
+  }
+  const members = stampSetMembers(stampSet);
+  const deletionReason = members.map((stamp) => stampDeletionReason(stamp.id)).find(Boolean);
+  if (deletionReason) {
+    showToast(`このセットは${deletionReason}ため削除できません`);
+    return;
+  }
+  if (!confirm(`「${stampSet.name}」と中のスタンプ${members.length}こを完全に削除します。画像データは自動バックアップからも消え、元に戻せません。よろしいですか？`)) {
+    return;
+  }
+
+  const previousStampAssets = state.stampAssets;
+  const previousStampSets = state.stampSets;
+  const memberIds = new Set(members.map((stamp) => stamp.id));
+  state.stampAssets = normalizeStampAssets(activeStampAssets().filter((stamp) => !memberIds.has(stamp.id)));
+  state.stampSets = activeStampSets().filter((item) => item.id !== stampSetId);
+  if (memberIds.has(state.selectedStampId)) {
+    state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
+  }
+  if (!persist()) {
+    state.stampAssets = previousStampAssets;
+    state.stampSets = previousStampSets;
+    return;
+  }
+  if (els.stampSetId.value === stampSetId) {
+    clearStampSetForm();
+  }
+  purgeDeletedStampData([...memberIds], [stampSetId]);
+  render();
+  showToast("スタンプセットと画像を削除しました");
+}
+
+function purgeDeletedStampData(stampIds, stampSetIds = []) {
+  const deletedStampIds = new Set(stampIds);
+  const deletedSetIds = new Set(stampSetIds);
+  try {
+    const nextBackups = readAutoBackups().map((backup) => {
+      const backupState = backup.state || {};
+      const stampAssets = Array.isArray(backupState.stampAssets)
+        ? backupState.stampAssets.filter((stamp) => !deletedStampIds.has(stamp.id))
+        : backupState.stampAssets;
+      const stampSets = Array.isArray(backupState.stampSets)
+        ? backupState.stampSets
+          .filter((stampSet) => !deletedSetIds.has(stampSet.id))
+          .map((stampSet) => ({
+            ...stampSet,
+            memberIds: Array.isArray(stampSet.memberIds)
+              ? stampSet.memberIds.filter((stampId) => !deletedStampIds.has(stampId))
+              : [],
+          }))
+          .filter((stampSet) => stampSet.memberIds.length)
+        : backupState.stampSets;
+      const ownedStampIdsByStudent = backupState.ownedStampIdsByStudent && typeof backupState.ownedStampIdsByStudent === "object"
+        ? Object.fromEntries(Object.entries(backupState.ownedStampIdsByStudent).map(([studentId, ownedStampIds]) => [
+          studentId,
+          Array.isArray(ownedStampIds) ? ownedStampIds.filter((stampId) => !deletedStampIds.has(stampId)) : [],
+        ]))
+        : backupState.ownedStampIdsByStudent;
+      return {
+        ...backup,
+        state: {
+          ...backupState,
+          stampAssets,
+          stampSets,
+          ownedStampIdsByStudent,
+        },
+      };
+    });
+    writeAutoBackups(nextBackups);
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 function editStampSet(stampSetId) {
@@ -1882,7 +2020,7 @@ function imageFileToStampDataUrl(file) {
     const image = new Image();
     const objectUrl = URL.createObjectURL(file);
     image.addEventListener("load", () => {
-      const maxSize = 360;
+      const maxSize = 300;
       const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
       const width = Math.max(1, Math.round(image.naturalWidth * scale));
       const height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -1893,7 +2031,7 @@ function imageFileToStampDataUrl(file) {
       context.clearRect(0, 0, width, height);
       context.drawImage(image, 0, 0, width, height);
       URL.revokeObjectURL(objectUrl);
-      resolve(canvas.toDataURL("image/webp", 0.82));
+      resolve(canvas.toDataURL("image/webp", 0.76));
     });
     image.addEventListener("error", () => {
       URL.revokeObjectURL(objectUrl);
