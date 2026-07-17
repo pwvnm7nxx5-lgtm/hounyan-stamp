@@ -239,11 +239,24 @@
 
         <section class="view teacher-page" data-view="teacher" aria-labelledby="teacher-title">
           <div class="teacher-grid">
-            <section class="work-panel">
+            <section class="teacher-hub">
+              <div>
+                <p class="eyebrow">先生ページ</p>
+                <h2 id="teacher-title">操作メニュー</h2>
+              </div>
+              <div class="teacher-tab-list" role="group" aria-label="先生ページの操作を切り替え">
+                <button class="teacher-tab is-active" type="button" aria-pressed="true" data-teacher-tab-button="students">児童とスタンプ</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="rewards">景品・交換</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="stamps">スタンプ設定</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="data">データ</button>
+              </div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="students">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">先生ページ</p>
-                  <h2 id="teacher-title">児童管理</h2>
+                  <h2>児童管理</h2>
                 </div>
               </div>
               <form id="studentForm" class="form-grid">
@@ -261,7 +274,7 @@
               <div class="student-list teacher-student-list" id="teacherStudentList"></div>
             </section>
 
-            <section class="detail-panel teacher-detail" id="teacherStudentDetail" hidden>
+            <section class="detail-panel teacher-detail" id="teacherStudentDetail" data-teacher-tab-panel="students" hidden>
               <div class="section-head detail-head">
                 <div>
                   <p class="eyebrow">児童詳細</p>
@@ -338,7 +351,7 @@
               </div>
             </section>
 
-            <section class="work-panel prize-settings-panel">
+            <section class="work-panel prize-settings-panel" data-teacher-tab-panel="rewards">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">景品設定</p>
@@ -371,7 +384,7 @@
               <div id="prizeSettingsList" class="reward-list"></div>
             </section>
 
-            <section class="work-panel">
+            <section class="work-panel" data-teacher-tab-panel="rewards">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">解放</p>
@@ -396,7 +409,7 @@
               </div>
             </section>
 
-            <section class="work-panel">
+            <section class="work-panel" data-teacher-tab-panel="rewards">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">交換履歴</p>
@@ -406,7 +419,7 @@
               <div id="redemptionList" class="redemption-list"></div>
             </section>
 
-            <section class="work-panel">
+            <section class="work-panel" data-teacher-tab-panel="data">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">データ</p>
@@ -432,7 +445,7 @@
               <p class="hint">保存はこのPCのブラウザ内です。ブラウザのデータを削除すると自動バックアップも消えるため、大事な節目ではJSONを書き出してください。</p>
             </section>
 
-            <section class="work-panel stamp-assets-panel">
+            <section class="work-panel stamp-assets-panel" data-teacher-tab-panel="stamps">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">スタンプ画像</p>
@@ -477,7 +490,7 @@
               <div id="stampAssetsList" class="asset-list"></div>
             </section>
 
-            <section class="work-panel stamp-sets-panel">
+            <section class="work-panel stamp-sets-panel" data-teacher-tab-panel="stamps">
               <div class="section-head">
                 <div>
                   <p class="eyebrow">スタンプセット</p>

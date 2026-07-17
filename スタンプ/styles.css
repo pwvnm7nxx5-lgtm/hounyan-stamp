@@ -101,6 +101,7 @@ rt {
 
 .icon-button,
 .page-tab,
+.teacher-tab,
 .primary-button,
 .soft-button,
 .danger-button,
@@ -322,12 +323,56 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.teacher-grid > .work-panel:nth-child(3),
-.teacher-grid > .work-panel:nth-child(4),
-.teacher-grid > .work-panel:nth-child(5),
-.teacher-grid > .work-panel:nth-child(6),
-.prize-settings-panel {
+.teacher-hub,
+.teacher-grid > [data-teacher-tab-panel]:not([data-teacher-tab-panel="students"]) {
   grid-column: 1 / -1;
+}
+
+.teacher-hub {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.teacher-tab-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.teacher-tab {
+  padding: 0 14px;
+  background: #edf7f0;
+  color: var(--green-deep);
+}
+
+.teacher-tab:hover,
+.teacher-tab.is-active {
+  background: var(--green);
+  color: #fff;
+}
+
+[data-teacher-tab-panel] {
+  display: none;
+}
+
+[data-teacher-tab-panel].is-active {
+  display: block;
+}
+
+[data-teacher-tab-panel][hidden] {
+  display: none !important;
+}
+
+.teacher-grid > .teacher-detail {
+  margin-top: 0;
 }
 
 .stamp-workbench {
@@ -2062,12 +2107,18 @@ input:focus,
     grid-template-columns: 1fr;
   }
 
-  .teacher-grid > .work-panel:nth-child(3),
-  .teacher-grid > .work-panel:nth-child(4),
-  .teacher-grid > .work-panel:nth-child(5),
-  .teacher-grid > .work-panel:nth-child(6),
-  .prize-settings-panel {
+  .teacher-hub,
+  .teacher-grid > [data-teacher-tab-panel]:not([data-teacher-tab-panel="students"]) {
     grid-column: auto;
+  }
+
+  .teacher-hub {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .teacher-tab-list {
+    justify-content: flex-start;
   }
 
   .score-row {
@@ -2095,6 +2146,10 @@ input:focus,
   .page-tab {
     flex: 1;
     min-width: calc(50% - 4px);
+  }
+
+  .teacher-tab {
+    flex: 1 1 calc(50% - 4px);
   }
 
   .student-switcher {

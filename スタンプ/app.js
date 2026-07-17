@@ -321,6 +321,8 @@ let stampSetDraftMembers = [];
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
   views: document.querySelectorAll("[data-view]"),
+  teacherTabButtons: document.querySelectorAll("[data-teacher-tab-button]"),
+  teacherTabPanels: document.querySelectorAll("[data-teacher-tab-panel]"),
   timerPage: document.querySelector('[data-view="timer"]'),
   currentStudentLabel: document.querySelector("#currentStudentLabel"),
   studentSwitchList: document.querySelector("#studentSwitchList"),
@@ -467,6 +469,7 @@ init();
 
 function init() {
   bindEvents();
+  showTeacherTab("students");
   updateStampAssetModeFields();
   ensureSelection();
   renderTimer();
@@ -476,6 +479,9 @@ function init() {
 function bindEvents() {
   els.viewButtons.forEach((button) => {
     button.addEventListener("click", () => showView(button.dataset.viewButton));
+  });
+  els.teacherTabButtons.forEach((button) => {
+    button.addEventListener("click", () => showTeacherTab(button.dataset.teacherTabButton));
   });
 
   els.studentForm.addEventListener("submit", (event) => {
@@ -2002,6 +2008,20 @@ function showView(viewName) {
   });
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === viewName);
+  });
+}
+
+function showTeacherTab(tabName) {
+  const nextTab = [...els.teacherTabButtons].some((button) => button.dataset.teacherTabButton === tabName)
+    ? tabName
+    : "students";
+  els.teacherTabButtons.forEach((button) => {
+    const isActive = button.dataset.teacherTabButton === nextTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  els.teacherTabPanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.teacherTabPanel === nextTab);
   });
 }
 
