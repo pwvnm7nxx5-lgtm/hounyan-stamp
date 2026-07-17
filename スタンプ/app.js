@@ -201,6 +201,88 @@ const defaultStampAssets = [
   },
 ];
 
+const builtInStampSetDefinitions = [
+  {
+    id: "built-in-animals",
+    name: "どうぶつセット",
+    slug: "animals",
+    members: [
+      ["cat", "ねこ"], ["dog", "いぬ"], ["rabbit", "うさぎ"],
+      ["elephant", "ぞう"], ["giraffe", "きりん"], ["penguin", "ぺんぎん"],
+    ],
+  },
+  {
+    id: "built-in-vehicles",
+    name: "のりものセット",
+    slug: "vehicles",
+    members: [
+      ["car", "くるま"], ["bus", "ばす"], ["fire-engine", "しょうぼうしゃ"],
+      ["ambulance", "きゅうきゅうしゃ"], ["airplane", "ひこうき"], ["ship", "ふね"],
+    ],
+  },
+  {
+    id: "built-in-trains",
+    name: "でんしゃセット",
+    slug: "trains",
+    members: [
+      ["local", "ろーかるせん"], ["express", "とっきゅう"], ["bullet", "しんかんせん"],
+      ["electric-locomotive", "でんききかんしゃ"], ["monorail", "ものれーる"], ["steam", "SL"],
+    ],
+  },
+  {
+    id: "built-in-train-items",
+    name: "でんしゃどうぐセット",
+    slug: "train-items",
+    members: [
+      ["ticket", "きっぷ"], ["station", "えき"], ["crossing", "ふみきり"],
+      ["signal", "しんごう"], ["platform", "ほーむ"], ["conductor-cap", "しゃしょうぼう"],
+    ],
+  },
+  {
+    id: "built-in-sweets",
+    name: "おかしセット",
+    slug: "sweets",
+    members: [
+      ["cake", "けーき"], ["donut", "どーなつ"], ["pudding", "ぷりん"],
+      ["candy", "あめ"], ["chocolate", "ちょこれーと"], ["cookie", "くっきー"],
+    ],
+  },
+  {
+    id: "built-in-gems",
+    name: "ほうせきセット",
+    slug: "gems",
+    rarity: "special",
+    members: [
+      ["ruby", "るびー"], ["sapphire", "さふぁいあ"], ["emerald", "えめらるど"],
+      ["diamond", "だいや"], ["amethyst", "あめじすと"], ["pearl", "ぱーる"],
+    ],
+  },
+];
+
+const defaultStampSets = builtInStampSetDefinitions.map((stampSet) => ({
+  id: stampSet.id,
+  name: stampSet.name,
+  priceSheets: 1,
+  memberIds: stampSet.members.map(([key]) => `${stampSet.id}-${key}`),
+  hidden: false,
+}));
+
+defaultStampAssets.push(
+  ...builtInStampSetDefinitions.flatMap((stampSet) =>
+    stampSet.members.map(([key, name]) => ({
+      id: `${stampSet.id}-${key}`,
+      name,
+      reading: name,
+      src: `assets/stamp-sets/${stampSet.slug}/${key}.png`,
+      unlockAt: 0,
+      purchaseOnly: true,
+      shopPriceSheets: 1,
+      rarity: stampSet.rarity || "normal",
+      setId: stampSet.id,
+    })),
+  ),
+);
+
 const hounyanOutfits = {
   default: {
     id: "default",
@@ -285,7 +367,7 @@ const defaultState = {
   stampEvents: [],
   rewards: defaultRewards,
   stampAssets: defaultStampAssets,
-  stampSets: [],
+  stampSets: defaultStampSets,
   redemptions: [],
   settings: {
     activeOutfit: "default",
@@ -782,28 +864,32 @@ function normalizeStampAssets(inputAssets) {
 }
 
 function normalizeStampSets(inputSets, stampAssets = []) {
-  if (!Array.isArray(inputSets)) {
-    return [];
-  }
-
+  const byId = new Map(defaultStampSets.map((stampSet) => [stampSet.id, structuredClone(stampSet)]));
   const knownStampIds = new Set(stampAssets.map((stamp) => stamp.id));
-  return inputSets
-    .filter((stampSet) => stampSet && stampSet.id)
-    .map((stampSet) => {
+  if (Array.isArray(inputSets)) {
+    inputSets.filter((stampSet) => stampSet && stampSet.id).forEach((stampSet) => {
       const id = String(stampSet.id);
+      const base = byId.get(id) || {};
       const memberIds = Array.isArray(stampSet.memberIds)
         ? stampSet.memberIds.map(String).filter((stampId) => knownStampIds.has(stampId))
         : stampAssets.filter((stamp) => stamp.setId === id).map((stamp) => stamp.id);
-      return {
+      byId.set(id, {
+        ...base,
         id,
-        name: String(stampSet.name || "あたらしいスタンプセット").trim(),
-        priceSheets: Math.max(1, Math.floor(Number(stampSet.priceSheets || 1))),
+        name: String(stampSet.name || base.name || "あたらしいスタンプセット").trim(),
+        priceSheets: Math.max(1, Math.floor(Number(stampSet.priceSheets || base.priceSheets || 1))),
         memberIds: [...new Set(memberIds)],
-        hidden: Boolean(stampSet.hidden),
-      };
-    })
+        hidden: Boolean(stampSet.hidden ?? base.hidden ?? false),
+      });
+    });
+  }
+  return Array.from(byId.values())
     .filter((stampSet) => stampSet.memberIds.length)
     .sort((a, b) => a.name.localeCompare(b.name, "ja"));
+}
+
+function isBuiltInStampSet(stampSetId) {
+  return defaultStampSets.some((stampSet) => stampSet.id === stampSetId);
 }
 
 function normalizeOwnedStampIdsByStudent(input) {
@@ -1561,7 +1647,9 @@ function renderStampSets() {
     .map((stampSet) => {
       const members = stampSetMembers(stampSet);
       const visibility = stampSet.hidden ? "非表示" : "表示中";
-      const deletionReason = members.map((stamp) => stampDeletionReason(stamp.id)).find(Boolean);
+      const deletionReason = isBuiltInStampSet(stampSet.id)
+        ? "最初からあるスタンプセットです"
+        : members.map((stamp) => stampDeletionReason(stamp.id)).find(Boolean);
       const canDelete = !deletionReason;
       return `
         <article class="stamp-set-settings-card${stampSet.hidden ? " is-hidden" : ""}">
@@ -1713,6 +1801,10 @@ function deleteStampAsset(stampId) {
 function deleteStampSet(stampSetId) {
   const stampSet = activeStampSets().find((item) => item.id === stampSetId);
   if (!stampSet) {
+    return;
+  }
+  if (isBuiltInStampSet(stampSetId)) {
+    showToast("最初からあるスタンプセットは削除できません");
     return;
   }
   const members = stampSetMembers(stampSet);
