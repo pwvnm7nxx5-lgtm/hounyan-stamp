@@ -416,7 +416,7 @@ button:disabled {
 
 .reward-goal-card {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   align-items: center;
   gap: 22px;
   min-width: 0;
@@ -432,9 +432,9 @@ button:disabled {
 .reward-goal-preview {
   display: grid;
   place-items: center;
-  width: 150px;
-  height: 150px;
-  padding: 6px;
+  width: 220px;
+  height: 220px;
+  padding: 8px;
   border: 2px solid rgba(47, 150, 223, 0.3);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.88);
@@ -442,8 +442,8 @@ button:disabled {
 }
 
 .reward-goal-stamp {
-  width: 138px;
-  height: 138px;
+  width: 202px;
+  height: 202px;
   object-fit: contain;
 }
 
@@ -451,7 +451,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  width: 132px;
+  width: 194px;
 }
 
 .reward-goal-set-preview img {
