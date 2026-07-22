@@ -645,6 +645,39 @@ const defaultRewards = [
   },
 ];
 
+const missionCategories = [
+  ["learning", "学習量"], ["accuracy", "正確さ"], ["care", "丁寧さ"],
+  ["continuity", "継続"], ["behavior", "行動"], ["stamp", "スタンプ"], ["other", "その他"],
+];
+
+const missionConditions = [
+  ["print_completed_count", "プリント完了枚数", "まい"],
+  ["question_answered_count", "問題を解いた数", "もん"],
+  ["correct_answer_count", "正解数", "もん"],
+  ["consecutive_correct_count", "連続正解数", "もん"],
+  ["study_minutes", "学習時間", "ふん"],
+  ["stamp_earned_count", "スタンプ獲得数", "こ"],
+  ["manual", "先生による判定", ""],
+];
+
+const defaultMissionTemplates = [
+  {
+    id: "daily-print-completed", name: "プリントを終わらせる", displayText: "プリントを{target}まい おわらせよう",
+    missionType: "daily", category: "learning", conditionType: "print_completed_count", defaultTargetValue: 1, unit: "まい",
+    evaluationType: "automatic", defaultStampReward: 1, defaultTicketReward: 1, enabled: true,
+  },
+  {
+    id: "daily-stamp-earned", name: "スタンプをもらう", displayText: "スタンプを{target}こ もらおう",
+    missionType: "daily", category: "stamp", conditionType: "stamp_earned_count", defaultTargetValue: 1, unit: "こ",
+    evaluationType: "automatic", defaultStampReward: 1, defaultTicketReward: 1, enabled: true,
+  },
+  {
+    id: "daily-careful-work", name: "丁寧に取り組む", displayText: "ていねいに とりくもう",
+    missionType: "daily", category: "care", conditionType: "manual", defaultTargetValue: 1, unit: "",
+    evaluationType: "manual", defaultStampReward: 2, defaultTicketReward: 2, enabled: true,
+  },
+];
+
 const defaultState = {
   students: [],
   groups: [],
@@ -653,6 +686,9 @@ const defaultState = {
   calendarEvents: [],
   timetableOverrides: [],
   stampEvents: [],
+  missionTemplates: defaultMissionTemplates,
+  studentMissionSettings: [],
+  dailyMissions: [],
   rewards: defaultRewards,
   stampAssets: defaultStampAssets,
   stampSets: defaultStampSets,
@@ -695,6 +731,9 @@ let stampSetDraftMembers = [];
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calendarSelectedDate = CalendarDate.dateKey(new Date());
 let timetableViewMode = "all";
+let missionStudentId = "";
+let lastCompletedMissionId = "";
+let missionCelebrationTimer = 0;
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -727,6 +766,8 @@ const els = {
   childLevelProgressText: document.querySelector("#childLevelProgressText"),
   childNextLevelPreview: document.querySelector("#childNextLevelPreview"),
   childNextUnlock: document.querySelector("#childNextUnlock"),
+  childDailyMissions: document.querySelector("#childDailyMissions"),
+  childTicketBalance: document.querySelector("#childTicketBalance"),
   childRewardGoal: document.querySelector("#childRewardGoal"),
   childSheetTitle: document.querySelector("#childSheetTitle"),
   childSheetProgress: document.querySelector("#childSheetProgress"),
@@ -744,6 +785,35 @@ const els = {
   teacherLevelImage: document.querySelector("#teacherLevelImage"),
   teacherLevelName: document.querySelector("#teacherLevelName"),
   teacherLevelRequirement: document.querySelector("#teacherLevelRequirement"),
+  missionStudentSelect: document.querySelector("#missionStudentSelect"),
+  missionTemplateForm: document.querySelector("#missionTemplateForm"),
+  missionTemplateId: document.querySelector("#missionTemplateId"),
+  missionTemplateName: document.querySelector("#missionTemplateName"),
+  missionTemplateDisplayText: document.querySelector("#missionTemplateDisplayText"),
+  missionTemplateType: document.querySelector("#missionTemplateType"),
+  missionTemplateCategory: document.querySelector("#missionTemplateCategory"),
+  missionTemplateCondition: document.querySelector("#missionTemplateCondition"),
+  missionTemplateEvaluation: document.querySelector("#missionTemplateEvaluation"),
+  missionTemplateTarget: document.querySelector("#missionTemplateTarget"),
+  missionTemplateUnit: document.querySelector("#missionTemplateUnit"),
+  missionTemplateStampReward: document.querySelector("#missionTemplateStampReward"),
+  missionTemplateTicketReward: document.querySelector("#missionTemplateTicketReward"),
+  missionTemplateEnabled: document.querySelector("#missionTemplateEnabled"),
+  clearMissionTemplateForm: document.querySelector("#clearMissionTemplateForm"),
+  missionTemplateList: document.querySelector("#missionTemplateList"),
+  studentMissionSettingForm: document.querySelector("#studentMissionSettingForm"),
+  studentMissionSettingId: document.querySelector("#studentMissionSettingId"),
+  studentMissionTemplateSelect: document.querySelector("#studentMissionTemplateSelect"),
+  studentMissionTarget: document.querySelector("#studentMissionTarget"),
+  studentMissionStampReward: document.querySelector("#studentMissionStampReward"),
+  studentMissionTicketReward: document.querySelector("#studentMissionTicketReward"),
+  studentMissionEnabled: document.querySelector("#studentMissionEnabled"),
+  clearStudentMissionSettingForm: document.querySelector("#clearStudentMissionSettingForm"),
+  studentMissionSettingList: document.querySelector("#studentMissionSettingList"),
+  teacherDailyMissions: document.querySelector("#teacherDailyMissions"),
+  teacherTicketBalance: document.querySelector("#teacherTicketBalance"),
+  ticketAdjustment: document.querySelector("#ticketAdjustment"),
+  applyTicketAdjustment: document.querySelector("#applyTicketAdjustment"),
   shopStudentSelect: document.querySelector("#shopStudentSelect"),
   shopHounyanImage: document.querySelector("#shopHounyanImage"),
   shopSelectedName: document.querySelector("#shopSelectedName"),
@@ -1017,6 +1087,23 @@ function bindEvents() {
     saveTimetableOverride();
   });
   els.createTestStudentButton.addEventListener("click", createTestStudent);
+  els.missionStudentSelect.addEventListener("change", () => {
+    missionStudentId = els.missionStudentSelect.value;
+    renderDailyMissions();
+  });
+  els.missionTemplateForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveMissionTemplate();
+  });
+  els.clearMissionTemplateForm.addEventListener("click", clearMissionTemplateForm);
+  els.missionTemplateCondition.addEventListener("change", updateMissionTemplateConditionFields);
+  els.studentMissionSettingForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveStudentMissionSetting();
+  });
+  els.clearStudentMissionSettingForm.addEventListener("click", clearStudentMissionSettingForm);
+  els.studentMissionTemplateSelect.addEventListener("change", fillStudentMissionFromTemplate);
+  els.applyTicketAdjustment.addEventListener("click", applyTicketAdjustment);
   els.stampAssetForm.addEventListener("submit", (event) => {
     event.preventDefault();
     saveStampAsset();
@@ -1168,6 +1255,7 @@ function normalizeState(input) {
       ...student,
       groupId: String(student?.groupId || ""),
       isTest: Boolean(student?.isTest),
+      ticketBalance: Math.max(0, Math.floor(Number(student?.ticketBalance || 0))),
     }))
     : [];
   merged.groups = normalizeGroups(input.groups);
@@ -1177,6 +1265,9 @@ function normalizeState(input) {
   merged.timetableOverrides = normalizeTimetableOverrides(input.timetableOverrides);
   merged.selectedGroupId = String(input.selectedGroupId || "");
   merged.stampEvents = Array.isArray(input.stampEvents) ? input.stampEvents : [];
+  merged.missionTemplates = normalizeMissionTemplates(input.missionTemplates);
+  merged.studentMissionSettings = normalizeStudentMissionSettings(input.studentMissionSettings);
+  merged.dailyMissions = normalizeDailyMissions(input.dailyMissions);
   merged.redemptions = Array.isArray(input.redemptions)
     ? input.redemptions.filter((redemption) => !REMOVED_PURCHASABLE_STAMP_IDS.has(redemption.stampId))
     : [];
@@ -1195,6 +1286,56 @@ function normalizeState(input) {
   merged.rewardGoalsByStudent = normalizeRewardGoalsByStudent(input.rewardGoalsByStudent);
   merged.equippedHounyanLevelByStudent = normalizeEquippedHounyanLevels(input.equippedHounyanLevelByStudent);
   return merged;
+}
+
+function normalizeMissionTemplates(input) {
+  const source = Array.isArray(input) ? input : defaultMissionTemplates;
+  return source.filter((template) => template && template.id && String(template.name || "").trim()).map((template) => ({
+    id: String(template.id),
+    name: String(template.name).trim(),
+    displayText: String(template.displayText || template.name).trim(),
+    missionType: ["daily", "special"].includes(template.missionType) ? template.missionType : "daily",
+    category: missionCategories.some(([id]) => id === template.category) ? template.category : "other",
+    conditionType: missionConditions.some(([id]) => id === template.conditionType) ? template.conditionType : "manual",
+    defaultTargetValue: Math.max(1, Math.floor(Number(template.defaultTargetValue || 1))),
+    unit: String(template.unit || ""),
+    evaluationType: template.evaluationType === "manual" ? "manual" : "automatic",
+    defaultStampReward: Math.max(0, Math.floor(Number(template.defaultStampReward || 0))),
+    defaultTicketReward: Math.max(0, Math.floor(Number(template.defaultTicketReward || 0))),
+    enabled: template.enabled !== false,
+    createdAt: template.createdAt || new Date().toISOString(),
+    updatedAt: template.updatedAt || template.createdAt || new Date().toISOString(),
+  }));
+}
+
+function normalizeStudentMissionSettings(input) {
+  if (!Array.isArray(input)) return [];
+  return input.filter((setting) => setting && setting.id && setting.studentId && setting.missionTemplateId).map((setting, index) => ({
+    id: String(setting.id), studentId: String(setting.studentId), missionTemplateId: String(setting.missionTemplateId),
+    targetValue: Math.max(1, Math.floor(Number(setting.targetValue || 1))),
+    stampReward: Math.max(0, Math.floor(Number(setting.stampReward || 0))),
+    ticketReward: Math.max(0, Math.floor(Number(setting.ticketReward || 0))),
+    displayOrder: Number.isFinite(Number(setting.displayOrder)) ? Number(setting.displayOrder) : index,
+    enabled: setting.enabled !== false, validFrom: String(setting.validFrom || ""), validUntil: String(setting.validUntil || ""),
+    createdAt: setting.createdAt || new Date().toISOString(), updatedAt: setting.updatedAt || setting.createdAt || new Date().toISOString(),
+  }));
+}
+
+function normalizeDailyMissions(input) {
+  if (!Array.isArray(input)) return [];
+  return input.filter((mission) => mission && mission.id && mission.studentId && mission.targetDate).map((mission) => ({
+    id: String(mission.id), studentId: String(mission.studentId), missionTemplateId: String(mission.missionTemplateId || ""),
+    studentMissionSettingId: String(mission.studentMissionSettingId || ""), targetDate: String(mission.targetDate),
+    name: String(mission.name || "ミッション"), displayText: String(mission.displayText || mission.name || "ミッション"),
+    missionType: mission.missionType === "special" ? "special" : "daily", category: String(mission.category || "other"),
+    conditionType: String(mission.conditionType || "manual"), evaluationType: mission.evaluationType === "manual" ? "manual" : "automatic",
+    targetValue: Math.max(1, Math.floor(Number(mission.targetValue || 1))), unit: String(mission.unit || ""),
+    currentValue: Math.max(0, Number(mission.currentValue || 0)), manualAdjustment: Number(mission.manualAdjustment || 0),
+    stampReward: Math.max(0, Math.floor(Number(mission.stampReward || 0))), ticketReward: Math.max(0, Math.floor(Number(mission.ticketReward || 0))),
+    status: ["not_started", "in_progress", "completed", "expired", "revoked"].includes(mission.status) ? mission.status : "not_started",
+    completedAt: mission.completedAt || "", rewardGranted: Boolean(mission.rewardGranted), createdAt: mission.createdAt || new Date().toISOString(),
+    updatedAt: mission.updatedAt || mission.createdAt || new Date().toISOString(),
+  }));
 }
 
 function normalizeRewardGoalsByStudent(input) {
@@ -1556,10 +1697,12 @@ function persist() {
 }
 
 function render() {
+  if (expirePastDailyMissions()) persist();
   renderTopStats();
   renderStudentSwitch();
   renderStudentLists();
   renderStudentDetails();
+  renderDailyMissions();
   renderSheetAlbum();
   renderRewards();
   renderStampBook();
@@ -1719,6 +1862,236 @@ function renderStudentDetails() {
     childMode: false,
   });
   renderHistory(student.id);
+}
+
+function missionProgressText(mission) {
+  if (mission.status === "completed") return "達成！";
+  if (mission.evaluationType === "manual") return "先生の確認待ち";
+  const current = Math.min(mission.targetValue, Math.max(0, Number(mission.currentValue || 0)));
+  return `${current} / ${mission.targetValue}${mission.unit}`;
+}
+
+function dailyMissionCardMarkup(mission, { teacher = false } = {}) {
+  const completed = mission.status === "completed";
+  const controls = !teacher ? "" : completed
+    ? `<div class="mission-card-actions"><span class="mission-reward-status">${mission.rewardGranted ? "報酬付与済み" : "報酬未付与"}</span><button class="text-button" type="button" data-mission-revert="${escapeHtml(mission.id)}">未達成に戻す</button></div>`
+    : mission.evaluationType === "manual"
+      ? `<div class="mission-card-actions"><button class="primary-button compact-button" type="button" data-mission-complete="${escapeHtml(mission.id)}">達成にする</button></div>`
+      : `<div class="mission-card-actions"><label class="field compact-field"><span>進捗を増減</span><input type="number" value="1" data-mission-adjustment="${escapeHtml(mission.id)}"></label><button class="soft-button compact-button" type="button" data-mission-adjust="${escapeHtml(mission.id)}">反映</button><button class="text-button" type="button" data-mission-complete="${escapeHtml(mission.id)}">達成にする</button></div>`;
+  return `
+    <article class="daily-mission-card${completed ? " is-completed" : ""}${lastCompletedMissionId === mission.id ? " is-newly-completed" : ""}">
+      <div class="mission-card-main">
+        <div class="mission-card-copy"><span class="mission-category">${escapeHtml(missionCategoryLabel(mission.category))}${mission.evaluationType === "manual" ? " / 先生判定" : ""}</span><h4>${escapeHtml(mission.displayText)}</h4></div>
+        <strong class="mission-progress">${escapeHtml(missionProgressText(mission))}</strong>
+      </div>
+      <div class="mission-rewards"><span>できたら</span><strong>スタンプ ${mission.stampReward}こ</strong><strong>きっぷ ${mission.ticketReward}まい</strong></div>
+      ${controls}
+    </article>
+  `;
+}
+
+function renderMissionTemplateOptions() {
+  const previousCategory = els.missionTemplateCategory.value || "learning";
+  const previousCondition = els.missionTemplateCondition.value || "print_completed_count";
+  els.missionTemplateCategory.innerHTML = missionCategories.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+  els.missionTemplateCondition.innerHTML = missionConditions.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+  els.missionTemplateCategory.value = missionCategories.some(([id]) => id === previousCategory) ? previousCategory : "learning";
+  els.missionTemplateCondition.value = missionConditions.some(([id]) => id === previousCondition) ? previousCondition : "print_completed_count";
+}
+
+function renderDailyMissions() {
+  const today = CalendarDate.dateKey(new Date());
+  const childStudent = selectedStudent();
+  if (!missionStudentId || !state.students.some((student) => student.id === missionStudentId)) {
+    missionStudentId = childStudent?.id || state.students[0]?.id || "";
+  }
+  const beforeMissionCount = state.dailyMissions.length;
+  const beforeSettingCount = state.studentMissionSettings.length;
+  let automaticChanged = false;
+  const missionStudents = [childStudent, state.students.find((student) => student.id === missionStudentId)]
+    .filter(Boolean)
+    .filter((student, index, students) => students.findIndex((item) => item.id === student.id) === index);
+  missionStudents.forEach((student) => {
+    generateDailyMissions(student.id, today);
+    automaticChanged = refreshAutomaticMissions(student.id, today) || automaticChanged;
+  });
+  if (state.dailyMissions.length !== beforeMissionCount || state.studentMissionSettings.length !== beforeSettingCount || automaticChanged) persist();
+
+  if (!childStudent) {
+    els.childTicketBalance.textContent = "きっぷ 0まい";
+    els.childDailyMissions.innerHTML = '<p class="empty-state compact-empty">児童を選ぶと、きょうのミッションが表示されます。</p>';
+  } else if (!canGenerateDailyMissions(childStudent.id, today)) {
+    els.childTicketBalance.textContent = `きっぷ ${childStudent.ticketBalance || 0}まい`;
+    els.childDailyMissions.innerHTML = '<p class="empty-state compact-empty">今日はお休みです。デイリーミッションはありません。</p>';
+  } else {
+    const missions = getDailyMissions(childStudent.id, today);
+    els.childTicketBalance.textContent = `きっぷ ${childStudent.ticketBalance || 0}まい`;
+    els.childDailyMissions.innerHTML = missions.length
+      ? missions.map((mission) => dailyMissionCardMarkup(mission)).join("")
+      : '<p class="empty-state compact-empty">先生ページでミッションを追加してください。</p>';
+  }
+
+  els.missionStudentSelect.innerHTML = state.students.map((student) => `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)}${isTestStudent(student) ? "（テスト）" : ""}</option>`).join("") || '<option value="">児童未登録</option>';
+  els.missionStudentSelect.value = missionStudentId;
+  renderMissionTemplateManagement();
+  renderStudentMissionSettings();
+  renderTeacherDailyMissions();
+}
+
+function renderMissionTemplateManagement() {
+  renderMissionTemplateOptions();
+  const selectedTemplate = els.studentMissionTemplateSelect.value;
+  const templates = state.missionTemplates.slice().sort((left, right) => left.name.localeCompare(right.name, "ja"));
+  els.studentMissionTemplateSelect.innerHTML = `<option value="">ひな形を選ぶ</option>${templates.filter((template) => template.missionType === "daily" && template.enabled).map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join("")}`;
+  if ([...els.studentMissionTemplateSelect.options].some((option) => option.value === selectedTemplate)) els.studentMissionTemplateSelect.value = selectedTemplate;
+  els.missionTemplateList.innerHTML = templates.length ? templates.map((template) => `
+    <article class="management-item${template.enabled ? "" : " is-disabled"}"><div><strong>${escapeHtml(template.name)}</strong><span>${escapeHtml(missionCategoryLabel(template.category))} / ${template.missionType === "daily" ? "デイリー" : "特別"} / ${escapeHtml(missionConditionLabel(template.conditionType))}</span></div><div class="management-actions"><button class="text-button" type="button" data-mission-template-edit="${escapeHtml(template.id)}">編集</button><button class="text-button" type="button" data-mission-template-copy="${escapeHtml(template.id)}">複製</button><button class="text-button" type="button" data-mission-template-toggle="${escapeHtml(template.id)}">${template.enabled ? "無効にする" : "有効にする"}</button><button class="text-button danger-text" type="button" data-mission-template-delete="${escapeHtml(template.id)}">削除</button></div></article>
+  `).join("") : '<p class="empty-state">ミッションひな形はありません。</p>';
+  els.missionTemplateList.querySelectorAll("[data-mission-template-edit]").forEach((button) => button.addEventListener("click", () => editMissionTemplate(button.dataset.missionTemplateEdit)));
+  els.missionTemplateList.querySelectorAll("[data-mission-template-copy]").forEach((button) => button.addEventListener("click", () => copyMissionTemplate(button.dataset.missionTemplateCopy)));
+  els.missionTemplateList.querySelectorAll("[data-mission-template-toggle]").forEach((button) => button.addEventListener("click", () => toggleMissionTemplate(button.dataset.missionTemplateToggle)));
+  els.missionTemplateList.querySelectorAll("[data-mission-template-delete]").forEach((button) => button.addEventListener("click", () => deleteMissionTemplate(button.dataset.missionTemplateDelete)));
+}
+
+function renderStudentMissionSettings() {
+  const student = state.students.find((item) => item.id === missionStudentId);
+  els.teacherTicketBalance.textContent = `きっぷ ${student?.ticketBalance || 0}まい`;
+  if (!student) {
+    els.studentMissionSettingList.innerHTML = '<p class="empty-state">児童を追加してください。</p>';
+    return;
+  }
+  const settings = state.studentMissionSettings.filter((setting) => setting.studentId === student.id).slice().sort((left, right) => left.displayOrder - right.displayOrder);
+  els.studentMissionSettingList.innerHTML = settings.length ? settings.map((setting) => {
+    const template = missionTemplateById(setting.missionTemplateId);
+    return `<article class="management-item${setting.enabled ? "" : " is-disabled"}"><div><strong>${escapeHtml(template?.name || "削除されたひな形")}</strong><span>目標 ${setting.targetValue}${escapeHtml(template?.unit || "")} / スタンプ ${setting.stampReward}こ / きっぷ ${setting.ticketReward}まい</span></div><div class="management-actions"><button class="text-button" type="button" data-student-mission-edit="${escapeHtml(setting.id)}">編集</button><button class="text-button" type="button" data-student-mission-toggle="${escapeHtml(setting.id)}">${setting.enabled ? "外す" : "使う"}</button><button class="text-button danger-text" type="button" data-student-mission-delete="${escapeHtml(setting.id)}">削除</button></div></article>`;
+  }).join("") : '<p class="empty-state">この児童のミッションはまだありません。</p>';
+  els.studentMissionSettingList.querySelectorAll("[data-student-mission-edit]").forEach((button) => button.addEventListener("click", () => editStudentMissionSetting(button.dataset.studentMissionEdit)));
+  els.studentMissionSettingList.querySelectorAll("[data-student-mission-toggle]").forEach((button) => button.addEventListener("click", () => toggleStudentMissionSetting(button.dataset.studentMissionToggle)));
+  els.studentMissionSettingList.querySelectorAll("[data-student-mission-delete]").forEach((button) => button.addEventListener("click", () => deleteStudentMissionSetting(button.dataset.studentMissionDelete)));
+}
+
+function renderTeacherDailyMissions() {
+  const student = state.students.find((item) => item.id === missionStudentId);
+  const today = CalendarDate.dateKey(new Date());
+  if (!student) {
+    els.teacherDailyMissions.innerHTML = '<p class="empty-state">児童を選んでください。</p>';
+    return;
+  }
+  if (!canGenerateDailyMissions(student.id, today)) {
+    els.teacherDailyMissions.innerHTML = '<p class="empty-state">今日はこの児童の休業日です。</p>';
+    return;
+  }
+  const missions = getDailyMissions(student.id, today);
+  els.teacherDailyMissions.innerHTML = missions.length ? missions.map((mission) => dailyMissionCardMarkup(mission, { teacher: true })).join("") : '<p class="empty-state">表示するミッションはありません。</p>';
+  els.teacherDailyMissions.querySelectorAll("[data-mission-complete]").forEach((button) => button.addEventListener("click", () => {
+    if (!completeMission(button.dataset.missionComplete)) return;
+    persist(); render(); showToast("ミッション達成！ 報酬を追加しました");
+  }));
+  els.teacherDailyMissions.querySelectorAll("[data-mission-revert]").forEach((button) => button.addEventListener("click", () => {
+    if (revertMission(button.dataset.missionRevert)) showToast("未達成へ戻し、報酬も取り消しました");
+  }));
+  els.teacherDailyMissions.querySelectorAll("[data-mission-adjust]").forEach((button) => button.addEventListener("click", () => {
+    const input = els.teacherDailyMissions.querySelector(`[data-mission-adjustment="${button.dataset.missionAdjust}"]`);
+    if (adjustMissionProgress(button.dataset.missionAdjust, Number(input?.value || 0))) showToast("進捗を更新しました");
+  }));
+}
+
+function clearMissionTemplateForm() {
+  els.missionTemplateId.value = ""; els.missionTemplateName.value = ""; els.missionTemplateDisplayText.value = "";
+  els.missionTemplateType.value = "daily"; els.missionTemplateCategory.value = "learning"; els.missionTemplateCondition.value = "print_completed_count";
+  els.missionTemplateEvaluation.value = "automatic"; els.missionTemplateTarget.value = "1"; els.missionTemplateUnit.value = "まい";
+  els.missionTemplateStampReward.value = "1"; els.missionTemplateTicketReward.value = "1"; els.missionTemplateEnabled.checked = true;
+}
+
+function updateMissionTemplateConditionFields() {
+  const condition = missionConditions.find(([id]) => id === els.missionTemplateCondition.value);
+  if (condition) els.missionTemplateUnit.value = condition[2];
+  if (els.missionTemplateCondition.value === "manual") els.missionTemplateEvaluation.value = "manual";
+}
+
+function saveMissionTemplate() {
+  const now = new Date().toISOString();
+  const existing = missionTemplateById(els.missionTemplateId.value);
+  const draft = {
+    name: els.missionTemplateName.value.trim(), displayText: els.missionTemplateDisplayText.value.trim(), missionType: els.missionTemplateType.value,
+    category: els.missionTemplateCategory.value, conditionType: els.missionTemplateCondition.value,
+    evaluationType: els.missionTemplateCondition.value === "manual" ? "manual" : els.missionTemplateEvaluation.value,
+    defaultTargetValue: Math.max(1, Number(els.missionTemplateTarget.value || 1)), unit: els.missionTemplateUnit.value.trim(),
+    defaultStampReward: Math.max(0, Number(els.missionTemplateStampReward.value || 0)), defaultTicketReward: Math.max(0, Number(els.missionTemplateTicketReward.value || 0)),
+    enabled: els.missionTemplateEnabled.checked, updatedAt: now,
+  };
+  if (!draft.name || !draft.displayText) return;
+  if (existing) Object.assign(existing, draft);
+  else state.missionTemplates.push({ id: crypto.randomUUID(), ...draft, createdAt: now });
+  clearMissionTemplateForm(); persist(); render(); showToast("ミッションひな形を保存しました");
+}
+
+function editMissionTemplate(templateId) {
+  const template = missionTemplateById(templateId); if (!template) return;
+  els.missionTemplateId.value = template.id; els.missionTemplateName.value = template.name; els.missionTemplateDisplayText.value = template.displayText;
+  els.missionTemplateType.value = template.missionType; els.missionTemplateCategory.value = template.category; els.missionTemplateCondition.value = template.conditionType;
+  els.missionTemplateEvaluation.value = template.evaluationType; els.missionTemplateTarget.value = template.defaultTargetValue; els.missionTemplateUnit.value = template.unit;
+  els.missionTemplateStampReward.value = template.defaultStampReward; els.missionTemplateTicketReward.value = template.defaultTicketReward; els.missionTemplateEnabled.checked = template.enabled;
+  els.missionTemplateName.focus();
+}
+
+function copyMissionTemplate(templateId) {
+  const template = missionTemplateById(templateId); if (!template) return;
+  const now = new Date().toISOString(); state.missionTemplates.push({ ...structuredClone(template), id: crypto.randomUUID(), name: `${template.name}（コピー）`, createdAt: now, updatedAt: now });
+  persist(); render(); showToast("ひな形を複製しました");
+}
+
+function toggleMissionTemplate(templateId) {
+  const template = missionTemplateById(templateId); if (!template) return;
+  template.enabled = !template.enabled; template.updatedAt = new Date().toISOString(); persist(); render();
+}
+
+function deleteMissionTemplate(templateId) {
+  const template = missionTemplateById(templateId); if (!template || !confirm(`「${template.name}」を削除しますか？\n児童への設定も外れます。`)) return;
+  state.missionTemplates = state.missionTemplates.filter((item) => item.id !== templateId);
+  state.studentMissionSettings = state.studentMissionSettings.filter((setting) => setting.missionTemplateId !== templateId);
+  persist(); render(); showToast("ミッションひな形を削除しました");
+}
+
+function clearStudentMissionSettingForm() {
+  els.studentMissionSettingId.value = ""; els.studentMissionTemplateSelect.value = ""; els.studentMissionTarget.value = "1";
+  els.studentMissionStampReward.value = "1"; els.studentMissionTicketReward.value = "1"; els.studentMissionEnabled.checked = true;
+}
+
+function fillStudentMissionFromTemplate() {
+  const template = missionTemplateById(els.studentMissionTemplateSelect.value); if (!template) return;
+  els.studentMissionTarget.value = template.defaultTargetValue; els.studentMissionStampReward.value = template.defaultStampReward; els.studentMissionTicketReward.value = template.defaultTicketReward;
+}
+
+function saveStudentMissionSetting() {
+  const student = state.students.find((item) => item.id === missionStudentId); const template = missionTemplateById(els.studentMissionTemplateSelect.value);
+  if (!student || !template) return;
+  const now = new Date().toISOString(); const existing = missionSettingById(els.studentMissionSettingId.value);
+  const draft = { studentId: student.id, missionTemplateId: template.id, targetValue: Math.max(1, Number(els.studentMissionTarget.value || 1)), stampReward: Math.max(0, Number(els.studentMissionStampReward.value || 0)), ticketReward: Math.max(0, Number(els.studentMissionTicketReward.value || 0)), enabled: els.studentMissionEnabled.checked, updatedAt: now };
+  if (existing) Object.assign(existing, draft); else state.studentMissionSettings.push({ id: crypto.randomUUID(), ...draft, displayOrder: state.studentMissionSettings.filter((setting) => setting.studentId === student.id).length, validFrom: "", validUntil: "", createdAt: now });
+  clearStudentMissionSettingForm(); persist(); render(); showToast("児童のミッションを保存しました");
+}
+
+function editStudentMissionSetting(settingId) {
+  const setting = missionSettingById(settingId); if (!setting) return;
+  els.studentMissionSettingId.value = setting.id; els.studentMissionTemplateSelect.value = setting.missionTemplateId; els.studentMissionTarget.value = setting.targetValue;
+  els.studentMissionStampReward.value = setting.stampReward; els.studentMissionTicketReward.value = setting.ticketReward; els.studentMissionEnabled.checked = setting.enabled;
+}
+
+function toggleStudentMissionSetting(settingId) {
+  const setting = missionSettingById(settingId); if (!setting) return;
+  setting.enabled = !setting.enabled; setting.updatedAt = new Date().toISOString(); persist(); render();
+}
+
+function deleteStudentMissionSetting(settingId) {
+  const setting = missionSettingById(settingId); if (!setting || !confirm("この児童のミッション設定を削除しますか？")) return;
+  state.studentMissionSettings = state.studentMissionSettings.filter((item) => item.id !== settingId); persist(); render();
+}
+
+function applyTicketAdjustment() {
+  const student = state.students.find((item) => item.id === missionStudentId); const amount = Number(els.ticketAdjustment.value || 0);
+  if (!student || !amount) return;
+  student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) + amount); els.ticketAdjustment.value = "0"; persist(); render(); showToast("きっぷ残高を更新しました");
 }
 
 function renderChildNextUnlock(total, student) {
@@ -2367,6 +2740,196 @@ function missionCalendarContext(studentId, date = CalendarDate.dateKey(new Date(
   };
 }
 
+function canGenerateDailyMissions(studentId, date = CalendarDate.dateKey(new Date())) {
+  return canGenerateDailyMission(studentId, date);
+}
+
+function missionTemplateById(templateId) {
+  return state.missionTemplates.find((template) => template.id === templateId) || null;
+}
+
+function missionSettingById(settingId) {
+  return state.studentMissionSettings.find((setting) => setting.id === settingId) || null;
+}
+
+function missionCategoryLabel(category) {
+  return missionCategories.find(([id]) => id === category)?.[1] || "その他";
+}
+
+function missionConditionLabel(conditionType) {
+  return missionConditions.find(([id]) => id === conditionType)?.[1] || "先生による判定";
+}
+
+function missionDisplayText(text, targetValue) {
+  return String(text || "ミッション").replaceAll("{target}", String(targetValue));
+}
+
+function missionSettingsForStudent(studentId, date = CalendarDate.dateKey(new Date())) {
+  return state.studentMissionSettings.filter((setting) => {
+    const template = missionTemplateById(setting.missionTemplateId);
+    return setting.studentId === studentId && setting.enabled && template?.enabled && template.missionType === "daily"
+      && CalendarDate.isDateInRange(date, setting.validFrom, setting.validUntil);
+  }).slice().sort((left, right) => left.displayOrder - right.displayOrder);
+}
+
+function ensureTestStudentMissionSettings(student) {
+  if (!isTestStudent(student) || state.studentMissionSettings.some((setting) => setting.studentId === student.id)) {
+    return false;
+  }
+  const now = new Date().toISOString();
+  const templateIds = ["daily-print-completed", "daily-stamp-earned", "daily-careful-work"];
+  templateIds.forEach((templateId, index) => {
+    const template = missionTemplateById(templateId);
+    if (!template) return;
+    state.studentMissionSettings.push({
+      id: crypto.randomUUID(), studentId: student.id, missionTemplateId: template.id,
+      targetValue: template.defaultTargetValue, stampReward: template.defaultStampReward, ticketReward: template.defaultTicketReward,
+      displayOrder: index, enabled: true, validFrom: "", validUntil: "", createdAt: now, updatedAt: now,
+    });
+  });
+  return true;
+}
+
+function generateDailyMissions(studentId, date = CalendarDate.dateKey(new Date())) {
+  const student = state.students.find((item) => item.id === studentId);
+  if (!student || !canGenerateDailyMissions(studentId, date)) return [];
+  ensureTestStudentMissionSettings(student);
+  const now = new Date().toISOString();
+  missionSettingsForStudent(studentId, date).forEach((setting) => {
+    const exists = state.dailyMissions.some((mission) => mission.studentId === studentId && mission.targetDate === date && mission.studentMissionSettingId === setting.id);
+    if (exists) return;
+    const template = missionTemplateById(setting.missionTemplateId);
+    if (!template) return;
+    state.dailyMissions.push({
+      id: crypto.randomUUID(), studentId, missionTemplateId: template.id, studentMissionSettingId: setting.id, targetDate: date,
+      name: template.name, displayText: missionDisplayText(template.displayText, setting.targetValue), missionType: template.missionType,
+      category: template.category, conditionType: template.conditionType, evaluationType: template.evaluationType,
+      targetValue: setting.targetValue, unit: template.unit, currentValue: 0, manualAdjustment: 0,
+      stampReward: setting.stampReward, ticketReward: setting.ticketReward, status: "not_started", completedAt: "", rewardGranted: false,
+      createdAt: now, updatedAt: now,
+    });
+  });
+  return getDailyMissions(studentId, date);
+}
+
+function getDailyMissions(studentId, date = CalendarDate.dateKey(new Date())) {
+  return state.dailyMissions.filter((mission) => mission.studentId === studentId && mission.targetDate === date)
+    .slice().sort((left, right) => {
+      const leftSetting = missionSettingById(left.studentMissionSettingId);
+      const rightSetting = missionSettingById(right.studentMissionSettingId);
+      return Number(leftSetting?.displayOrder || 0) - Number(rightSetting?.displayOrder || 0);
+    });
+}
+
+function expirePastDailyMissions(today = CalendarDate.dateKey(new Date())) {
+  let changed = false;
+  state.dailyMissions.forEach((mission) => {
+    if (mission.missionType !== "daily" || mission.targetDate >= today || ["completed", "expired"].includes(mission.status)) return;
+    mission.status = "expired";
+    mission.updatedAt = new Date().toISOString();
+    changed = true;
+  });
+  return changed;
+}
+
+function automaticMissionBaseValue(mission) {
+  const stampCount = state.stampEvents.filter((event) => event.studentId === mission.studentId && !event.canceled
+    && event.source !== "mission-reward" && CalendarDate.dateKey(new Date(event.createdAt)) === mission.targetDate).length;
+  if (["print_completed_count", "stamp_earned_count"].includes(mission.conditionType)) return stampCount;
+  return 0;
+}
+
+function missionProgressValue(mission) {
+  if (mission.conditionType === "manual") return Math.min(mission.targetValue, Math.max(0, mission.currentValue || 0));
+  return Math.max(0, automaticMissionBaseValue(mission) + Number(mission.manualAdjustment || 0));
+}
+
+function grantMissionReward(mission) {
+  if (mission.rewardGranted) return false;
+  const student = state.students.find((item) => item.id === mission.studentId);
+  if (!student) return false;
+  const now = new Date().toISOString();
+  const stamp = stampById(state.selectedStampId);
+  for (let index = 0; index < mission.stampReward; index += 1) {
+    state.stampEvents.push({ id: crypto.randomUUID(), studentId: student.id, stampId: stamp.id, memo: `ミッション報酬: ${mission.name}`, createdAt: now, canceled: false, source: "mission-reward", missionId: mission.id });
+  }
+  student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) + mission.ticketReward);
+  mission.rewardGranted = true;
+  return true;
+}
+
+function revokeMissionReward(mission) {
+  if (!mission.rewardGranted) return false;
+  const student = state.students.find((item) => item.id === mission.studentId);
+  if (!student) return false;
+  state.stampEvents.forEach((event) => {
+    if (event.missionId === mission.id && event.source === "mission-reward") event.canceled = true;
+  });
+  student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) - mission.ticketReward);
+  mission.rewardGranted = false;
+  return true;
+}
+
+function completeMission(missionId) {
+  const mission = state.dailyMissions.find((item) => item.id === missionId);
+  if (!mission || mission.status === "completed") return false;
+  mission.currentValue = mission.targetValue;
+  mission.status = "completed";
+  mission.completedAt = new Date().toISOString();
+  mission.updatedAt = mission.completedAt;
+  grantMissionReward(mission);
+  lastCompletedMissionId = mission.id;
+  clearTimeout(missionCelebrationTimer);
+  missionCelebrationTimer = window.setTimeout(() => {
+    lastCompletedMissionId = "";
+    renderDailyMissions();
+  }, 1800);
+  return true;
+}
+
+function refreshAutomaticMissions(studentId, date = CalendarDate.dateKey(new Date())) {
+  let changed = false;
+  getDailyMissions(studentId, date).forEach((mission) => {
+    if (mission.evaluationType !== "automatic" || mission.status === "completed") return;
+    const value = missionProgressValue(mission);
+    mission.currentValue = value;
+    mission.status = value > 0 ? "in_progress" : "not_started";
+    mission.updatedAt = new Date().toISOString();
+    if (value >= mission.targetValue) changed = completeMission(mission.id) || changed;
+  });
+  return changed;
+}
+
+function adjustMissionProgress(missionId, amount) {
+  const mission = state.dailyMissions.find((item) => item.id === missionId);
+  if (!mission || mission.status === "completed") return false;
+  const value = Number(amount || 0);
+  if (!value) return false;
+  if (mission.conditionType === "manual") mission.currentValue = Math.max(0, Number(mission.currentValue || 0) + value);
+  else mission.manualAdjustment = Math.max(-automaticMissionBaseValue(mission), Number(mission.manualAdjustment || 0) + value);
+  const progress = missionProgressValue(mission);
+  mission.currentValue = progress;
+  mission.status = progress > 0 ? "in_progress" : "not_started";
+  mission.updatedAt = new Date().toISOString();
+  if (progress >= mission.targetValue) completeMission(mission.id);
+  persist();
+  render();
+  return true;
+}
+
+function revertMission(missionId) {
+  const mission = state.dailyMissions.find((item) => item.id === missionId);
+  if (!mission || mission.status !== "completed") return false;
+  revokeMissionReward(mission);
+  mission.status = "in_progress";
+  mission.completedAt = "";
+  mission.currentValue = Math.min(mission.targetValue - 1, missionProgressValue(mission));
+  mission.updatedAt = new Date().toISOString();
+  persist();
+  render();
+  return true;
+}
+
 function renderCalendar() {
   if (!els.calendarEventId.value && !els.calendarEventStart.value) {
     els.calendarEventStart.value = calendarSelectedDate;
@@ -2719,6 +3282,11 @@ window.HounyanSchoolCalendar = {
   hasSubjectOnDate,
   canGenerateDailyMission,
   missionCalendarContext,
+  canGenerateDailyMissions,
+  generateDailyMissions,
+  getDailyMissions,
+  adjustMissionProgress,
+  completeMission,
 };
 
 function renderHounyanCloset() {
@@ -4301,6 +4869,7 @@ function saveStudent() {
     return;
   }
 
+  let savedStudent = null;
   if (els.studentId.value) {
     const student = state.students.find((item) => item.id === els.studentId.value);
     if (student) {
@@ -4308,6 +4877,7 @@ function saveStudent() {
       student.note = note;
       student.groupId = groupId;
       student.isTest = isTest;
+      savedStudent = student;
     }
   } else {
     const student = {
@@ -4316,11 +4886,15 @@ function saveStudent() {
       note,
       groupId,
       isTest,
+      ticketBalance: 0,
       createdAt: new Date().toISOString(),
     };
     state.students.push(student);
     state.selectedStudentId = student.id;
+    savedStudent = student;
   }
+
+  if (isTestStudent(savedStudent)) ensureTestStudentMissionSettings(savedStudent);
 
   clearStudentForm();
   persist();
@@ -4354,6 +4928,7 @@ function createTestStudent() {
     createdAt: new Date().toISOString(),
   };
   state.students.push(student);
+  ensureTestStudentMissionSettings(student);
   state.selectedStudentId = student.id;
   persist();
   render();
@@ -4717,6 +5292,7 @@ function addStampBatch({ student, selections, source, memo }) {
         memo,
         createdAt,
         canceled: false,
+        source: source === "teacher" ? "teacher-stamp" : "child-stamp",
       });
     }
   });
@@ -4727,6 +5303,9 @@ function addStampBatch({ student, selections, source, memo }) {
   const unlockedLevels = levelsUnlockedBetween(stats.total, nextTotal);
   const dominantStamp = dominantStampFromSelections(selections);
   state.stampEvents.push(...events);
+  const missionDate = CalendarDate.dateKey(new Date(createdAt));
+  generateDailyMissions(student.id, missionDate);
+  refreshAutomaticMissions(student.id, missionDate);
   autoEquipLatestUnlockedHounyan(student.id, unlockedLevels);
   lastStampedEventIds = new Set(events.map((event) => event.id));
   if (source === "teacher") {
@@ -5112,6 +5691,8 @@ function deleteSelectedStudent() {
   createAutoBackup("before-delete", { force: true });
   state.students = state.students.filter((item) => item.id !== student.id);
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
+  state.studentMissionSettings = state.studentMissionSettings.filter((setting) => setting.studentId !== student.id);
+  state.dailyMissions = state.dailyMissions.filter((mission) => mission.studentId !== student.id);
   state.redemptions = state.redemptions.filter((redemption) => redemption.studentId !== student.id);
   delete state.ownedStampIdsByStudent[student.id];
   delete state.rewardGoalsByStudent[student.id];

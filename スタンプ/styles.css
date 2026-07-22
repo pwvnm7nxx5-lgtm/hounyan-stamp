@@ -390,6 +390,126 @@ button:disabled {
   min-height: 62px;
 }
 
+.daily-mission-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ticket-balance,
+.mission-reward-status {
+  color: #80551d;
+  font-size: 0.88rem;
+}
+
+.daily-mission-list {
+  display: grid;
+  gap: 10px;
+}
+
+.daily-mission-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--blue);
+  border-radius: var(--radius);
+  background: #fbfefd;
+}
+
+.daily-mission-card.is-completed {
+  border-left-color: var(--green);
+  background: #f2fff1;
+}
+
+.daily-mission-card.is-newly-completed {
+  animation: missionComplete 0.7s ease both;
+}
+
+.mission-card-main,
+.mission-card-actions,
+.ticket-adjustment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mission-card-copy {
+  min-width: 0;
+}
+
+.mission-card-copy h4 {
+  margin: 3px 0 0;
+  font-size: 1rem;
+}
+
+.mission-category {
+  color: var(--blue-dark);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.mission-progress {
+  flex: 0 0 auto;
+  color: var(--green-deep);
+  font-size: 0.95rem;
+}
+
+.mission-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.mission-rewards strong {
+  color: var(--ink);
+}
+
+.mission-card-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+
+.mission-card-actions .field {
+  min-width: 130px;
+}
+
+.mission-management-panel,
+.mission-today-section {
+  display: grid;
+  gap: 16px;
+}
+
+.mission-management-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.mission-management-grid > section + section {
+  padding-left: 22px;
+  border-left: 1px solid var(--line);
+}
+
+.mission-form {
+  margin-bottom: 14px;
+}
+
+.ticket-adjustment {
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+@keyframes missionComplete {
+  0% { transform: scale(0.97); background: #fff6bd; }
+  55% { transform: scale(1.015); background: #efffe9; }
+  100% { transform: scale(1); }
+}
+
 .calendar-timetable-board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
@@ -3390,6 +3510,20 @@ input:focus,
 }
 
 @media (max-width: 980px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .top-actions {
+    width: 100%;
+  }
+
+  .page-tab {
+    flex: 1;
+    min-width: 0;
+  }
+
   .child-grid,
   .shop-grid,
   .settings-grid,
@@ -3443,6 +3577,17 @@ input:focus,
     grid-template-columns: 1fr;
   }
 
+  .mission-management-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mission-management-grid > section + section {
+    padding-top: 20px;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
   .calendar-day-detail {
     padding-right: 0;
     padding-bottom: 18px;
@@ -3489,6 +3634,18 @@ input:focus,
 
   .calendar-overview-hounyan {
     width: 120px;
+  }
+
+  .mission-card-main,
+  .mission-card-actions,
+  .ticket-adjustment {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mission-card-actions .field,
+  .ticket-adjustment .field {
+    width: 100%;
   }
 
   .calendar-head,

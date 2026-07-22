@@ -95,6 +95,17 @@
               <strong>あと0こでスタンプかいほう！</strong>
             </div>
 
+            <section class="daily-mission-panel" aria-labelledby="childMissionTitle">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">きょうのチャレンジ</p>
+                  <h3 id="childMissionTitle">デイリーミッション</h3>
+                </div>
+                <strong id="childTicketBalance" class="ticket-balance">きっぷ 0まい</strong>
+              </div>
+              <div id="childDailyMissions" class="daily-mission-list"></div>
+            </section>
+
             <div class="sheet-head">
               <h3 id="childSheetTitle">シート 1</h3>
               <p id="childSheetProgress">あと20こでシートがいっぱい</p>
@@ -332,10 +343,75 @@
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="groups">組の管理</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="timetable">時間割</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="calendar">カレンダー</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="missions">ミッション管理</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="rewards">景品・交換</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="stamps">スタンプ設定</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="data">データ</button>
               </div>
+            </section>
+
+            <section class="work-panel mission-management-panel" data-teacher-tab-panel="missions">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">デイリーミッション</p>
+                  <h2>ミッション管理</h2>
+                </div>
+                <label class="field compact-field"><span>児童</span><select id="missionStudentSelect" class="select"></select></label>
+              </div>
+
+              <div class="mission-management-grid">
+                <section>
+                  <div class="section-head compact"><div><p class="eyebrow">ひな形</p><h3>ミッションをつくる</h3></div></div>
+                  <form id="missionTemplateForm" class="form-grid mission-form">
+                    <input id="missionTemplateId" type="hidden">
+                    <label class="field"><span>ミッション名</span><input id="missionTemplateName" type="text" required placeholder="例: プリントを終わらせる"></label>
+                    <label class="field"><span>児童への文</span><input id="missionTemplateDisplayText" type="text" required placeholder="例: プリントを{target}まい おわらせよう"></label>
+                    <div class="date-range-row">
+                      <label class="field"><span>種類</span><select id="missionTemplateType" class="select"><option value="daily">デイリー</option><option value="special">特別（準備中）</option></select></label>
+                      <label class="field"><span>カテゴリー</span><select id="missionTemplateCategory" class="select"></select></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>達成条件</span><select id="missionTemplateCondition" class="select"></select></label>
+                      <label class="field"><span>判定</span><select id="missionTemplateEvaluation" class="select"><option value="automatic">自動</option><option value="manual">先生が判定</option></select></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>目標</span><input id="missionTemplateTarget" type="number" min="1" value="1" required></label>
+                      <label class="field"><span>単位</span><input id="missionTemplateUnit" type="text" value="まい"></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>スタンプ報酬</span><input id="missionTemplateStampReward" type="number" min="0" value="1" required></label>
+                      <label class="field"><span>きっぷ報酬</span><input id="missionTemplateTicketReward" type="number" min="0" value="1" required></label>
+                    </div>
+                    <label class="check-row"><input id="missionTemplateEnabled" type="checkbox" checked> このひな形を使う</label>
+                    <div class="form-actions"><button class="primary-button" type="submit">ひな形を保存</button><button id="clearMissionTemplateForm" class="soft-button" type="button">新規入力</button></div>
+                  </form>
+                  <div id="missionTemplateList" class="management-list"></div>
+                </section>
+
+                <section>
+                  <div class="section-head compact"><div><p class="eyebrow">児童別</p><h3>今日出すミッション</h3></div></div>
+                  <form id="studentMissionSettingForm" class="form-grid mission-form">
+                    <input id="studentMissionSettingId" type="hidden">
+                    <label class="field"><span>ひな形を選ぶ</span><select id="studentMissionTemplateSelect" class="select"></select></label>
+                    <div class="date-range-row">
+                      <label class="field"><span>目標</span><input id="studentMissionTarget" type="number" min="1" value="1" required></label>
+                      <label class="field"><span>スタンプ報酬</span><input id="studentMissionStampReward" type="number" min="0" value="1" required></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>きっぷ報酬</span><input id="studentMissionTicketReward" type="number" min="0" value="1" required></label>
+                      <label class="check-row"><input id="studentMissionEnabled" type="checkbox" checked> この児童に表示する</label>
+                    </div>
+                    <div class="form-actions"><button class="primary-button" type="submit">児童へ追加</button><button id="clearStudentMissionSettingForm" class="soft-button" type="button">新規入力</button></div>
+                  </form>
+                  <div id="studentMissionSettingList" class="management-list"></div>
+                  <div class="ticket-adjustment"><strong id="teacherTicketBalance">きっぷ 0まい</strong><label class="field compact-field"><span>きっぷを増減</span><input id="ticketAdjustment" type="number" value="0"></label><button id="applyTicketAdjustment" class="soft-button" type="button">反映</button></div>
+                </section>
+              </div>
+
+              <section class="mission-today-section">
+                <div class="section-head compact"><div><p class="eyebrow">きょう</p><h3>当日のミッション確認</h3></div></div>
+                <div id="teacherDailyMissions" class="daily-mission-list teacher-daily-mission-list"></div>
+              </section>
             </section>
 
             <section class="work-panel" data-teacher-tab-panel="students">
