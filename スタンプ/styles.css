@@ -269,6 +269,10 @@ button:disabled {
   color: #fff;
 }
 
+#studentSwitcher[hidden] {
+  display: none;
+}
+
 .student-tab-button.is-test {
   border-color: rgba(47, 150, 223, 0.42);
   background: #f1faff;
@@ -290,6 +294,139 @@ button:disabled {
 
 .view.is-active {
   display: block;
+}
+
+.stamp-tab-list,
+.calendar-display-tab-list,
+.timetable-view-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stamp-tab,
+.calendar-display-tab {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--green-deep);
+  font-weight: 800;
+}
+
+.stamp-tab:hover,
+.stamp-tab.is-active,
+.calendar-display-tab:hover,
+.calendar-display-tab.is-active,
+.timetable-view-mode .soft-button.is-active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.stamp-tab-panel[hidden],
+.calendar-display-panel[hidden] {
+  display: none;
+}
+
+.calendar-page {
+  display: grid;
+  gap: 16px;
+}
+
+.view.calendar-page {
+  display: none;
+}
+
+.view.calendar-page.is-active {
+  display: grid;
+}
+
+.calendar-overview-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 180px;
+}
+
+.calendar-overview-hero p:last-child {
+  margin-top: 8px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.calendar-overview-hounyan {
+  width: min(190px, 30vw);
+  height: auto;
+  object-fit: contain;
+}
+
+.calendar-view-panel,
+.timetable-view-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.calendar-view-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.calendar-view-detail .section-head {
+  grid-column: 1 / -1;
+}
+
+.calendar-view-detail .day-timetable {
+  margin-top: 0;
+}
+
+.calendar-view-event {
+  min-height: 62px;
+}
+
+.calendar-timetable-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+  gap: 16px;
+}
+
+.timetable-display-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+
+.timetable-display-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.timetable-display-head h4 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.timetable-display-head span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.timetable-display-table td {
+  min-width: 82px;
+  text-align: center;
+  font-weight: 800;
 }
 
 .child-grid,
@@ -3298,6 +3435,14 @@ input:focus,
     grid-template-columns: 1fr;
   }
 
+  .calendar-view-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-timetable-board {
+    grid-template-columns: 1fr;
+  }
+
   .calendar-day-detail {
     padding-right: 0;
     padding-bottom: 18px;
@@ -3330,6 +3475,20 @@ input:focus,
 
   .teacher-tab {
     flex: 1 1 calc(50% - 4px);
+  }
+
+  .stamp-tab,
+  .calendar-display-tab,
+  .timetable-view-mode .soft-button {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .calendar-overview-hero {
+    align-items: flex-start;
+  }
+
+  .calendar-overview-hounyan {
+    width: 120px;
   }
 
   .calendar-head,

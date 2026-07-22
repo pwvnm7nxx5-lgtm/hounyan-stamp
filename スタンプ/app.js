@@ -694,10 +694,16 @@ let timerMode = "study";
 let stampSetDraftMembers = [];
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let calendarSelectedDate = CalendarDate.dateKey(new Date());
+let timetableViewMode = "all";
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
   views: document.querySelectorAll("[data-view]"),
+  studentSwitcher: document.querySelector("#studentSwitcher"),
+  stampTabButtons: document.querySelectorAll("[data-stamp-tab-button]"),
+  stampTabPanels: document.querySelectorAll("[data-stamp-tab-panel]"),
+  calendarDisplayTabButtons: document.querySelectorAll("[data-calendar-display-tab-button]"),
+  calendarDisplayTabPanels: document.querySelectorAll("[data-calendar-display-tab-panel]"),
   teacherTabButtons: document.querySelectorAll("[data-teacher-tab-button]"),
   teacherTabPanels: document.querySelectorAll("[data-teacher-tab-panel]"),
   timerPage: document.querySelector('[data-view="timer"]'),
@@ -827,6 +833,19 @@ const els = {
   calendarDayStatus: document.querySelector("#calendarDayStatus"),
   calendarEventList: document.querySelector("#calendarEventList"),
   calendarDayTimetable: document.querySelector("#calendarDayTimetable"),
+  calendarViewMonthLabel: document.querySelector("#calendarViewMonthLabel"),
+  calendarViewGroupSelect: document.querySelector("#calendarViewGroupSelect"),
+  calendarViewPreviousButton: document.querySelector("#calendarViewPreviousButton"),
+  calendarViewNextButton: document.querySelector("#calendarViewNextButton"),
+  calendarViewTodayButton: document.querySelector("#calendarViewTodayButton"),
+  calendarViewGrid: document.querySelector("#calendarViewGrid"),
+  calendarViewSelectedDateLabel: document.querySelector("#calendarViewSelectedDateLabel"),
+  calendarViewDayStatus: document.querySelector("#calendarViewDayStatus"),
+  calendarViewEventList: document.querySelector("#calendarViewEventList"),
+  calendarViewDayTimetable: document.querySelector("#calendarViewDayTimetable"),
+  calendarTimetableGroupSelect: document.querySelector("#calendarTimetableGroupSelect"),
+  timetableViewModeButtons: document.querySelectorAll("[data-timetable-view-mode]"),
+  calendarTimetableBoard: document.querySelector("#calendarTimetableBoard"),
   calendarEventForm: document.querySelector("#calendarEventForm"),
   calendarEventId: document.querySelector("#calendarEventId"),
   calendarEventTitle: document.querySelector("#calendarEventTitle"),
@@ -924,6 +943,9 @@ init();
 
 function init() {
   bindEvents();
+  showView("stamp");
+  showStampTab("child");
+  showCalendarDisplayTab("calendar");
   showTeacherTab("students");
   updateStampAssetModeFields();
   ensureSelection();
@@ -937,6 +959,12 @@ function bindEvents() {
   });
   els.teacherTabButtons.forEach((button) => {
     button.addEventListener("click", () => showTeacherTab(button.dataset.teacherTabButton));
+  });
+  els.stampTabButtons.forEach((button) => {
+    button.addEventListener("click", () => showStampTab(button.dataset.stampTabButton));
+  });
+  els.calendarDisplayTabButtons.forEach((button) => {
+    button.addEventListener("click", () => showCalendarDisplayTab(button.dataset.calendarDisplayTabButton));
   });
 
   els.studentForm.addEventListener("submit", (event) => {
@@ -966,6 +994,17 @@ function bindEvents() {
   els.calendarPreviousButton.addEventListener("click", () => moveCalendarMonth(-1));
   els.calendarNextButton.addEventListener("click", () => moveCalendarMonth(1));
   els.calendarTodayButton.addEventListener("click", goToCalendarToday);
+  els.calendarViewGroupSelect.addEventListener("change", () => selectGroup(els.calendarViewGroupSelect.value));
+  els.calendarTimetableGroupSelect.addEventListener("change", () => selectGroup(els.calendarTimetableGroupSelect.value));
+  els.calendarViewPreviousButton.addEventListener("click", () => moveCalendarMonth(-1));
+  els.calendarViewNextButton.addEventListener("click", () => moveCalendarMonth(1));
+  els.calendarViewTodayButton.addEventListener("click", goToCalendarToday);
+  els.timetableViewModeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      timetableViewMode = button.dataset.timetableViewMode;
+      renderTimetableDisplay();
+    });
+  });
   els.calendarEventForm.addEventListener("submit", (event) => {
     event.preventDefault();
     saveCalendarEvent();
@@ -1532,6 +1571,8 @@ function render() {
   renderGroups();
   renderTimetable();
   renderCalendar();
+  renderCalendarDisplay();
+  renderTimetableDisplay();
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === activeView());
   });
@@ -1899,6 +1940,8 @@ function renderGroups() {
   els.currentGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
   els.timetableGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
   els.calendarGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
+  els.calendarViewGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
+  els.calendarTimetableGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
   els.studentGroup.innerHTML = groupOptions(els.studentGroup.value, { includeBlank: true, includeDisabled: true });
   els.timetableCopyTarget.innerHTML = groupOptions("", { includeBlank: true });
 
@@ -2415,6 +2458,85 @@ function renderCalendarDayDetail() {
   els.timetableOverrideList.querySelectorAll("[data-override-delete]").forEach((button) => button.addEventListener("click", () => deleteTimetableOverride(button.dataset.overrideDelete)));
 }
 
+function renderCalendarDisplay() {
+  const groupId = state.selectedGroupId;
+  const today = CalendarDate.dateKey(new Date());
+  els.calendarViewMonthLabel.textContent = `${calendarCursor.getFullYear()}年${calendarCursor.getMonth() + 1}月`;
+  els.calendarViewGrid.innerHTML = CalendarDate.monthGrid(calendarCursor).map(({ key, date, inMonth }) => {
+    const info = schoolDayInfo(key, groupId);
+    const weekend = date.getDay() === 0 ? " is-sunday" : date.getDay() === 6 ? " is-saturday" : "";
+    const eventLabels = info.events.slice(0, 2).map((event) => `<span>${escapeHtml(event.title)}</span>`).join("");
+    const more = info.events.length > 2 ? `<span>ほか${info.events.length - 2}件</span>` : "";
+    return `
+      <button class="calendar-day${inMonth ? "" : " is-outside"}${key === today ? " is-today" : ""}${key === calendarSelectedDate ? " is-selected" : ""}${info.isSchoolDay ? "" : " is-holiday"}${weekend}" type="button" data-calendar-view-date="${key}">
+        <strong>${date.getDate()}</strong>
+        <div class="calendar-day-events">${eventLabels}${more}</div>
+      </button>
+    `;
+  }).join("");
+  els.calendarViewGrid.querySelectorAll("[data-calendar-view-date]").forEach((button) => {
+    button.addEventListener("click", () => selectCalendarDate(button.dataset.calendarViewDate));
+  });
+
+  const info = schoolDayInfo(calendarSelectedDate, groupId);
+  const dayTimetable = getDayTimetable(groupId, calendarSelectedDate);
+  els.calendarViewSelectedDateLabel.textContent = formatCalendarDate(calendarSelectedDate);
+  els.calendarViewDayStatus.textContent = schoolDayStatusLabel(info);
+  els.calendarViewDayStatus.className = `calendar-status is-${info.status}`;
+  els.calendarViewEventList.innerHTML = info.events.length
+    ? info.events.map((event) => `<article class="calendar-event-item calendar-view-event"><div><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(calendarEventTypeLabel(event.type))}${event.note ? ` / ${escapeHtml(event.note)}` : ""}</span></div></article>`).join("")
+    : '<p class="empty-state compact-empty">予定はありません。</p>';
+  els.calendarViewDayTimetable.innerHTML = !info.isSchoolDay
+    ? '<p class="empty-state compact-empty">休業日のため授業はありません。</p>'
+    : !dayTimetable.timetable
+      ? '<p class="empty-state compact-empty">この組の基本時間割は未設定です。</p>'
+      : `<ol class="day-timetable-list">${dayTimetable.periods.map((period) => `<li><span>${period.periodNumber}時間目</span><strong>${escapeHtml(period.subject?.name || "未設定")}</strong>${period.override ? '<em>変更</em>' : ""}</li>`).join("")}</ol>`;
+}
+
+function timetableDisplayMarkup(group) {
+  const timetable = timetableForEditor(group.id);
+  if (!timetable) {
+    return `<article class="timetable-display-card"><h4>${escapeHtml(group.name)}</h4><p class="empty-state compact-empty">基本時間割は未設定です。</p></article>`;
+  }
+  const headers = ["月", "火", "水", "木", "金"];
+  const rows = Array.from({ length: timetable.periodCount }, (_, periodIndex) => {
+    const periodNumber = periodIndex + 1;
+    const cells = headers.map((_, weekdayIndex) => {
+      const subject = subjectById(timetable.cells[`${weekdayIndex}-${periodNumber}`]);
+      return `<td>${escapeHtml(subject?.name || "")}</td>`;
+    }).join("");
+    return `<tr><th scope="row">${periodNumber}時間目</th>${cells}</tr>`;
+  }).join("");
+  return `
+    <article class="timetable-display-card">
+      <div class="timetable-display-head"><h4>${escapeHtml(group.name)}</h4><span>${escapeHtml(timetable.name)}</span></div>
+      <div class="timetable-scroll"><table class="timetable-table timetable-display-table"><thead><tr><th>時間</th>${headers.map((day) => `<th>${day}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>
+    </article>
+  `;
+}
+
+function renderTimetableDisplay() {
+  const groups = sortedGroups({ includeDisabled: false });
+  const selected = selectedGroup();
+  els.calendarTimetableGroupSelect.disabled = timetableViewMode === "all";
+  els.timetableViewModeButtons.forEach((button) => {
+    const active = button.dataset.timetableViewMode === timetableViewMode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  if (!groups.length) {
+    els.calendarTimetableBoard.innerHTML = '<p class="empty-state">先生ページの「組の管理」で組を追加してください。</p>';
+    return;
+  }
+  if (timetableViewMode === "group") {
+    els.calendarTimetableBoard.innerHTML = selected
+      ? timetableDisplayMarkup(selected)
+      : '<p class="empty-state">組を選んでください。</p>';
+    return;
+  }
+  els.calendarTimetableBoard.innerHTML = groups.map(timetableDisplayMarkup).join("");
+}
+
 function selectCalendarDate(date) {
   if (!CalendarDate.parseDateKey(date)) return;
   calendarSelectedDate = date;
@@ -2422,11 +2544,13 @@ function selectCalendarDate(date) {
   calendarCursor = new Date(selected.getFullYear(), selected.getMonth(), 1);
   clearCalendarEventForm();
   renderCalendar();
+  renderCalendarDisplay();
 }
 
 function moveCalendarMonth(amount) {
   calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + amount, 1);
   renderCalendar();
+  renderCalendarDisplay();
 }
 
 function goToCalendarToday() {
@@ -2434,6 +2558,7 @@ function goToCalendarToday() {
   calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   clearCalendarEventForm();
   renderCalendar();
+  renderCalendarDisplay();
 }
 
 function updateCalendarEventTimeFields() {
@@ -3874,8 +3999,41 @@ function showView(viewName) {
   els.views.forEach((view) => {
     view.classList.toggle("is-active", view.dataset.view === viewName);
   });
+  els.studentSwitcher.hidden = viewName !== "stamp";
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === viewName);
+  });
+}
+
+function showStampTab(tabName) {
+  const nextTab = [...els.stampTabButtons].some((button) => button.dataset.stampTabButton === tabName)
+    ? tabName
+    : "child";
+  els.stampTabButtons.forEach((button) => {
+    const isActive = button.dataset.stampTabButton === nextTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  els.stampTabPanels.forEach((panel) => {
+    const isActive = panel.dataset.stampTabPanel === nextTab;
+    panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
+  });
+}
+
+function showCalendarDisplayTab(tabName) {
+  const nextTab = [...els.calendarDisplayTabButtons].some((button) => button.dataset.calendarDisplayTabButton === tabName)
+    ? tabName
+    : "calendar";
+  els.calendarDisplayTabButtons.forEach((button) => {
+    const isActive = button.dataset.calendarDisplayTabButton === nextTab;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  els.calendarDisplayTabPanels.forEach((panel) => {
+    const isActive = panel.dataset.calendarDisplayTabPanel === nextTab;
+    panel.classList.toggle("is-active", isActive);
+    panel.hidden = !isActive;
   });
 }
 
@@ -3894,7 +4052,7 @@ function showTeacherTab(tabName) {
 }
 
 function activeView() {
-  return document.querySelector(".view.is-active")?.dataset.view || "child";
+  return document.querySelector(".view.is-active")?.dataset.view || "stamp";
 }
 
 function setTimerMode(mode) {

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ほうにゃんスタンプ台帳</title>
-    <link rel="stylesheet" href="styles.css?v=reward-goal-v4">
+    <link rel="stylesheet" href="styles.css?v=tab-layout-v1">
   </head>
   <body>
     <div class="app-shell">
@@ -14,16 +14,15 @@
           <h1>ほうにゃんスタンプ台帳</h1>
         </div>
         <div class="top-actions" aria-label="ページ切り替え">
-          <button class="page-tab is-active" type="button" data-view-button="child">児童</button>
-          <button class="page-tab" type="button" data-view-button="shop">おかいもの</button>
-          <button class="page-tab" type="button" data-view-button="book">ずかん</button>
+          <button class="page-tab is-active" type="button" data-view-button="stamp">スタンプ</button>
+          <button class="page-tab" type="button" data-view-button="calendar">カレンダー</button>
           <button class="page-tab" type="button" data-view-button="timer">タイマー</button>
           <button class="page-tab" type="button" data-view-button="teacher">先生</button>
           <button class="page-tab" type="button" data-view-button="settings">設定</button>
         </div>
       </header>
 
-      <div class="student-switcher" aria-label="児童切り替え">
+      <div class="student-switcher" id="studentSwitcher" aria-label="児童切り替え">
         <div class="switch-status">
           <span>児童切り替え</span>
           <strong id="currentStudentLabel">選択中：児童未選択</strong>
@@ -32,7 +31,14 @@
       </div>
 
       <main>
-        <section class="view is-active child-page" data-view="child" aria-label="児童ページ">
+        <section class="view is-active stamp-page" data-view="stamp" aria-label="スタンプ">
+          <nav class="stamp-tab-list" role="tablist" aria-label="スタンプの画面を切り替え">
+            <button class="stamp-tab is-active" type="button" role="tab" aria-selected="true" data-stamp-tab-button="child">児童</button>
+            <button class="stamp-tab" type="button" role="tab" aria-selected="false" data-stamp-tab-button="shop">おかいもの</button>
+            <button class="stamp-tab" type="button" role="tab" aria-selected="false" data-stamp-tab-button="book">ずかん</button>
+          </nav>
+
+          <section class="stamp-tab-panel is-active child-page" data-stamp-tab-panel="child" aria-label="児童ページ">
           <div class="child-grid">
             <section class="hero-panel child-hero">
               <div class="hounyan-stage">
@@ -117,7 +123,7 @@
           </section>
         </section>
 
-        <section class="view shop-page" data-view="shop" aria-labelledby="shop-title">
+        <section class="stamp-tab-panel shop-page" data-stamp-tab-panel="shop" aria-labelledby="shop-title" hidden>
           <div class="shop-grid">
             <section class="hero-panel shop-summary">
               <div class="shop-hero-top">
@@ -169,7 +175,7 @@
           </div>
         </section>
 
-        <section class="view stamp-book-page" data-view="book" aria-labelledby="stamp-book-title">
+        <section class="stamp-tab-panel stamp-book-page" data-stamp-tab-panel="book" aria-labelledby="stamp-book-title" hidden>
           <section class="hero-panel stamp-book-hero">
             <div>
               <p class="eyebrow">スタンプずかん</p>
@@ -190,6 +196,65 @@
               </div>
             </div>
             <div id="stampBookSetList" class="stamp-book-set-list"></div>
+          </section>
+        </section>
+
+        </section>
+
+        <section class="view calendar-page" data-view="calendar" aria-labelledby="calendar-view-title">
+          <section class="hero-panel calendar-overview-hero">
+            <div>
+              <p class="eyebrow">学校の予定と授業</p>
+              <h2 id="calendar-view-title">カレンダーと時間割</h2>
+              <p>予定を確認して、組ごとの時間割をすぐに見られます。</p>
+            </div>
+            <img src="assets/hounyan-home.png" alt="ほうにゃん" class="calendar-overview-hounyan">
+          </section>
+
+          <nav class="calendar-display-tab-list" role="tablist" aria-label="カレンダーの画面を切り替え">
+            <button class="calendar-display-tab is-active" type="button" role="tab" aria-selected="true" data-calendar-display-tab-button="calendar">カレンダー</button>
+            <button class="calendar-display-tab" type="button" role="tab" aria-selected="false" data-calendar-display-tab-button="timetable">時間割</button>
+          </nav>
+
+          <section class="calendar-display-panel is-active" data-calendar-display-tab-panel="calendar">
+            <section class="work-panel calendar-view-panel">
+              <div class="section-head calendar-head">
+                <div>
+                  <p class="eyebrow">月間予定</p>
+                  <h3 id="calendarViewMonthLabel">年月</h3>
+                </div>
+                <div class="calendar-toolbar">
+                  <label class="field compact-field"><span>対象の組</span><select id="calendarViewGroupSelect" class="select"></select></label>
+                  <button class="icon-button" id="calendarViewPreviousButton" type="button" title="前の月" aria-label="前の月">‹</button>
+                  <button class="soft-button" id="calendarViewTodayButton" type="button">今日</button>
+                  <button class="icon-button" id="calendarViewNextButton" type="button" title="次の月" aria-label="次の月">›</button>
+                </div>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div>
+              <div id="calendarViewGrid" class="calendar-grid" aria-label="月間カレンダー"></div>
+              <div class="calendar-view-detail">
+                <div class="section-head compact"><div><p class="eyebrow">選んだ日</p><h3 id="calendarViewSelectedDateLabel">日付</h3></div><span id="calendarViewDayStatus" class="calendar-status"></span></div>
+                <div id="calendarViewEventList" class="calendar-event-list"></div>
+                <div class="day-timetable"><h4>当日の時間割</h4><div id="calendarViewDayTimetable"></div></div>
+              </div>
+            </section>
+          </section>
+
+          <section class="calendar-display-panel" data-calendar-display-tab-panel="timetable" hidden>
+            <section class="work-panel timetable-view-panel">
+              <div class="section-head calendar-head">
+                <div>
+                  <p class="eyebrow">基本時間割</p>
+                  <h3>組の時間割</h3>
+                </div>
+                <label class="field compact-field"><span>組を選ぶ</span><select id="calendarTimetableGroupSelect" class="select"></select></label>
+              </div>
+              <div class="timetable-view-mode" role="group" aria-label="時間割の表示方法">
+                <button class="soft-button is-active" type="button" aria-pressed="true" data-timetable-view-mode="all">全ての組を一覧</button>
+                <button class="soft-button" type="button" aria-pressed="false" data-timetable-view-mode="group">選んだ組を表示</button>
+              </div>
+              <div id="calendarTimetableBoard" class="calendar-timetable-board"></div>
+            </section>
           </section>
         </section>
 
@@ -841,6 +906,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="calendar-service.js"></script>
-    <script src="app.js?v=calendar-v1"></script>
+    <script src="app.js?v=tab-layout-v1"></script>
   </body>
 </html>
