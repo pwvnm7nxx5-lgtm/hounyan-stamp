@@ -48,6 +48,8 @@ const REMOVED_PURCHASABLE_STAMP_IDS = new Set([
   "shop-special-legend",
   "shop-special-gorgeous",
 ]);
+const MISSION_CLEAR_STAMP_ID = "hounyan-mission-clear";
+const MISSION_REWARD_SOURCES = new Set(["mission-reward", "mission-clear"]);
 
 const defaultStampAssets = [
   {
@@ -150,6 +152,16 @@ const defaultStampAssets = [
     reading: "すーぱーすぺしゃる",
     src: "assets/hounyan-stamps/hounyan-stamp-05.png",
     unlockAt: 260,
+    rarity: "special",
+  },
+  {
+    id: MISSION_CLEAR_STAMP_ID,
+    name: "ミッションクリア",
+    reading: "みっしょんくりあ",
+    src: "assets/hounyan-stamps/hounyan-mission-clear.png",
+    unlockAt: 0,
+    hidden: true,
+    missionOnly: true,
     rarity: "special",
   },
   {
@@ -1542,6 +1554,7 @@ function normalizeStampAssets(inputAssets) {
         shopPriceSheets: Math.max(1, Math.floor(Number(stamp.shopPriceSheets ?? base.shopPriceSheets ?? 1))),
         rarity: String(stamp.rarity || base.rarity || "normal"),
         hidden: Boolean(stamp.hidden ?? base.hidden ?? false),
+        missionOnly: Boolean(stamp.missionOnly ?? base.missionOnly ?? false),
         setId: stamp.setId ? String(stamp.setId) : "",
       });
     });
@@ -1621,7 +1634,7 @@ function activeStampAssets() {
 }
 
 function visibleStampAssets() {
-  return activeStampAssets().filter((stamp) => !stamp.hidden && stampSetIsVisible(stamp));
+  return activeStampAssets().filter((stamp) => !stamp.hidden && !stamp.missionOnly && stampSetIsVisible(stamp));
 }
 
 function activeStampSets() {
@@ -2846,7 +2859,7 @@ function expirePastDailyMissions(today = CalendarDate.dateKey(new Date())) {
 
 function automaticMissionBaseValue(mission) {
   const stampCount = state.stampEvents.filter((event) => event.studentId === mission.studentId && !event.canceled
-    && event.source !== "mission-reward" && CalendarDate.dateKey(new Date(event.createdAt)) === mission.targetDate).length;
+    && !MISSION_REWARD_SOURCES.has(event.source) && CalendarDate.dateKey(new Date(event.createdAt)) === mission.targetDate).length;
   if (["print_completed_count", "stamp_earned_count"].includes(mission.conditionType)) return stampCount;
   return 0;
 }
@@ -2861,9 +2874,9 @@ function grantMissionReward(mission) {
   const student = state.students.find((item) => item.id === mission.studentId);
   if (!student) return false;
   const now = new Date().toISOString();
-  const stamp = stampById(state.selectedStampId);
+  const stamp = stampById(MISSION_CLEAR_STAMP_ID);
   for (let index = 0; index < mission.stampReward; index += 1) {
-    state.stampEvents.push({ id: crypto.randomUUID(), studentId: student.id, stampId: stamp.id, memo: `ミッション報酬: ${mission.name}`, createdAt: now, canceled: false, source: "mission-reward", missionId: mission.id });
+    state.stampEvents.push({ id: crypto.randomUUID(), studentId: student.id, stampId: stamp.id, memo: `ミッションクリア: ${mission.name}`, createdAt: now, canceled: false, source: "mission-clear", missionId: mission.id });
   }
   student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) + mission.ticketReward);
   mission.rewardGranted = true;
@@ -2875,7 +2888,7 @@ function revokeMissionReward(mission) {
   const student = state.students.find((item) => item.id === mission.studentId);
   if (!student) return false;
   state.stampEvents.forEach((event) => {
-    if (event.missionId === mission.id && event.source === "mission-reward") event.canceled = true;
+    if (event.missionId === mission.id && MISSION_REWARD_SOURCES.has(event.source)) event.canceled = true;
   });
   student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) - mission.ticketReward);
   mission.rewardGranted = false;
@@ -4236,6 +4249,7 @@ async function saveStampAsset() {
     shopPriceSheets,
     rarity: existing?.rarity || "normal",
     hidden,
+    missionOnly: Boolean(existing?.missionOnly),
   };
 
   const previousStampAssets = state.stampAssets;
