@@ -264,6 +264,9 @@
               </div>
               <div class="teacher-tab-list" role="group" aria-label="先生ページの操作を切り替え">
                 <button class="teacher-tab is-active" type="button" aria-pressed="true" data-teacher-tab-button="students">児童とスタンプ</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="groups">組の管理</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="timetable">時間割</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="calendar">カレンダー</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="rewards">景品・交換</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="stamps">スタンプ設定</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="data">データ</button>
@@ -286,6 +289,14 @@
                 <label class="field">
                   <span>メモ</span>
                   <input id="studentNote" type="text" autocomplete="off" placeholder="例: 3年 / Aグループ">
+                </label>
+                <label class="field">
+                  <span>組</span>
+                  <select id="studentGroup" class="select"></select>
+                </label>
+                <label class="check-row development-setting">
+                  <input id="studentTestMode" type="checkbox">
+                  <span><strong>開発・動作確認用</strong><br>テスト児童として使用する</span>
                 </label>
                 <button class="primary-button wide" type="submit">保存</button>
               </form>
@@ -372,6 +383,136 @@
                     </div>
                   </div>
                   <div class="history-list" id="historyList"></div>
+                </section>
+              </div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="groups">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">組</p>
+                  <h2>組の管理</h2>
+                </div>
+                <label class="field compact-field">
+                  <span>現在の組</span>
+                  <select id="currentGroupSelect" class="select"></select>
+                </label>
+              </div>
+              <form id="groupForm" class="form-grid group-form">
+                <input id="groupId" type="hidden">
+                <label class="field">
+                  <span>組名</span>
+                  <input id="groupName" type="text" autocomplete="off" required placeholder="例: 支援学級A">
+                </label>
+                <label class="check-row">
+                  <input id="groupEnabled" type="checkbox" checked>
+                  この組を使う
+                </label>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">組を保存</button>
+                  <button class="soft-button" type="button" id="clearGroupForm">新規入力</button>
+                </div>
+              </form>
+              <p class="hint">使わなくなった組は「無効」にすると、過去の時間割や予定を残したまま一覧から外せます。</p>
+              <div id="groupList" class="management-list"></div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="timetable">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">時間割</p>
+                  <h2>基本時間割</h2>
+                </div>
+                <label class="field compact-field">
+                  <span>対象の組</span>
+                  <select id="timetableGroupSelect" class="select"></select>
+                </label>
+              </div>
+              <form id="timetableForm" class="form-grid timetable-meta-form">
+                <label class="field">
+                  <span>時間割名</span>
+                  <input id="timetableName" type="text" value="基本時間割" required>
+                </label>
+                <label class="field">
+                  <span>時間数</span>
+                  <input id="timetablePeriodCount" type="number" min="1" max="10" value="6">
+                </label>
+                <details class="detail-settings">
+                  <summary>適用期間（将来の学期用）</summary>
+                  <div class="detail-settings-grid">
+                    <label class="field"><span>開始日</span><input id="timetableStartsOn" type="date"></label>
+                    <label class="field"><span>終了日</span><input id="timetableEndsOn" type="date"></label>
+                  </div>
+                </details>
+                <div class="form-actions">
+                  <button class="soft-button" type="button" id="applyTimetablePeriods">時間数を反映</button>
+                  <button class="primary-button" type="submit">時間割を保存</button>
+                  <button class="danger-button" type="button" id="resetTimetableButton">初期化</button>
+                </div>
+              </form>
+              <div class="timetable-scroll"><div id="timetableEditor" class="timetable-editor"></div></div>
+              <div class="timetable-copy-row">
+                <label class="field"><span>コピー先の組</span><select id="timetableCopyTarget" class="select"></select></label>
+                <button id="copyTimetableButton" class="soft-button" type="button">この時間割をコピー</button>
+              </div>
+              <details class="subject-settings">
+                <summary>教科を管理</summary>
+                <form id="subjectForm" class="form-grid compact-form">
+                  <input id="subjectId" type="hidden">
+                  <label class="field"><span>教科名</span><input id="subjectName" type="text" required placeholder="例: プログラミング"></label>
+                  <div class="form-actions"><button class="soft-button" type="submit">教科を保存</button><button id="clearSubjectForm" class="text-button" type="button">新規入力</button></div>
+                </form>
+                <div id="subjectList" class="subject-list"></div>
+              </details>
+            </section>
+
+            <section class="work-panel calendar-work-panel" data-teacher-tab-panel="calendar">
+              <div class="section-head calendar-head">
+                <div>
+                  <p class="eyebrow">カレンダー</p>
+                  <h2 id="calendarMonthLabel">年月</h2>
+                </div>
+                <div class="calendar-toolbar">
+                  <label class="field compact-field"><span>対象の組</span><select id="calendarGroupSelect" class="select"></select></label>
+                  <button class="icon-button" id="calendarPreviousButton" type="button" title="前の月" aria-label="前の月">‹</button>
+                  <button class="soft-button" id="calendarTodayButton" type="button">今日</button>
+                  <button class="icon-button" id="calendarNextButton" type="button" title="次の月" aria-label="次の月">›</button>
+                </div>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div>
+              <div id="calendarGrid" class="calendar-grid" aria-label="月間カレンダー"></div>
+              <div class="calendar-detail-grid">
+                <section class="calendar-day-detail">
+                  <div class="section-head compact"><div><p class="eyebrow">選んだ日</p><h3 id="calendarSelectedDateLabel">日付</h3></div><span id="calendarDayStatus" class="calendar-status"></span></div>
+                  <div id="calendarEventList" class="calendar-event-list"></div>
+                  <div class="day-timetable"><h4>当日の時間割</h4><div id="calendarDayTimetable"></div></div>
+                  <form id="timetableOverrideForm" class="form-grid compact-form">
+                    <label class="field"><span>変更する時間</span><select id="overridePeriod" class="select"></select></label>
+                    <label class="field"><span>変更後の教科</span><select id="overrideSubject" class="select"></select></label>
+                    <label class="field"><span>メモ</span><input id="overrideMemo" type="text" placeholder="例: 水泳"></label>
+                    <div class="form-actions"><button class="soft-button" type="submit">この時間を変更</button></div>
+                  </form>
+                  <div id="timetableOverrideList" class="override-list"></div>
+                </section>
+                <section class="calendar-event-editor">
+                  <div class="section-head compact"><div><p class="eyebrow">予定</p><h3>予定を追加・編集</h3></div></div>
+                  <form id="calendarEventForm" class="form-grid">
+                    <input id="calendarEventId" type="hidden">
+                    <label class="field"><span>予定名</span><input id="calendarEventTitle" type="text" required placeholder="例: 夏季休業"></label>
+                    <div class="date-range-row"><label class="field"><span>開始日</span><input id="calendarEventStart" type="date" required></label><label class="field"><span>終了日</span><input id="calendarEventEnd" type="date"></label></div>
+                    <label class="check-row"><input id="calendarEventAllDay" type="checkbox" checked> 終日予定</label>
+                    <div id="calendarEventTimeFields" class="date-range-row" hidden><label class="field"><span>開始時刻</span><input id="calendarEventStartTime" type="time"></label><label class="field"><span>終了時刻</span><input id="calendarEventEndTime" type="time"></label></div>
+                    <details class="detail-settings"><summary>詳細設定</summary><div class="detail-settings-grid">
+                      <label class="field"><span>種類</span><select id="calendarEventType" class="select"></select></label>
+                      <label class="field"><span>対象</span><select id="calendarEventScope" class="select"><option value="school">学校全体</option><option value="groups">特定の組</option></select></label>
+                      <label id="calendarEventGroupsField" class="field" hidden><span>対象の組（複数選択可）</span><select id="calendarEventGroups" class="select" multiple></select></label>
+                      <label class="field"><span>繰り返し</span><select id="calendarEventRepeat" class="select"><option value="none">なし</option><option value="weekly">毎週</option></select></label>
+                      <label class="field"><span>登校日への影響</span><select id="calendarEventSchoolDayEffect" class="select"><option value="auto">種類に合わせる</option><option value="school-day">登校日にする</option><option value="holiday">休業日にする</option><option value="shortened">短縮授業日にする</option><option value="event-day">行事日にする</option></select></label>
+                      <label class="field"><span>時間割への影響</span><select id="calendarEventTimetableEffect" class="select"><option value="none">なし</option><option value="shortened">短縮授業</option><option value="event">行事日</option></select></label>
+                      <label class="field full-width"><span>メモ</span><input id="calendarEventNote" type="text" placeholder="必要なときだけ入力"></label>
+                    </div></details>
+                    <div class="form-actions"><button class="primary-button" type="submit">予定を保存</button><button id="clearCalendarEventForm" class="soft-button" type="button">新規入力</button></div>
+                  </form>
                 </section>
               </div>
             </section>
@@ -699,6 +840,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=reward-goal-v4"></script>
+    <script src="calendar-service.js"></script>
+    <script src="app.js?v=calendar-v1"></script>
   </body>
 </html>

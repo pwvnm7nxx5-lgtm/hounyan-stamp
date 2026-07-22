@@ -8,6 +8,19 @@ const STAMP_BATCH_MAX = SHEET_SIZE;
 const STAMP_SET_MAX_MEMBERS = 12;
 const TEST_STUDENT_NAME = "テスト児童";
 const TEST_AVAILABLE_SHEETS = Number.MAX_SAFE_INTEGER;
+const WEEKDAYS = ["月", "火", "水", "木", "金"];
+const DEFAULT_PERIOD_COUNT = 6;
+const CalendarDate = window.HounyanCalendar;
+const defaultSubjects = [
+  "国語", "算数", "理科", "社会", "生活", "音楽", "図工", "体育", "道徳",
+  "外国語", "外国語活動", "総合", "学級活動", "自立活動", "交流", "行事", "その他",
+].map((name, index) => ({ id: `subject-${index + 1}`, name, sortOrder: index, enabled: true }));
+const calendarEventTypes = [
+  ["school-event", "学校行事"], ["grade-event", "学年行事"], ["group-event", "組の予定"],
+  ["holiday", "休業日"], ["substitute-holiday", "振替休日"], ["school-closure", "臨時休校"],
+  ["long-vacation", "長期休業"], ["saturday-school", "土曜授業"], ["shortened", "短縮授業"],
+  ["timetable-change", "時間割変更"], ["deadline", "締切"], ["other", "その他"],
+];
 const TIMER_DEFAULT_SECONDS = 5 * 60;
 const TIMER_MAX_SECONDS = 99 * 60 + 59;
 const TIMER_FINISH_SOUNDS = {
@@ -445,6 +458,20 @@ const builtInStampSetDefinitions = [
       ["heart-ruby", "ハートルビー"], ["moon-sapphire", "つきサファイア"], ["crown-jewel", "おうかんほうせき"],
     ],
   },
+  {
+    id: "built-in-osaka-foods",
+    name: "大阪グルメセット",
+    slug: "osaka-foods",
+    priceSheets: 2,
+    seriesId: "osaka-foods",
+    seriesName: "大阪グルメ",
+    tier: 1,
+    rarity: "special",
+    members: [
+      ["takoyaki", "たこやき"], ["okonomiyaki", "おこのみやき"], ["kushikatsu", "くしかつ"],
+      ["butaman", "ぶたまん"], ["kitsune-udon", "きつねうどん"], ["mixed-juice", "ミックスジュース"],
+    ],
+  },
 ];
 
 const defaultStampSets = builtInStampSetDefinitions.map((stampSet) => ({
@@ -620,6 +647,11 @@ const defaultRewards = [
 
 const defaultState = {
   students: [],
+  groups: [],
+  subjects: defaultSubjects,
+  timetables: [],
+  calendarEvents: [],
+  timetableOverrides: [],
   stampEvents: [],
   rewards: defaultRewards,
   stampAssets: defaultStampAssets,
@@ -634,6 +666,7 @@ const defaultState = {
   rewardGoalsByStudent: {},
   equippedHounyanLevelByStudent: {},
   selectedStudentId: "",
+  selectedGroupId: "",
   selectedStampId: "sonochoshi",
 };
 
@@ -659,6 +692,8 @@ let timerAudioContext = null;
 let timerFinishedSoundPlayed = false;
 let timerMode = "study";
 let stampSetDraftMembers = [];
+let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calendarSelectedDate = CalendarDate.dateKey(new Date());
 
 const els = {
   viewButtons: document.querySelectorAll("[data-view-button]"),
@@ -756,7 +791,65 @@ const els = {
   studentId: document.querySelector("#studentId"),
   studentName: document.querySelector("#studentName"),
   studentNote: document.querySelector("#studentNote"),
+  studentGroup: document.querySelector("#studentGroup"),
+  studentTestMode: document.querySelector("#studentTestMode"),
   createTestStudentButton: document.querySelector("#createTestStudentButton"),
+  groupForm: document.querySelector("#groupForm"),
+  groupId: document.querySelector("#groupId"),
+  groupName: document.querySelector("#groupName"),
+  groupEnabled: document.querySelector("#groupEnabled"),
+  clearGroupForm: document.querySelector("#clearGroupForm"),
+  currentGroupSelect: document.querySelector("#currentGroupSelect"),
+  groupList: document.querySelector("#groupList"),
+  timetableForm: document.querySelector("#timetableForm"),
+  timetableGroupSelect: document.querySelector("#timetableGroupSelect"),
+  timetableName: document.querySelector("#timetableName"),
+  timetablePeriodCount: document.querySelector("#timetablePeriodCount"),
+  timetableStartsOn: document.querySelector("#timetableStartsOn"),
+  timetableEndsOn: document.querySelector("#timetableEndsOn"),
+  applyTimetablePeriods: document.querySelector("#applyTimetablePeriods"),
+  timetableEditor: document.querySelector("#timetableEditor"),
+  timetableCopyTarget: document.querySelector("#timetableCopyTarget"),
+  copyTimetableButton: document.querySelector("#copyTimetableButton"),
+  resetTimetableButton: document.querySelector("#resetTimetableButton"),
+  subjectForm: document.querySelector("#subjectForm"),
+  subjectId: document.querySelector("#subjectId"),
+  subjectName: document.querySelector("#subjectName"),
+  clearSubjectForm: document.querySelector("#clearSubjectForm"),
+  subjectList: document.querySelector("#subjectList"),
+  calendarMonthLabel: document.querySelector("#calendarMonthLabel"),
+  calendarGroupSelect: document.querySelector("#calendarGroupSelect"),
+  calendarPreviousButton: document.querySelector("#calendarPreviousButton"),
+  calendarNextButton: document.querySelector("#calendarNextButton"),
+  calendarTodayButton: document.querySelector("#calendarTodayButton"),
+  calendarGrid: document.querySelector("#calendarGrid"),
+  calendarSelectedDateLabel: document.querySelector("#calendarSelectedDateLabel"),
+  calendarDayStatus: document.querySelector("#calendarDayStatus"),
+  calendarEventList: document.querySelector("#calendarEventList"),
+  calendarDayTimetable: document.querySelector("#calendarDayTimetable"),
+  calendarEventForm: document.querySelector("#calendarEventForm"),
+  calendarEventId: document.querySelector("#calendarEventId"),
+  calendarEventTitle: document.querySelector("#calendarEventTitle"),
+  calendarEventStart: document.querySelector("#calendarEventStart"),
+  calendarEventEnd: document.querySelector("#calendarEventEnd"),
+  calendarEventAllDay: document.querySelector("#calendarEventAllDay"),
+  calendarEventTimeFields: document.querySelector("#calendarEventTimeFields"),
+  calendarEventStartTime: document.querySelector("#calendarEventStartTime"),
+  calendarEventEndTime: document.querySelector("#calendarEventEndTime"),
+  calendarEventType: document.querySelector("#calendarEventType"),
+  calendarEventScope: document.querySelector("#calendarEventScope"),
+  calendarEventGroupsField: document.querySelector("#calendarEventGroupsField"),
+  calendarEventGroups: document.querySelector("#calendarEventGroups"),
+  calendarEventRepeat: document.querySelector("#calendarEventRepeat"),
+  calendarEventSchoolDayEffect: document.querySelector("#calendarEventSchoolDayEffect"),
+  calendarEventTimetableEffect: document.querySelector("#calendarEventTimetableEffect"),
+  calendarEventNote: document.querySelector("#calendarEventNote"),
+  clearCalendarEventForm: document.querySelector("#clearCalendarEventForm"),
+  timetableOverrideForm: document.querySelector("#timetableOverrideForm"),
+  overridePeriod: document.querySelector("#overridePeriod"),
+  overrideSubject: document.querySelector("#overrideSubject"),
+  overrideMemo: document.querySelector("#overrideMemo"),
+  timetableOverrideList: document.querySelector("#timetableOverrideList"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   createAutoBackupButton: document.querySelector("#createAutoBackupButton"),
@@ -849,6 +942,40 @@ function bindEvents() {
   els.studentForm.addEventListener("submit", (event) => {
     event.preventDefault();
     saveStudent();
+  });
+  els.groupForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveGroup();
+  });
+  els.clearGroupForm.addEventListener("click", clearGroupForm);
+  els.currentGroupSelect.addEventListener("change", () => selectGroup(els.currentGroupSelect.value));
+  els.timetableGroupSelect.addEventListener("change", () => selectGroup(els.timetableGroupSelect.value));
+  els.calendarGroupSelect.addEventListener("change", () => selectGroup(els.calendarGroupSelect.value));
+  els.timetableForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveTimetable();
+  });
+  els.applyTimetablePeriods.addEventListener("click", () => renderTimetableEditor(readTimetableEditor()));
+  els.copyTimetableButton.addEventListener("click", copyTimetableToGroup);
+  els.resetTimetableButton.addEventListener("click", resetTimetable);
+  els.subjectForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveSubject();
+  });
+  els.clearSubjectForm.addEventListener("click", clearSubjectForm);
+  els.calendarPreviousButton.addEventListener("click", () => moveCalendarMonth(-1));
+  els.calendarNextButton.addEventListener("click", () => moveCalendarMonth(1));
+  els.calendarTodayButton.addEventListener("click", goToCalendarToday);
+  els.calendarEventForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveCalendarEvent();
+  });
+  els.clearCalendarEventForm.addEventListener("click", clearCalendarEventForm);
+  els.calendarEventAllDay.addEventListener("change", updateCalendarEventTimeFields);
+  els.calendarEventScope.addEventListener("change", updateCalendarEventScopeFields);
+  els.timetableOverrideForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveTimetableOverride();
   });
   els.createTestStudentButton.addEventListener("click", createTestStudent);
   els.stampAssetForm.addEventListener("submit", (event) => {
@@ -997,7 +1124,19 @@ function normalizeState(input) {
     ...input,
   };
 
-  merged.students = Array.isArray(input.students) ? input.students : [];
+  merged.students = Array.isArray(input.students)
+    ? input.students.map((student) => ({
+      ...student,
+      groupId: String(student?.groupId || ""),
+      isTest: Boolean(student?.isTest),
+    }))
+    : [];
+  merged.groups = normalizeGroups(input.groups);
+  merged.subjects = normalizeSubjects(input.subjects);
+  merged.timetables = normalizeTimetables(input.timetables);
+  merged.calendarEvents = normalizeCalendarEvents(input.calendarEvents);
+  merged.timetableOverrides = normalizeTimetableOverrides(input.timetableOverrides);
+  merged.selectedGroupId = String(input.selectedGroupId || "");
   merged.stampEvents = Array.isArray(input.stampEvents) ? input.stampEvents : [];
   merged.redemptions = Array.isArray(input.redemptions)
     ? input.redemptions.filter((redemption) => !REMOVED_PURCHASABLE_STAMP_IDS.has(redemption.stampId))
@@ -1028,6 +1167,86 @@ function normalizeRewardGoalsByStudent(input) {
       return [];
     }
     return [[studentId, { type: goal.type, id: String(goal.id) }]];
+  }));
+}
+
+function normalizeGroups(input) {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((group) => group && group.id && String(group.name || "").trim())
+    .map((group, index) => ({
+      id: String(group.id),
+      name: String(group.name).trim(),
+      sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : index,
+      enabled: group.enabled !== false,
+      createdAt: group.createdAt || new Date().toISOString(),
+      updatedAt: group.updatedAt || group.createdAt || new Date().toISOString(),
+    }))
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function normalizeSubjects(input) {
+  const source = Array.isArray(input) && input.length ? input : defaultSubjects;
+  return source
+    .filter((subject) => subject && subject.id && String(subject.name || "").trim())
+    .map((subject, index) => ({
+      id: String(subject.id),
+      name: String(subject.name).trim(),
+      sortOrder: Number.isFinite(Number(subject.sortOrder)) ? Number(subject.sortOrder) : index,
+      enabled: subject.enabled !== false,
+    }))
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function normalizeTimetables(input) {
+  if (!Array.isArray(input)) return [];
+  return input.filter((timetable) => timetable && timetable.id && timetable.groupId).map((timetable) => ({
+    id: String(timetable.id),
+    groupId: String(timetable.groupId),
+    name: String(timetable.name || "基本時間割").trim() || "基本時間割",
+    startsOn: String(timetable.startsOn || ""),
+    endsOn: String(timetable.endsOn || ""),
+    enabled: timetable.enabled !== false,
+    periodCount: Math.min(10, Math.max(1, Math.floor(Number(timetable.periodCount || DEFAULT_PERIOD_COUNT)))),
+    cells: timetable.cells && typeof timetable.cells === "object" && !Array.isArray(timetable.cells) ? timetable.cells : {},
+    createdAt: timetable.createdAt || new Date().toISOString(),
+    updatedAt: timetable.updatedAt || timetable.createdAt || new Date().toISOString(),
+  }));
+}
+
+function normalizeCalendarEvents(input) {
+  if (!Array.isArray(input)) return [];
+  return input.filter((event) => event && event.id && event.startDate && event.title).map((event) => ({
+    id: String(event.id),
+    title: String(event.title).trim(),
+    startDate: String(event.startDate),
+    endDate: String(event.endDate || event.startDate),
+    allDay: event.allDay !== false,
+    startTime: String(event.startTime || ""),
+    endTime: String(event.endTime || ""),
+    type: String(event.type || "other"),
+    scope: event.scope === "groups" ? "groups" : "school",
+    groupIds: Array.isArray(event.groupIds) ? event.groupIds.map(String) : [],
+    note: String(event.note || ""),
+    repeat: event.repeat === "weekly" ? "weekly" : "none",
+    schoolDayEffect: String(event.schoolDayEffect || "auto"),
+    timetableEffect: String(event.timetableEffect || "none"),
+    createdAt: event.createdAt || new Date().toISOString(),
+    updatedAt: event.updatedAt || event.createdAt || new Date().toISOString(),
+  }));
+}
+
+function normalizeTimetableOverrides(input) {
+  if (!Array.isArray(input)) return [];
+  return input.filter((override) => override && override.id && override.date && override.groupId).map((override) => ({
+    id: String(override.id),
+    date: String(override.date),
+    groupId: String(override.groupId),
+    periodNumber: Math.max(1, Math.floor(Number(override.periodNumber || 1))),
+    subjectId: String(override.subjectId || ""),
+    note: String(override.note || ""),
+    createdAt: override.createdAt || new Date().toISOString(),
+    updatedAt: override.updatedAt || override.createdAt || new Date().toISOString(),
   }));
 }
 
@@ -1310,6 +1529,9 @@ function render() {
   renderStampSets();
   renderLevelSettings();
   renderAutoBackups();
+  renderGroups();
+  renderTimetable();
+  renderCalendar();
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === activeView());
   });
@@ -1388,11 +1610,13 @@ function renderStudentList(container, { childMode }) {
         : childMode
         ? `シート ${stats.currentSheet.count}/${SHEET_SIZE}`
         : `累計 ${stats.total} / 使えるシート ${stats.availableSheets}`;
+      const group = groupById(student.groupId);
+      const meta = student.note || group?.name || (testStudent ? "制限なし・集計に入らない" : childMode ? "がんばり中" : "メモなし");
       return `
         <button class="student-card${selected}${testStudent ? " is-test" : ""}" type="button" data-select-student="${student.id}">
           <span>
             <span class="student-name">${escapeHtml(student.name)}${testStudent ? '<span class="test-student-badge">テスト</span>' : ""}</span>
-            <span class="student-meta">${escapeHtml(student.note || (testStudent ? "制限なし・集計に入らない" : childMode ? "がんばり中" : "メモなし"))}</span>
+            <span class="student-meta">${escapeHtml(meta)}</span>
           </span>
           <span class="student-meta">${escapeHtml(sheetText)}</span>
         </button>
@@ -1629,6 +1853,748 @@ function openHounyanCloset() {
     els.hounyanClosetList.querySelector(".is-selected, .hounyan-closet-option")?.focus();
   });
 }
+
+function sortedGroups({ includeDisabled = true } = {}) {
+  return state.groups
+    .filter((group) => includeDisabled || group.enabled)
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function groupById(groupId) {
+  return state.groups.find((group) => group.id === groupId) || null;
+}
+
+function selectedGroup() {
+  return groupById(state.selectedGroupId);
+}
+
+function selectGroup(groupId) {
+  const group = groupById(groupId);
+  if (!group || !group.enabled) {
+    state.selectedGroupId = "";
+  } else {
+    state.selectedGroupId = group.id;
+  }
+  persist();
+  render();
+}
+
+function ensureGroupSelection() {
+  if (selectedGroup()?.enabled) return;
+  state.selectedGroupId = sortedGroups({ includeDisabled: false })[0]?.id || "";
+}
+
+function groupOptions(selectedId = "", { includeBlank = false, includeDisabled = false } = {}) {
+  const groups = sortedGroups({ includeDisabled });
+  const blank = includeBlank ? '<option value="">組を選ばない</option>' : "";
+  return blank + groups.map((group) => `
+    <option value="${escapeHtml(group.id)}"${group.id === selectedId ? " selected" : ""}>${escapeHtml(group.name)}${group.enabled ? "" : "（無効）"}</option>
+  `).join("");
+}
+
+function renderGroups() {
+  ensureGroupSelection();
+  const currentId = state.selectedGroupId;
+  els.currentGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
+  els.timetableGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
+  els.calendarGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
+  els.studentGroup.innerHTML = groupOptions(els.studentGroup.value, { includeBlank: true, includeDisabled: true });
+  els.timetableCopyTarget.innerHTML = groupOptions("", { includeBlank: true });
+
+  if (!state.groups.length) {
+    els.groupList.innerHTML = '<p class="empty-state">まだ組がありません。先に組を追加してください。</p>';
+    return;
+  }
+
+  els.groupList.innerHTML = sortedGroups().map((group, index) => `
+    <article class="management-item${group.enabled ? "" : " is-disabled"}">
+      <div>
+        <strong>${escapeHtml(group.name)}</strong>
+        <span>${group.enabled ? "使用中" : "無効（履歴は残っています）"}</span>
+      </div>
+      <div class="management-actions">
+        <button class="icon-button" type="button" title="上へ移動" aria-label="上へ移動" data-group-move="up" data-group-id="${escapeHtml(group.id)}"${index === 0 ? " disabled" : ""}>↑</button>
+        <button class="icon-button" type="button" title="下へ移動" aria-label="下へ移動" data-group-move="down" data-group-id="${escapeHtml(group.id)}"${index === state.groups.length - 1 ? " disabled" : ""}>↓</button>
+        <button class="text-button" type="button" data-group-select="${escapeHtml(group.id)}">選択</button>
+        <button class="text-button" type="button" data-group-edit="${escapeHtml(group.id)}">編集</button>
+        <button class="text-button" type="button" data-group-toggle="${escapeHtml(group.id)}">${group.enabled ? "無効にする" : "有効にする"}</button>
+        <button class="text-button danger-text" type="button" data-group-delete="${escapeHtml(group.id)}">完全削除</button>
+      </div>
+    </article>
+  `).join("");
+
+  els.groupList.querySelectorAll("[data-group-select]").forEach((button) => button.addEventListener("click", () => selectGroup(button.dataset.groupSelect)));
+  els.groupList.querySelectorAll("[data-group-edit]").forEach((button) => button.addEventListener("click", () => editGroup(button.dataset.groupEdit)));
+  els.groupList.querySelectorAll("[data-group-toggle]").forEach((button) => button.addEventListener("click", () => toggleGroup(button.dataset.groupToggle)));
+  els.groupList.querySelectorAll("[data-group-delete]").forEach((button) => button.addEventListener("click", () => deleteGroup(button.dataset.groupDelete)));
+  els.groupList.querySelectorAll("[data-group-move]").forEach((button) => button.addEventListener("click", () => moveGroup(button.dataset.groupId, button.dataset.groupMove)));
+}
+
+function saveGroup() {
+  const name = els.groupName.value.trim();
+  if (!name) {
+    showToast("組名を入力してください");
+    return;
+  }
+  const now = new Date().toISOString();
+  if (els.groupId.value) {
+    const group = groupById(els.groupId.value);
+    if (!group) return;
+    group.name = name;
+    group.enabled = els.groupEnabled.checked;
+    group.updatedAt = now;
+  } else {
+    const group = {
+      id: crypto.randomUUID(),
+      name,
+      enabled: els.groupEnabled.checked,
+      sortOrder: sortedGroups().length,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.groups.push(group);
+    if (group.enabled) state.selectedGroupId = group.id;
+  }
+  clearGroupForm();
+  persist();
+  render();
+  showToast("組を保存しました");
+}
+
+function clearGroupForm() {
+  els.groupId.value = "";
+  els.groupName.value = "";
+  els.groupEnabled.checked = true;
+}
+
+function editGroup(groupId) {
+  const group = groupById(groupId);
+  if (!group) return;
+  els.groupId.value = group.id;
+  els.groupName.value = group.name;
+  els.groupEnabled.checked = group.enabled;
+  els.groupName.focus();
+}
+
+function toggleGroup(groupId) {
+  const group = groupById(groupId);
+  if (!group) return;
+  group.enabled = !group.enabled;
+  group.updatedAt = new Date().toISOString();
+  if (!group.enabled && state.selectedGroupId === group.id) ensureGroupSelection();
+  persist();
+  render();
+  showToast(group.enabled ? "組を有効にしました" : "組を無効にしました");
+}
+
+function moveGroup(groupId, direction) {
+  const groups = sortedGroups();
+  const index = groups.findIndex((group) => group.id === groupId);
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (index < 0 || targetIndex < 0 || targetIndex >= groups.length) return;
+  const current = groups[index];
+  const target = groups[targetIndex];
+  [current.sortOrder, target.sortOrder] = [target.sortOrder, current.sortOrder];
+  persist();
+  render();
+}
+
+function deleteGroup(groupId) {
+  const group = groupById(groupId);
+  if (!group) return;
+  const related = state.timetables.filter((timetable) => timetable.groupId === groupId).length
+    + state.timetableOverrides.filter((override) => override.groupId === groupId).length
+    + state.calendarEvents.filter((event) => event.groupIds.includes(groupId)).length;
+  const ok = confirm(`${group.name}を完全に削除します。関連する時間割・当日変更・組別予定も削除されます（${related}件）。よろしいですか？`);
+  if (!ok) return;
+  createAutoBackup("before-delete", { force: true });
+  state.groups = state.groups.filter((item) => item.id !== groupId);
+  state.timetables = state.timetables.filter((timetable) => timetable.groupId !== groupId);
+  state.timetableOverrides = state.timetableOverrides.filter((override) => override.groupId !== groupId);
+  state.calendarEvents = state.calendarEvents.map((event) => ({ ...event, groupIds: event.groupIds.filter((id) => id !== groupId) }))
+    .filter((event) => event.scope !== "groups" || event.groupIds.length);
+  state.students.forEach((student) => {
+    if (student.groupId === groupId) student.groupId = "";
+  });
+  ensureGroupSelection();
+  persist();
+  render();
+  showToast("組と関連データを削除しました");
+}
+
+function activeSubjects({ includeDisabled = false } = {}) {
+  return state.subjects.filter((subject) => includeDisabled || subject.enabled).slice().sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+function subjectById(subjectId) {
+  return state.subjects.find((subject) => subject.id === subjectId) || null;
+}
+
+function subjectOptions(selectedId = "", { includeBlank = true } = {}) {
+  const blank = includeBlank ? '<option value="">未設定</option>' : "";
+  return blank + activeSubjects({ includeDisabled: selectedId ? true : false }).map((subject) => `
+    <option value="${escapeHtml(subject.id)}"${subject.id === selectedId ? " selected" : ""}>${escapeHtml(subject.name)}${subject.enabled ? "" : "（無効）"}</option>
+  `).join("");
+}
+
+function timetableForEditor(groupId) {
+  return state.timetables.filter((timetable) => timetable.groupId === groupId && timetable.enabled)
+    .sort((left, right) => String(right.startsOn).localeCompare(String(left.startsOn)) || String(right.updatedAt).localeCompare(String(left.updatedAt)))[0] || null;
+}
+
+function renderTimetable() {
+  const group = selectedGroup();
+  const timetable = group ? timetableForEditor(group.id) : null;
+  els.timetableName.value = timetable?.name || "基本時間割";
+  els.timetablePeriodCount.value = String(timetable?.periodCount || DEFAULT_PERIOD_COUNT);
+  els.timetableStartsOn.value = timetable?.startsOn || "";
+  els.timetableEndsOn.value = timetable?.endsOn || "";
+  renderTimetableEditor(timetable ? { periodCount: timetable.periodCount, cells: timetable.cells } : null);
+  renderSubjectList();
+}
+
+function readTimetableEditor() {
+  const cells = {};
+  els.timetableEditor.querySelectorAll("[data-timetable-cell]").forEach((select) => {
+    if (select.value) cells[select.dataset.timetableCell] = select.value;
+  });
+  return {
+    periodCount: Math.min(10, Math.max(1, Math.floor(Number(els.timetablePeriodCount.value || DEFAULT_PERIOD_COUNT)))),
+    cells,
+  };
+}
+
+function renderTimetableEditor(draft = null) {
+  const group = selectedGroup();
+  if (!group) {
+    els.timetableEditor.innerHTML = '<p class="empty-state">先に「組の管理」で組を追加・選択してください。</p>';
+    return;
+  }
+  const timetable = timetableForEditor(group.id);
+  const source = draft || (timetable ? { periodCount: timetable.periodCount, cells: timetable.cells } : { periodCount: DEFAULT_PERIOD_COUNT, cells: {} });
+  const periodCount = Math.min(10, Math.max(1, Math.floor(Number(source.periodCount || DEFAULT_PERIOD_COUNT))));
+  els.timetablePeriodCount.value = String(periodCount);
+  els.timetableEditor.innerHTML = `
+    <table class="timetable-table">
+      <thead><tr><th>時間</th>${WEEKDAYS.map((weekday) => `<th>${weekday}</th>`).join("")}</tr></thead>
+      <tbody>${Array.from({ length: periodCount }, (_, periodIndex) => {
+        const periodNumber = periodIndex + 1;
+        return `<tr><th>${periodNumber}時間目</th>${WEEKDAYS.map((_, weekdayIndex) => {
+          const key = `${weekdayIndex}-${periodNumber}`;
+          return `<td><select class="select timetable-cell-select" data-timetable-cell="${key}">${subjectOptions(source.cells?.[key] || "")}</select></td>`;
+        }).join("")}</tr>`;
+      }).join("")}</tbody>
+    </table>
+  `;
+}
+
+function saveTimetable() {
+  const group = selectedGroup();
+  if (!group) {
+    showToast("先に対象の組を選んでください");
+    return;
+  }
+  const draft = readTimetableEditor();
+  const name = els.timetableName.value.trim() || "基本時間割";
+  const startsOn = els.timetableStartsOn.value;
+  const endsOn = els.timetableEndsOn.value;
+  if (startsOn && endsOn && CalendarDate.compareDateKeys(startsOn, endsOn) > 0) {
+    showToast("適用終了日は開始日以降にしてください");
+    return;
+  }
+  const current = timetableForEditor(group.id);
+  const now = new Date().toISOString();
+  if (current) {
+    Object.assign(current, { name, startsOn, endsOn, ...draft, updatedAt: now });
+  } else {
+    state.timetables.push({ id: crypto.randomUUID(), groupId: group.id, name, startsOn, endsOn, enabled: true, ...draft, createdAt: now, updatedAt: now });
+  }
+  persist();
+  render();
+  showToast(`${group.name}の時間割を保存しました`);
+}
+
+function copyTimetableToGroup() {
+  const sourceGroup = selectedGroup();
+  const targetGroup = groupById(els.timetableCopyTarget.value);
+  if (!sourceGroup || !targetGroup || sourceGroup.id === targetGroup.id) {
+    showToast("コピー先の別の組を選んでください");
+    return;
+  }
+  const draft = readTimetableEditor();
+  const now = new Date().toISOString();
+  const existing = timetableForEditor(targetGroup.id);
+  const copied = { name: els.timetableName.value.trim() || "基本時間割", startsOn: els.timetableStartsOn.value, endsOn: els.timetableEndsOn.value, ...draft, updatedAt: now };
+  if (existing) Object.assign(existing, copied);
+  else state.timetables.push({ id: crypto.randomUUID(), groupId: targetGroup.id, enabled: true, createdAt: now, ...copied });
+  persist();
+  render();
+  showToast(`${targetGroup.name}へ時間割をコピーしました`);
+}
+
+function resetTimetable() {
+  const group = selectedGroup();
+  if (!group) return;
+  if (!confirm(`${group.name}の時間割を空にします。よろしいですか？`)) return;
+  const timetable = timetableForEditor(group.id);
+  if (timetable) {
+    timetable.cells = {};
+    timetable.periodCount = DEFAULT_PERIOD_COUNT;
+    timetable.updatedAt = new Date().toISOString();
+  }
+  persist();
+  render();
+  showToast("時間割を初期化しました");
+}
+
+function renderSubjectList() {
+  els.subjectList.innerHTML = activeSubjects({ includeDisabled: true }).map((subject) => `
+    <span class="subject-chip${subject.enabled ? "" : " is-disabled"}">${escapeHtml(subject.name)}
+      <button type="button" title="編集" aria-label="${escapeHtml(subject.name)}を編集" data-subject-edit="${escapeHtml(subject.id)}">✎</button>
+      <button type="button" title="${subject.enabled ? "無効にする" : "有効にする"}" aria-label="${escapeHtml(subject.name)}を切り替え" data-subject-toggle="${escapeHtml(subject.id)}">${subject.enabled ? "−" : "+"}</button>
+    </span>
+  `).join("");
+  els.subjectList.querySelectorAll("[data-subject-edit]").forEach((button) => button.addEventListener("click", () => editSubject(button.dataset.subjectEdit)));
+  els.subjectList.querySelectorAll("[data-subject-toggle]").forEach((button) => button.addEventListener("click", () => toggleSubject(button.dataset.subjectToggle)));
+}
+
+function saveSubject() {
+  const name = els.subjectName.value.trim();
+  if (!name) return;
+  const subject = subjectById(els.subjectId.value);
+  if (subject) subject.name = name;
+  else state.subjects.push({ id: crypto.randomUUID(), name, sortOrder: state.subjects.length, enabled: true });
+  clearSubjectForm();
+  persist();
+  render();
+}
+
+function clearSubjectForm() {
+  els.subjectId.value = "";
+  els.subjectName.value = "";
+}
+
+function editSubject(subjectId) {
+  const subject = subjectById(subjectId);
+  if (!subject) return;
+  els.subjectId.value = subject.id;
+  els.subjectName.value = subject.name;
+  els.subjectName.focus();
+}
+
+function toggleSubject(subjectId) {
+  const subject = subjectById(subjectId);
+  if (!subject) return;
+  subject.enabled = !subject.enabled;
+  persist();
+  render();
+}
+
+function calendarEventTypeLabel(type) {
+  return calendarEventTypes.find(([id]) => id === type)?.[1] || "その他";
+}
+
+function eventTargetsGroup(event, groupId) {
+  return event.scope === "school" || (Boolean(groupId) && event.groupIds.includes(groupId));
+}
+
+function eventOccursOnDate(event, date) {
+  if (!CalendarDate.isDateInRange(date, event.startDate, event.endDate || event.startDate)) return false;
+  if (event.repeat !== "weekly") return true;
+  const start = CalendarDate.parseDateKey(event.startDate);
+  const target = CalendarDate.parseDateKey(date);
+  return Boolean(start && target && start.getDay() === target.getDay());
+}
+
+function calendarEventsForDate(date, groupId) {
+  return state.calendarEvents
+    .filter((event) => eventTargetsGroup(event, groupId) && eventOccursOnDate(event, date))
+    .slice()
+    .sort((left, right) => left.allDay === right.allDay ? left.title.localeCompare(right.title, "ja") : left.allDay ? -1 : 1);
+}
+
+function eventSchoolDayEffect(event) {
+  if (event.schoolDayEffect && event.schoolDayEffect !== "auto") return event.schoolDayEffect;
+  if (["holiday", "substitute-holiday", "school-closure", "long-vacation"].includes(event.type)) return "holiday";
+  if (event.type === "saturday-school") return "school-day";
+  if (event.type === "shortened") return "shortened";
+  if (["school-event", "grade-event", "group-event"].includes(event.type)) return "event-day";
+  return "none";
+}
+
+function schoolDayInfo(date, groupId = "") {
+  const target = CalendarDate.parseDateKey(date);
+  if (!target) return { date, isSchoolDay: false, isHoliday: false, isRegularSchoolDay: false, hasSpecialEvent: false, status: "unset", events: [] };
+  const events = calendarEventsForDate(date, groupId);
+  const effects = events.map(eventSchoolDayEffect);
+  const holiday = CalendarDate.holidayName(date);
+  const weekday = target.getDay();
+  const baseSchoolDay = weekday >= 1 && weekday <= 5 && !holiday;
+  const forcedHoliday = effects.includes("holiday");
+  const forcedSchoolDay = effects.includes("school-day");
+  const isSchoolDay = forcedHoliday ? false : forcedSchoolDay || baseSchoolDay;
+  const isShortened = isSchoolDay && (effects.includes("shortened") || events.some((event) => event.timetableEffect === "shortened"));
+  const isEventDay = isSchoolDay && (effects.includes("event-day") || events.some((event) => event.timetableEffect === "event"));
+  return {
+    date,
+    isSchoolDay,
+    isHoliday: !isSchoolDay,
+    isRegularSchoolDay: isSchoolDay && !forcedSchoolDay && !isShortened && !isEventDay,
+    hasSpecialEvent: Boolean(events.length || holiday || isShortened || isEventDay),
+    status: !isSchoolDay ? "holiday" : isShortened ? "shortened" : isEventDay ? "event" : forcedSchoolDay ? "special" : "normal",
+    holidayName: holiday,
+    events,
+  };
+}
+
+function isSchoolDay(date, groupId = "") {
+  return schoolDayInfo(date, groupId).isSchoolDay;
+}
+
+function isHoliday(date, groupId = "") {
+  return !isSchoolDay(date, groupId);
+}
+
+function timetableForDate(groupId, date) {
+  return state.timetables
+    .filter((timetable) => timetable.groupId === groupId && timetable.enabled && CalendarDate.isDateInRange(date, timetable.startsOn, timetable.endsOn))
+    .slice()
+    .sort((left, right) => String(right.startsOn).localeCompare(String(left.startsOn)) || String(right.updatedAt).localeCompare(String(left.updatedAt)))[0] || null;
+}
+
+function getDayTimetable(groupId, date) {
+  const day = schoolDayInfo(date, groupId);
+  if (!groupId || !day.isSchoolDay) return { ...day, timetable: null, periods: [] };
+  const timetable = timetableForDate(groupId, date);
+  if (!timetable) return { ...day, timetable: null, periods: [] };
+  const weekdayIndex = (CalendarDate.parseDateKey(date).getDay() + 6) % 7;
+  const overrides = state.timetableOverrides.filter((override) => override.groupId === groupId && override.date === date);
+  const overrideByPeriod = new Map(overrides.map((override) => [override.periodNumber, override]));
+  const periods = Array.from({ length: timetable.periodCount }, (_, periodIndex) => {
+    const periodNumber = periodIndex + 1;
+    const override = overrideByPeriod.get(periodNumber);
+    const subjectId = override ? override.subjectId : timetable.cells[`${weekdayIndex}-${periodNumber}`] || "";
+    return { periodNumber, subjectId, subject: subjectById(subjectId), override };
+  });
+  return { ...day, timetable, periods };
+}
+
+function hasSubjectOnDate(groupId, date, subjectId) {
+  return getDayTimetable(groupId, date).periods.some((period) => period.subjectId === subjectId);
+}
+
+function schoolDaysAfter(date, count, groupId = "") {
+  let cursor = String(date || "");
+  const goal = Math.max(0, Math.floor(Number(count || 0)));
+  if (!CalendarDate.parseDateKey(cursor)) return "";
+  let found = 0;
+  while (found < goal) {
+    cursor = CalendarDate.addDays(cursor, 1);
+    if (isSchoolDay(cursor, groupId)) found += 1;
+  }
+  return cursor;
+}
+
+function countSchoolDaysBetween(startDate, endDate, groupId = "") {
+  if (!CalendarDate.parseDateKey(startDate) || !CalendarDate.parseDateKey(endDate) || CalendarDate.compareDateKeys(startDate, endDate) > 0) return 0;
+  let count = 0;
+  let cursor = startDate;
+  while (CalendarDate.compareDateKeys(cursor, endDate) <= 0) {
+    if (isSchoolDay(cursor, groupId)) count += 1;
+    cursor = CalendarDate.addDays(cursor, 1);
+  }
+  return count;
+}
+
+function canGenerateDailyMission(studentId, date = CalendarDate.dateKey(new Date())) {
+  const student = state.students.find((item) => item.id === studentId);
+  return Boolean(student && (isTestStudent(student) || isSchoolDay(date, student.groupId)));
+}
+
+function missionCalendarContext(studentId, date = CalendarDate.dateKey(new Date())) {
+  const student = state.students.find((item) => item.id === studentId);
+  const testMode = isTestStudent(student);
+  const day = schoolDayInfo(date, student?.groupId || "");
+  return {
+    canGenerate: Boolean(student && (testMode || day.isSchoolDay)),
+    isTestStudent: testMode,
+    schoolDay: day,
+    timetable: !testMode || student?.testUseTimetable ? getDayTimetable(student?.groupId || "", date) : { ...day, timetable: null, periods: [] },
+  };
+}
+
+function renderCalendar() {
+  if (!els.calendarEventId.value && !els.calendarEventStart.value) {
+    els.calendarEventStart.value = calendarSelectedDate;
+  }
+  renderCalendarEventTypeOptions();
+  renderCalendarGroupOptions();
+  renderCalendarMonth();
+  renderCalendarDayDetail();
+  updateCalendarEventTimeFields();
+  updateCalendarEventScopeFields();
+}
+
+function renderCalendarEventTypeOptions() {
+  const previous = els.calendarEventType.value || "other";
+  els.calendarEventType.innerHTML = calendarEventTypes.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+  els.calendarEventType.value = calendarEventTypes.some(([id]) => id === previous) ? previous : "other";
+}
+
+function renderCalendarGroupOptions() {
+  const selectedIds = new Set([...els.calendarEventGroups.selectedOptions].map((option) => option.value));
+  els.calendarEventGroups.innerHTML = groupOptions("", { includeBlank: false }).replaceAll(" selected", "");
+  [...els.calendarEventGroups.options].forEach((option) => {
+    option.selected = selectedIds.has(option.value);
+  });
+}
+
+function renderCalendarMonth() {
+  const groupId = state.selectedGroupId;
+  const today = CalendarDate.dateKey(new Date());
+  els.calendarMonthLabel.textContent = `${calendarCursor.getFullYear()}年${calendarCursor.getMonth() + 1}月`;
+  els.calendarGrid.innerHTML = CalendarDate.monthGrid(calendarCursor).map(({ key, date, inMonth }) => {
+    const info = schoolDayInfo(key, groupId);
+    const events = info.events;
+    const weekend = date.getDay() === 0 ? " is-sunday" : date.getDay() === 6 ? " is-saturday" : "";
+    const eventLabels = events.slice(0, 2).map((event) => `<span>${escapeHtml(event.title)}</span>`).join("");
+    const more = events.length > 2 ? `<span>ほか${events.length - 2}件</span>` : "";
+    return `
+      <button class="calendar-day${inMonth ? "" : " is-outside"}${key === today ? " is-today" : ""}${key === calendarSelectedDate ? " is-selected" : ""}${info.isSchoolDay ? "" : " is-holiday"}${weekend}" type="button" data-calendar-date="${key}">
+        <strong>${date.getDate()}</strong>
+        <div class="calendar-day-events">${eventLabels}${more}</div>
+      </button>
+    `;
+  }).join("");
+  els.calendarGrid.querySelectorAll("[data-calendar-date]").forEach((button) => button.addEventListener("click", () => selectCalendarDate(button.dataset.calendarDate)));
+}
+
+function formatCalendarDate(date) {
+  const value = CalendarDate.parseDateKey(date);
+  if (!value) return "日付";
+  return `${value.getFullYear()}年${value.getMonth() + 1}月${value.getDate()}日（${["日", "月", "火", "水", "木", "金", "土"][value.getDay()]}）`;
+}
+
+function schoolDayStatusLabel(info) {
+  if (!info.isSchoolDay) return info.holidayName || "休業日";
+  if (info.status === "shortened") return "短縮授業日";
+  if (info.status === "event") return "行事日";
+  if (info.status === "special") return "特別登校日";
+  return "通常登校日";
+}
+
+function renderCalendarDayDetail() {
+  const groupId = state.selectedGroupId;
+  const info = schoolDayInfo(calendarSelectedDate, groupId);
+  const dayTimetable = getDayTimetable(groupId, calendarSelectedDate);
+  els.calendarSelectedDateLabel.textContent = formatCalendarDate(calendarSelectedDate);
+  els.calendarDayStatus.textContent = schoolDayStatusLabel(info);
+  els.calendarDayStatus.className = `calendar-status is-${info.status}`;
+  els.calendarEventList.innerHTML = info.events.length ? info.events.map((event) => `
+    <article class="calendar-event-item"><div><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(calendarEventTypeLabel(event.type))}${event.repeat === "weekly" ? " / 毎週" : ""}${event.note ? ` / ${escapeHtml(event.note)}` : ""}</span></div>
+      <div><button class="text-button" type="button" data-calendar-event-edit="${escapeHtml(event.id)}">編集</button><button class="text-button" type="button" data-calendar-event-copy="${escapeHtml(event.id)}">複製</button><button class="text-button danger-text" type="button" data-calendar-event-delete="${escapeHtml(event.id)}">削除</button></div></article>
+  `).join("") : '<p class="empty-state compact-empty">予定はありません。右側から追加できます。</p>';
+  els.calendarEventList.querySelectorAll("[data-calendar-event-edit]").forEach((button) => button.addEventListener("click", () => editCalendarEvent(button.dataset.calendarEventEdit)));
+  els.calendarEventList.querySelectorAll("[data-calendar-event-copy]").forEach((button) => button.addEventListener("click", () => duplicateCalendarEvent(button.dataset.calendarEventCopy)));
+  els.calendarEventList.querySelectorAll("[data-calendar-event-delete]").forEach((button) => button.addEventListener("click", () => deleteCalendarEvent(button.dataset.calendarEventDelete)));
+
+  els.calendarDayTimetable.innerHTML = !info.isSchoolDay
+    ? '<p class="empty-state compact-empty">休業日のため授業はありません。</p>'
+    : !dayTimetable.timetable
+      ? '<p class="empty-state compact-empty">基本時間割は未設定です。</p>'
+      : `<ol class="day-timetable-list">${dayTimetable.periods.map((period) => `<li><span>${period.periodNumber}時間目</span><strong>${escapeHtml(period.subject?.name || "未設定")}</strong>${period.override ? '<em>変更</em>' : ""}</li>`).join("")}</ol>`;
+
+  const periodCount = dayTimetable.timetable?.periodCount || timetableForEditor(groupId)?.periodCount || DEFAULT_PERIOD_COUNT;
+  els.overridePeriod.innerHTML = Array.from({ length: periodCount }, (_, index) => `<option value="${index + 1}">${index + 1}時間目</option>`).join("");
+  els.overrideSubject.innerHTML = subjectOptions("", { includeBlank: true });
+  const overrides = state.timetableOverrides.filter((override) => override.groupId === groupId && override.date === calendarSelectedDate).sort((left, right) => left.periodNumber - right.periodNumber);
+  els.timetableOverrideList.innerHTML = overrides.map((override) => `
+    <div class="override-item"><span>${override.periodNumber}時間目: <strong>${escapeHtml(subjectById(override.subjectId)?.name || "未設定")}</strong>${override.note ? `（${escapeHtml(override.note)}）` : ""}</span><button class="text-button danger-text" type="button" data-override-delete="${escapeHtml(override.id)}">変更を取り消す</button></div>
+  `).join("");
+  els.timetableOverrideList.querySelectorAll("[data-override-delete]").forEach((button) => button.addEventListener("click", () => deleteTimetableOverride(button.dataset.overrideDelete)));
+}
+
+function selectCalendarDate(date) {
+  if (!CalendarDate.parseDateKey(date)) return;
+  calendarSelectedDate = date;
+  const selected = CalendarDate.parseDateKey(date);
+  calendarCursor = new Date(selected.getFullYear(), selected.getMonth(), 1);
+  clearCalendarEventForm();
+  renderCalendar();
+}
+
+function moveCalendarMonth(amount) {
+  calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + amount, 1);
+  renderCalendar();
+}
+
+function goToCalendarToday() {
+  calendarSelectedDate = CalendarDate.dateKey(new Date());
+  calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  clearCalendarEventForm();
+  renderCalendar();
+}
+
+function updateCalendarEventTimeFields() {
+  els.calendarEventTimeFields.hidden = els.calendarEventAllDay.checked;
+}
+
+function updateCalendarEventScopeFields() {
+  els.calendarEventGroupsField.hidden = els.calendarEventScope.value !== "groups";
+}
+
+function clearCalendarEventForm() {
+  els.calendarEventId.value = "";
+  els.calendarEventTitle.value = "";
+  els.calendarEventStart.value = calendarSelectedDate;
+  els.calendarEventEnd.value = "";
+  els.calendarEventAllDay.checked = true;
+  els.calendarEventStartTime.value = "";
+  els.calendarEventEndTime.value = "";
+  els.calendarEventType.value = "other";
+  els.calendarEventScope.value = "school";
+  [...els.calendarEventGroups.options].forEach((option) => { option.selected = false; });
+  els.calendarEventRepeat.value = "none";
+  els.calendarEventSchoolDayEffect.value = "auto";
+  els.calendarEventTimetableEffect.value = "none";
+  els.calendarEventNote.value = "";
+  updateCalendarEventTimeFields();
+  updateCalendarEventScopeFields();
+}
+
+function readCalendarEventForm() {
+  const startDate = els.calendarEventStart.value;
+  const endDate = els.calendarEventEnd.value || startDate;
+  return {
+    title: els.calendarEventTitle.value.trim(),
+    startDate,
+    endDate,
+    allDay: els.calendarEventAllDay.checked,
+    startTime: els.calendarEventStartTime.value,
+    endTime: els.calendarEventEndTime.value,
+    type: els.calendarEventType.value,
+    scope: els.calendarEventScope.value,
+    groupIds: [...els.calendarEventGroups.selectedOptions].map((option) => option.value),
+    note: els.calendarEventNote.value.trim(),
+    repeat: els.calendarEventRepeat.value,
+    schoolDayEffect: els.calendarEventSchoolDayEffect.value,
+    timetableEffect: els.calendarEventTimetableEffect.value,
+  };
+}
+
+function saveCalendarEvent() {
+  const draft = readCalendarEventForm();
+  if (!draft.title || !CalendarDate.parseDateKey(draft.startDate)) {
+    showToast("予定名と開始日を入力してください");
+    return;
+  }
+  if (CalendarDate.compareDateKeys(draft.startDate, draft.endDate) > 0) {
+    showToast("終了日は開始日以降にしてください");
+    return;
+  }
+  if (draft.scope === "groups" && !draft.groupIds.length) {
+    showToast("対象の組を選んでください");
+    return;
+  }
+  const now = new Date().toISOString();
+  const existing = state.calendarEvents.find((event) => event.id === els.calendarEventId.value);
+  if (existing) Object.assign(existing, draft, { updatedAt: now });
+  else state.calendarEvents.push({ id: crypto.randomUUID(), ...draft, createdAt: now, updatedAt: now });
+  calendarSelectedDate = draft.startDate;
+  calendarCursor = new Date(CalendarDate.parseDateKey(draft.startDate).getFullYear(), CalendarDate.parseDateKey(draft.startDate).getMonth(), 1);
+  clearCalendarEventForm();
+  persist();
+  render();
+  showToast("予定を保存しました");
+}
+
+function editCalendarEvent(eventId) {
+  const event = state.calendarEvents.find((item) => item.id === eventId);
+  if (!event) return;
+  els.calendarEventId.value = event.id;
+  els.calendarEventTitle.value = event.title;
+  els.calendarEventStart.value = event.startDate;
+  els.calendarEventEnd.value = event.endDate === event.startDate ? "" : event.endDate;
+  els.calendarEventAllDay.checked = event.allDay;
+  els.calendarEventStartTime.value = event.startTime;
+  els.calendarEventEndTime.value = event.endTime;
+  els.calendarEventType.value = event.type;
+  els.calendarEventScope.value = event.scope;
+  [...els.calendarEventGroups.options].forEach((option) => { option.selected = event.groupIds.includes(option.value); });
+  els.calendarEventRepeat.value = event.repeat;
+  els.calendarEventSchoolDayEffect.value = event.schoolDayEffect;
+  els.calendarEventTimetableEffect.value = event.timetableEffect;
+  els.calendarEventNote.value = event.note;
+  updateCalendarEventTimeFields();
+  updateCalendarEventScopeFields();
+  els.calendarEventTitle.focus();
+}
+
+function duplicateCalendarEvent(eventId) {
+  const event = state.calendarEvents.find((item) => item.id === eventId);
+  if (!event) return;
+  editCalendarEvent(eventId);
+  els.calendarEventId.value = "";
+  els.calendarEventTitle.value = `${event.title}（コピー）`;
+  els.calendarEventTitle.focus();
+}
+
+function deleteCalendarEvent(eventId) {
+  const event = state.calendarEvents.find((item) => item.id === eventId);
+  if (!event || !confirm(`「${event.title}」を削除します。よろしいですか？`)) return;
+  state.calendarEvents = state.calendarEvents.filter((item) => item.id !== eventId);
+  clearCalendarEventForm();
+  persist();
+  render();
+  showToast("予定を削除しました");
+}
+
+function saveTimetableOverride() {
+  const group = selectedGroup();
+  if (!group) {
+    showToast("先に対象の組を選んでください");
+    return;
+  }
+  const periodNumber = Math.max(1, Math.floor(Number(els.overridePeriod.value || 1)));
+  const subjectId = els.overrideSubject.value;
+  const existing = state.timetableOverrides.find((override) => override.groupId === group.id && override.date === calendarSelectedDate && override.periodNumber === periodNumber);
+  if (!subjectId) {
+    if (existing) state.timetableOverrides = state.timetableOverrides.filter((override) => override.id !== existing.id);
+    persist();
+    render();
+    showToast("この時間の変更を取り消しました");
+    return;
+  }
+  const now = new Date().toISOString();
+  if (existing) Object.assign(existing, { subjectId, note: els.overrideMemo.value.trim(), updatedAt: now });
+  else state.timetableOverrides.push({ id: crypto.randomUUID(), date: calendarSelectedDate, groupId: group.id, periodNumber, subjectId, note: els.overrideMemo.value.trim(), createdAt: now, updatedAt: now });
+  els.overrideMemo.value = "";
+  persist();
+  render();
+  showToast("当日の時間割を変更しました");
+}
+
+function deleteTimetableOverride(overrideId) {
+  const override = state.timetableOverrides.find((item) => item.id === overrideId);
+  if (!override || !confirm(`${override.periodNumber}時間目の変更を取り消しますか？`)) return;
+  state.timetableOverrides = state.timetableOverrides.filter((item) => item.id !== overrideId);
+  persist();
+  render();
+  showToast("基本時間割に戻しました");
+}
+
+window.HounyanSchoolCalendar = {
+  isSchoolDay,
+  isHoliday,
+  schoolDayInfo,
+  schoolDaysAfter,
+  countSchoolDaysBetween,
+  getDayTimetable,
+  hasSubjectOnDate,
+  canGenerateDailyMission,
+  missionCalendarContext,
+};
 
 function renderHounyanCloset() {
   const student = selectedStudent();
@@ -3170,6 +4136,8 @@ function formatTimerTime(totalSeconds) {
 function saveStudent() {
   const name = els.studentName.value.trim();
   const note = els.studentNote.value.trim();
+  const groupId = els.studentGroup.value;
+  const isTest = Boolean(els.studentTestMode.checked);
   if (!name) {
     showToast("名前を入力してください");
     return;
@@ -3180,12 +4148,16 @@ function saveStudent() {
     if (student) {
       student.name = name;
       student.note = note;
+      student.groupId = groupId;
+      student.isTest = isTest;
     }
   } else {
     const student = {
       id: crypto.randomUUID(),
       name,
       note,
+      groupId,
+      isTest,
       createdAt: new Date().toISOString(),
     };
     state.students.push(student);
@@ -3202,6 +4174,8 @@ function clearStudentForm() {
   els.studentId.value = "";
   els.studentName.value = "";
   els.studentNote.value = "";
+  els.studentGroup.value = "";
+  els.studentTestMode.checked = false;
 }
 
 function createTestStudent() {
@@ -3960,6 +4934,8 @@ function editSelectedStudent() {
   els.studentId.value = student.id;
   els.studentName.value = student.name;
   els.studentNote.value = student.note || "";
+  els.studentGroup.value = student.groupId || "";
+  els.studentTestMode.checked = isTestStudent(student);
   showView("teacher");
   els.studentName.focus();
 }
