@@ -1332,7 +1332,7 @@ function normalizeDailyMissions(input) {
     targetValue: Math.max(1, Math.floor(Number(mission.targetValue || 1))), unit: String(mission.unit || ""),
     currentValue: Math.max(0, Number(mission.currentValue || 0)), manualAdjustment: Number(mission.manualAdjustment || 0),
     stampReward: Math.max(0, Math.floor(Number(mission.stampReward || 0))), ticketReward: Math.max(0, Math.floor(Number(mission.ticketReward || 0))),
-    status: ["not_started", "in_progress", "completed", "expired", "revoked"].includes(mission.status) ? mission.status : "not_started",
+    status: ["not_started", "in_progress", "completed", "expired", "revoked", "removed"].includes(mission.status) ? mission.status : "not_started",
     completedAt: mission.completedAt || "", rewardGranted: Boolean(mission.rewardGranted), createdAt: mission.createdAt || new Date().toISOString(),
     updatedAt: mission.updatedAt || mission.createdAt || new Date().toISOString(),
   }));
@@ -1866,6 +1866,7 @@ function renderStudentDetails() {
 
 function missionProgressText(mission) {
   if (mission.status === "completed") return "達成！";
+  if (mission.status === "revoked") return "先生が取り消しました";
   if (mission.evaluationType === "manual") return "先生の確認待ち";
   const current = Math.min(mission.targetValue, Math.max(0, Number(mission.currentValue || 0)));
   return `${current} / ${mission.targetValue}${mission.unit}`;
@@ -1873,11 +1874,12 @@ function missionProgressText(mission) {
 
 function dailyMissionCardMarkup(mission, { teacher = false } = {}) {
   const completed = mission.status === "completed";
+  const deleteButton = `<button class="text-button danger-text" type="button" data-mission-remove="${escapeHtml(mission.id)}">今日だけ削除</button>`;
   const controls = !teacher ? "" : completed
-    ? `<div class="mission-card-actions"><span class="mission-reward-status">${mission.rewardGranted ? "報酬付与済み" : "報酬未付与"}</span><button class="text-button" type="button" data-mission-revert="${escapeHtml(mission.id)}">未達成に戻す</button></div>`
-    : mission.evaluationType === "manual"
-      ? `<div class="mission-card-actions"><button class="primary-button compact-button" type="button" data-mission-complete="${escapeHtml(mission.id)}">達成にする</button></div>`
-      : `<div class="mission-card-actions"><label class="field compact-field"><span>進捗を増減</span><input type="number" value="1" data-mission-adjustment="${escapeHtml(mission.id)}"></label><button class="soft-button compact-button" type="button" data-mission-adjust="${escapeHtml(mission.id)}">反映</button><button class="text-button" type="button" data-mission-complete="${escapeHtml(mission.id)}">達成にする</button></div>`;
+    ? `<div class="mission-card-actions"><span class="mission-reward-status">${mission.rewardGranted ? "報酬付与済み" : "報酬未付与"}</span><button class="text-button" type="button" data-mission-revert="${escapeHtml(mission.id)}">未達成に戻す</button>${deleteButton}</div>`
+    : mission.status === "revoked" || mission.evaluationType === "manual"
+      ? `<div class="mission-card-actions"><button class="primary-button compact-button" type="button" data-mission-complete="${escapeHtml(mission.id)}">達成にする</button>${deleteButton}</div>`
+      : `<div class="mission-card-actions"><label class="field compact-field"><span>進捗を増減</span><input type="number" value="1" data-mission-adjustment="${escapeHtml(mission.id)}"></label><button class="soft-button compact-button" type="button" data-mission-adjust="${escapeHtml(mission.id)}">反映</button><button class="text-button" type="button" data-mission-complete="${escapeHtml(mission.id)}">達成にする</button>${deleteButton}</div>`;
   return `
     <article class="daily-mission-card${completed ? " is-completed" : ""}${lastCompletedMissionId === mission.id ? " is-newly-completed" : ""}">
       <div class="mission-card-main">
@@ -1990,6 +1992,10 @@ function renderTeacherDailyMissions() {
   els.teacherDailyMissions.querySelectorAll("[data-mission-revert]").forEach((button) => button.addEventListener("click", () => {
     if (revertMission(button.dataset.missionRevert)) showToast("未達成へ戻し、報酬も取り消しました");
   }));
+  els.teacherDailyMissions.querySelectorAll("[data-mission-remove]").forEach((button) => button.addEventListener("click", () => {
+    if (!confirm("この日のミッションを削除しますか？")) return;
+    if (removeDailyMission(button.dataset.missionRemove)) showToast("今日のミッションを削除しました");
+  }));
   els.teacherDailyMissions.querySelectorAll("[data-mission-adjust]").forEach((button) => button.addEventListener("click", () => {
     const input = els.teacherDailyMissions.querySelector(`[data-mission-adjustment="${button.dataset.missionAdjust}"]`);
     if (adjustMissionProgress(button.dataset.missionAdjust, Number(input?.value || 0))) showToast("進捗を更新しました");
@@ -2048,6 +2054,8 @@ function toggleMissionTemplate(templateId) {
 
 function deleteMissionTemplate(templateId) {
   const template = missionTemplateById(templateId); if (!template || !confirm(`「${template.name}」を削除しますか？\n児童への設定も外れます。`)) return;
+  state.studentMissionSettings.filter((setting) => setting.missionTemplateId === templateId)
+    .forEach((setting) => removePendingMissionsForSetting(setting.id, { includeCompleted: true }));
   state.missionTemplates = state.missionTemplates.filter((item) => item.id !== templateId);
   state.studentMissionSettings = state.studentMissionSettings.filter((setting) => setting.missionTemplateId !== templateId);
   persist(); render(); showToast("ミッションひな形を削除しました");
@@ -2080,11 +2088,15 @@ function editStudentMissionSetting(settingId) {
 
 function toggleStudentMissionSetting(settingId) {
   const setting = missionSettingById(settingId); if (!setting) return;
-  setting.enabled = !setting.enabled; setting.updatedAt = new Date().toISOString(); persist(); render();
+  setting.enabled = !setting.enabled;
+  setting.updatedAt = new Date().toISOString();
+  if (!setting.enabled) removePendingMissionsForSetting(settingId, { includeCompleted: true });
+  persist(); render();
 }
 
 function deleteStudentMissionSetting(settingId) {
   const setting = missionSettingById(settingId); if (!setting || !confirm("この児童のミッション設定を削除しますか？")) return;
+  removePendingMissionsForSetting(settingId, { includeCompleted: true });
   state.studentMissionSettings = state.studentMissionSettings.filter((item) => item.id !== settingId); persist(); render();
 }
 
@@ -2813,7 +2825,7 @@ function generateDailyMissions(studentId, date = CalendarDate.dateKey(new Date()
 }
 
 function getDailyMissions(studentId, date = CalendarDate.dateKey(new Date())) {
-  return state.dailyMissions.filter((mission) => mission.studentId === studentId && mission.targetDate === date)
+  return state.dailyMissions.filter((mission) => mission.studentId === studentId && mission.targetDate === date && mission.status !== "removed")
     .slice().sort((left, right) => {
       const leftSetting = missionSettingById(left.studentMissionSettingId);
       const rightSetting = missionSettingById(right.studentMissionSettingId);
@@ -2890,7 +2902,7 @@ function completeMission(missionId) {
 function refreshAutomaticMissions(studentId, date = CalendarDate.dateKey(new Date())) {
   let changed = false;
   getDailyMissions(studentId, date).forEach((mission) => {
-    if (mission.evaluationType !== "automatic" || mission.status === "completed") return;
+    if (mission.evaluationType !== "automatic" || ["completed", "revoked"].includes(mission.status)) return;
     const value = missionProgressValue(mission);
     mission.currentValue = value;
     mission.status = value > 0 ? "in_progress" : "not_started";
@@ -2921,13 +2933,33 @@ function revertMission(missionId) {
   const mission = state.dailyMissions.find((item) => item.id === missionId);
   if (!mission || mission.status !== "completed") return false;
   revokeMissionReward(mission);
-  mission.status = "in_progress";
+  mission.status = "revoked";
   mission.completedAt = "";
   mission.currentValue = Math.min(mission.targetValue - 1, missionProgressValue(mission));
   mission.updatedAt = new Date().toISOString();
   persist();
   render();
   return true;
+}
+
+function removeDailyMission(missionId) {
+  const mission = state.dailyMissions.find((item) => item.id === missionId);
+  if (!mission || mission.status === "removed") return false;
+  if (mission.status === "completed") revokeMissionReward(mission);
+  mission.status = "removed";
+  mission.updatedAt = new Date().toISOString();
+  persist();
+  render();
+  return true;
+}
+
+function removePendingMissionsForSetting(settingId, { includeCompleted = false } = {}) {
+  const today = CalendarDate.dateKey(new Date());
+  state.dailyMissions.forEach((mission) => {
+    if (mission.studentMissionSettingId !== settingId || mission.targetDate < today || (!includeCompleted && mission.status === "completed")) return;
+    mission.status = "removed";
+    mission.updatedAt = new Date().toISOString();
+  });
 }
 
 function renderCalendar() {
