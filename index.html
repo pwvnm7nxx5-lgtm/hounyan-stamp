@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ほうにゃんスタンプ台帳</title>
+    <link rel="stylesheet" href="styles.css?v=tab-layout-v1">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">特別支援スタンプ管理</p>
+          <h1>ほうにゃんスタンプ台帳</h1>
+        </div>
+        <div class="top-actions" aria-label="ページ切り替え">
+          <button class="page-tab is-active" type="button" data-view-button="stamp">スタンプ</button>
+          <button class="page-tab" type="button" data-view-button="calendar">カレンダー</button>
+          <button class="page-tab" type="button" data-view-button="timer">タイマー</button>
+          <button class="page-tab" type="button" data-view-button="teacher">先生</button>
+          <button class="page-tab" type="button" data-view-button="settings">設定</button>
+        </div>
+      </header>
+
+      <div class="student-switcher" id="studentSwitcher" aria-label="児童切り替え">
+        <div class="switch-status">
+          <span>児童切り替え</span>
+          <strong id="currentStudentLabel">選択中：児童未選択</strong>
+        </div>
+        <div class="student-tab-list" id="studentSwitchList" role="tablist" aria-label="児童を選択"></div>
+      </div>
+
+      <main>
+        <section class="view is-active stamp-page" data-view="stamp" aria-label="スタンプ">
+          <nav class="stamp-tab-list" role="tablist" aria-label="スタンプの画面を切り替え">
+            <button class="stamp-tab is-active" type="button" role="tab" aria-selected="true" data-stamp-tab-button="child">児童</button>
+            <button class="stamp-tab" type="button" role="tab" aria-selected="false" data-stamp-tab-button="shop">おかいもの</button>
+            <button class="stamp-tab" type="button" role="tab" aria-selected="false" data-stamp-tab-button="book">ずかん</button>
+          </nav>
+
+          <section class="stamp-tab-panel is-active child-page" data-stamp-tab-panel="child" aria-label="児童ページ">
+          <div class="child-grid">
+            <section class="hero-panel child-hero">
+              <div class="hounyan-stage">
+                <button class="hounyan-change-button" type="button" id="childHounyanButton" aria-label="かぶりものをえらぶ">
+                  <img src="assets/hounyan-home.png" alt="ほうにゃん" class="hounyan-image" id="childHounyanImage">
+                </button>
+              </div>
+              <section class="reward-goal-card" id="childRewardGoal" aria-label="いまのねらい"></section>
+            </section>
+          </div>
+
+          <section class="detail-panel child-detail" id="childStudentDetail" hidden>
+            <div class="section-head detail-head">
+              <div>
+                <p class="eyebrow">いまのシート</p>
+                <h2 id="childSelectedName">未選択</h2>
+              </div>
+            </div>
+
+            <div class="score-row child-score-row">
+              <div class="score-box">
+                <span><ruby>今<rt>いま</rt></ruby>までに<ruby>集<rt>あつ</rt></ruby>めたスタンプ</span>
+                <strong id="childTotal">0</strong>
+              </div>
+              <div class="score-box">
+                <span><ruby>使<rt>つか</rt></ruby>えるシート</span>
+                <strong id="childAvailableSheets">0</strong>
+              </div>
+              <div class="score-box">
+                <span>いまのシート</span>
+                <strong id="childCurrentSheetCount">0/20</strong>
+              </div>
+              <div class="score-box">
+                <span>あと</span>
+                <strong id="childRemainingText">20こ</strong>
+              </div>
+            </div>
+
+            <div class="child-level-card">
+              <div>
+                <span class="level-label">ほうにゃんレベル</span>
+                <strong id="childLevelName">Lv.1 いつものほうにゃん</strong>
+                <p id="childLevelRequirement">あと20こで小さな紙の王冠</p>
+                <div class="level-progress" aria-hidden="true">
+                  <span id="childLevelProgressBar"></span>
+                </div>
+                <small id="childLevelProgressText">0/20こ</small>
+              </div>
+              <div id="childNextLevelPreview" class="mystery-level-preview" role="img" aria-label="つぎのかぶりものはひみつ">?</div>
+            </div>
+
+            <div class="next-unlock-banner" id="childNextUnlock">
+              <span>つぎのもくひょう</span>
+              <strong>あと0こでスタンプかいほう！</strong>
+            </div>
+
+            <section class="daily-mission-panel" aria-labelledby="childMissionTitle">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">きょうのチャレンジ</p>
+                  <h3 id="childMissionTitle">デイリーミッション</h3>
+                </div>
+                <strong id="childTicketBalance" class="ticket-balance">きっぷ 0まい</strong>
+              </div>
+              <div id="childDailyMissions" class="daily-mission-list"></div>
+            </section>
+
+            <div class="sheet-head">
+              <h3 id="childSheetTitle">シート 1</h3>
+              <p id="childSheetProgress">あと20こでシートがいっぱい</p>
+            </div>
+            <div class="stamp-sheet" id="childSheetGrid" aria-label="20こスタンプシート"></div>
+
+            <div class="sheet-album-summary">
+              <div>
+                <p class="eyebrow">がんばりアルバム</p>
+                <strong><span id="childCompletedSheets">0</span>まい できたよ！</strong>
+              </div>
+              <button class="soft-button" type="button" id="openSheetAlbumButton">シートをみる</button>
+            </div>
+
+            <div class="child-stamp-area">
+              <section>
+                <div class="section-head compact">
+                  <div>
+                    <p class="eyebrow">スタンプ</p>
+                    <h3><ruby>押<rt>お</rt></ruby>すスタンプをえらぶ</h3>
+                  </div>
+                </div>
+                <button class="primary-button wide stamp-press-button" type="button" id="childAddStampButton">スタンプをおす</button>
+              </section>
+            </div>
+          </section>
+        </section>
+
+        <section class="stamp-tab-panel shop-page" data-stamp-tab-panel="shop" aria-labelledby="shop-title" hidden>
+          <div class="shop-grid">
+            <section class="hero-panel shop-summary">
+              <div class="shop-hero-top">
+                <div>
+                  <p class="eyebrow">ごほうび</p>
+                  <h2 id="shop-title"><ruby>お買い物<rt>おかいもの</rt></ruby></h2>
+                </div>
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="shop-hounyan" id="shopHounyanImage">
+              </div>
+              <label>
+                <ruby>児童<rt>じどう</rt></ruby>をえらぶ
+                <select id="shopStudentSelect" class="select"></select>
+              </label>
+              <div class="shop-wallet">
+                <div class="shop-wallet-main">
+                  <span><ruby>使<rt>つか</rt></ruby>えるシート</span>
+                  <strong id="shopAvailableSheets">0</strong>
+                </div>
+                <div class="shop-wallet-sub">
+                  <span><ruby>児童<rt>じどう</rt></ruby></span>
+                  <strong id="shopSelectedName">未選択</strong>
+                </div>
+                <div class="shop-wallet-sub">
+                  <span><ruby>完成<rt>かんせい</rt></ruby>シート</span>
+                  <strong id="shopCompletedSheets">0</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="work-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">景品</p>
+                  <h2>景品をえらぶ</h2>
+                </div>
+              </div>
+              <div id="shopRewards" class="reward-list shop-prize-list"></div>
+            </section>
+
+            <section class="work-panel shop-stamp-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">スタンプ</p>
+                  <h2>スタンプを買う</h2>
+                </div>
+              </div>
+              <div id="shopStampRewards" class="stamp-shop-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="stamp-tab-panel stamp-book-page" data-stamp-tab-panel="book" aria-labelledby="stamp-book-title" hidden>
+          <section class="hero-panel stamp-book-hero">
+            <div>
+              <p class="eyebrow">スタンプずかん</p>
+              <h2 id="stamp-book-title">あつめた スタンプ</h2>
+              <p id="stampBookLead">じどうを えらぶと、あつめた スタンプが みられるよ</p>
+            </div>
+            <div class="stamp-book-total" aria-label="あつめたスタンプの数">
+              <strong id="stampBookOwnedCount">0</strong>
+              <span>/ <span id="stampBookTotalCount">0</span> こ</span>
+            </div>
+          </section>
+
+          <section class="work-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">コレクション</p>
+                <h2>スタンプセット</h2>
+              </div>
+            </div>
+            <div id="stampBookSetList" class="stamp-book-set-list"></div>
+          </section>
+        </section>
+
+        </section>
+
+        <section class="view calendar-page" data-view="calendar" aria-labelledby="calendar-view-title">
+          <section class="hero-panel calendar-overview-hero">
+            <div>
+              <p class="eyebrow">学校の予定と授業</p>
+              <h2 id="calendar-view-title">カレンダーと時間割</h2>
+              <p>予定を確認して、組ごとの時間割をすぐに見られます。</p>
+            </div>
+            <img src="assets/hounyan-home.png" alt="ほうにゃん" class="calendar-overview-hounyan">
+          </section>
+
+          <nav class="calendar-display-tab-list" role="tablist" aria-label="カレンダーの画面を切り替え">
+            <button class="calendar-display-tab is-active" type="button" role="tab" aria-selected="true" data-calendar-display-tab-button="calendar">カレンダー</button>
+            <button class="calendar-display-tab" type="button" role="tab" aria-selected="false" data-calendar-display-tab-button="timetable">時間割</button>
+          </nav>
+
+          <section class="calendar-display-panel is-active" data-calendar-display-tab-panel="calendar">
+            <section class="work-panel calendar-view-panel">
+              <div class="section-head calendar-head">
+                <div>
+                  <p class="eyebrow">月間予定</p>
+                  <h3 id="calendarViewMonthLabel">年月</h3>
+                </div>
+                <div class="calendar-toolbar">
+                  <label class="field compact-field"><span>対象の組</span><select id="calendarViewGroupSelect" class="select"></select></label>
+                  <button class="icon-button" id="calendarViewPreviousButton" type="button" title="前の月" aria-label="前の月">‹</button>
+                  <button class="soft-button" id="calendarViewTodayButton" type="button">今日</button>
+                  <button class="icon-button" id="calendarViewNextButton" type="button" title="次の月" aria-label="次の月">›</button>
+                </div>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div>
+              <div id="calendarViewGrid" class="calendar-grid" aria-label="月間カレンダー"></div>
+              <div class="calendar-view-detail">
+                <div class="section-head compact"><div><p class="eyebrow">選んだ日</p><h3 id="calendarViewSelectedDateLabel">日付</h3></div><span id="calendarViewDayStatus" class="calendar-status"></span></div>
+                <div id="calendarViewEventList" class="calendar-event-list"></div>
+                <div class="day-timetable"><h4>当日の時間割</h4><div id="calendarViewDayTimetable"></div></div>
+              </div>
+            </section>
+          </section>
+
+          <section class="calendar-display-panel" data-calendar-display-tab-panel="timetable" hidden>
+            <section class="work-panel timetable-view-panel">
+              <div class="section-head calendar-head">
+                <div>
+                  <p class="eyebrow">基本時間割</p>
+                  <h3>組の時間割</h3>
+                </div>
+                <label class="field compact-field"><span>組を選ぶ</span><select id="calendarTimetableGroupSelect" class="select"></select></label>
+              </div>
+              <div class="timetable-view-mode" role="group" aria-label="時間割の表示方法">
+                <button class="soft-button is-active" type="button" aria-pressed="true" data-timetable-view-mode="all">全ての組を一覧</button>
+                <button class="soft-button" type="button" aria-pressed="false" data-timetable-view-mode="group">選んだ組を表示</button>
+              </div>
+              <div id="calendarTimetableBoard" class="calendar-timetable-board"></div>
+            </section>
+          </section>
+        </section>
+
+        <section class="view timer-page" data-view="timer" aria-labelledby="timer-title">
+          <div class="timer-grid">
+            <section class="hero-panel timer-hero">
+              <div>
+                <p class="eyebrow">タイマー</p>
+                <h2 id="timer-title">じかんをきめる</h2>
+              </div>
+              <div class="timer-cheer" id="timerCheerText">ほうにゃんもいっしょに見てるよ</div>
+              <div class="timer-hounyan-scene">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" class="timer-hounyan timer-hounyan-default">
+                <img src="assets/timer-hounyan/study-writing-01.png" alt="" aria-hidden="true" class="timer-hounyan timer-hounyan-study timer-hounyan-study-1">
+                <img src="assets/timer-hounyan/study-writing-02.png" alt="" aria-hidden="true" class="timer-hounyan timer-hounyan-study timer-hounyan-study-2">
+                <img src="assets/timer-hounyan/study-writing-03.png" alt="" aria-hidden="true" class="timer-hounyan timer-hounyan-study timer-hounyan-study-3">
+                <img src="assets/timer-hounyan/break-01-stretch.png" alt="" aria-hidden="true" class="timer-hounyan timer-hounyan-break timer-hounyan-break-1">
+                <img src="assets/timer-hounyan/break-02-water.png" alt="" aria-hidden="true" class="timer-hounyan timer-hounyan-break timer-hounyan-break-2">
+                <img src="assets/timer-hounyan/break-03-ready.png" alt="" aria-hidden="true" class="timer-hounyan timer-hounyan-break timer-hounyan-break-3">
+              </div>
+            </section>
+
+            <section class="work-panel timer-panel">
+              <div class="timer-display">
+                <div class="timer-ring" id="timerRing" aria-hidden="true">
+                  <div class="timer-ring-inner">
+                    <strong id="timerTime">05:00</strong>
+                    <span id="timerStatus">じゅんびOK</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timer-mode-choice" aria-label="タイマーの種類">
+                <button class="timer-mode-button is-selected" type="button" data-timer-mode="study">べんきょう</button>
+                <button class="timer-mode-button" type="button" data-timer-mode="play">きゅうけい</button>
+              </div>
+
+              <div class="timer-presets" aria-label="時間プリセット">
+                <button class="soft-button" type="button" data-timer-preset="60">1分</button>
+                <button class="soft-button" type="button" data-timer-preset="180">3分</button>
+                <button class="soft-button" type="button" data-timer-preset="300">5分</button>
+                <button class="soft-button" type="button" data-timer-preset="600">10分</button>
+              </div>
+
+              <div class="timer-inputs">
+                <label>
+                  分
+                  <input id="timerMinutes" type="number" min="0" max="99" step="1" value="5">
+                </label>
+                <label>
+                  秒
+                  <input id="timerSeconds" type="number" min="0" max="59" step="1" value="0">
+                </label>
+                <button class="soft-button" type="button" id="timerSetButton">セット</button>
+              </div>
+
+              <div class="timer-actions">
+                <button class="primary-button" type="button" id="timerStartButton">スタート</button>
+                <button class="soft-button" type="button" id="timerPauseButton">一時停止</button>
+                <button class="danger-button" type="button" id="timerResetButton">リセット</button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view teacher-page" data-view="teacher" aria-labelledby="teacher-title">
+          <div class="teacher-grid">
+            <section class="teacher-hub">
+              <div>
+                <p class="eyebrow">先生ページ</p>
+                <h2 id="teacher-title">操作メニュー</h2>
+              </div>
+              <div class="teacher-tab-list" role="group" aria-label="先生ページの操作を切り替え">
+                <button class="teacher-tab is-active" type="button" aria-pressed="true" data-teacher-tab-button="students">児童とスタンプ</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="groups">組の管理</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="timetable">時間割</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="calendar">カレンダー</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="missions">ミッション管理</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="rewards">景品・交換</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="stamps">スタンプ設定</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="data">データ</button>
+              </div>
+            </section>
+
+            <section class="work-panel mission-management-panel" data-teacher-tab-panel="missions">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">デイリーミッション</p>
+                  <h2>ミッション管理</h2>
+                </div>
+                <label class="field compact-field"><span>児童</span><select id="missionStudentSelect" class="select"></select></label>
+              </div>
+
+              <div class="mission-management-grid">
+                <section>
+                  <div class="section-head compact"><div><p class="eyebrow">ひな形</p><h3>ミッションをつくる</h3></div></div>
+                  <form id="missionTemplateForm" class="form-grid mission-form">
+                    <input id="missionTemplateId" type="hidden">
+                    <label class="field"><span>ミッション名</span><input id="missionTemplateName" type="text" required placeholder="例: プリントを終わらせる"></label>
+                    <label class="field"><span>児童への文</span><input id="missionTemplateDisplayText" type="text" required placeholder="例: プリントを{target}まい おわらせよう"></label>
+                    <div class="date-range-row">
+                      <label class="field"><span>種類</span><select id="missionTemplateType" class="select"><option value="daily">デイリー</option><option value="special">特別（準備中）</option></select></label>
+                      <label class="field"><span>カテゴリー</span><select id="missionTemplateCategory" class="select"></select></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>達成条件</span><select id="missionTemplateCondition" class="select"></select></label>
+                      <label class="field"><span>判定</span><select id="missionTemplateEvaluation" class="select"><option value="automatic">自動</option><option value="manual">先生が判定</option></select></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>目標</span><input id="missionTemplateTarget" type="number" min="1" value="1" required></label>
+                      <label class="field"><span>単位</span><input id="missionTemplateUnit" type="text" value="まい"></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>スタンプ報酬</span><input id="missionTemplateStampReward" type="number" min="0" value="1" required></label>
+                      <label class="field"><span>きっぷ報酬</span><input id="missionTemplateTicketReward" type="number" min="0" value="1" required></label>
+                    </div>
+                    <label class="check-row"><input id="missionTemplateEnabled" type="checkbox" checked> このひな形を使う</label>
+                    <div class="form-actions"><button class="primary-button" type="submit">ひな形を保存</button><button id="clearMissionTemplateForm" class="soft-button" type="button">新規入力</button></div>
+                  </form>
+                  <div id="missionTemplateList" class="management-list"></div>
+                </section>
+
+                <section>
+                  <div class="section-head compact"><div><p class="eyebrow">児童別</p><h3>今日出すミッション</h3></div></div>
+                  <form id="studentMissionSettingForm" class="form-grid mission-form">
+                    <input id="studentMissionSettingId" type="hidden">
+                    <label class="field"><span>ひな形を選ぶ</span><select id="studentMissionTemplateSelect" class="select"></select></label>
+                    <div class="date-range-row">
+                      <label class="field"><span>目標</span><input id="studentMissionTarget" type="number" min="1" value="1" required></label>
+                      <label class="field"><span>スタンプ報酬</span><input id="studentMissionStampReward" type="number" min="0" value="1" required></label>
+                    </div>
+                    <div class="date-range-row">
+                      <label class="field"><span>きっぷ報酬</span><input id="studentMissionTicketReward" type="number" min="0" value="1" required></label>
+                      <label class="check-row"><input id="studentMissionEnabled" type="checkbox" checked> この児童に表示する</label>
+                    </div>
+                    <div class="form-actions"><button class="primary-button" type="submit">児童へ追加</button><button id="clearStudentMissionSettingForm" class="soft-button" type="button">新規入力</button></div>
+                  </form>
+                  <div id="studentMissionSettingList" class="management-list"></div>
+                  <div class="ticket-adjustment"><strong id="teacherTicketBalance">きっぷ 0まい</strong><label class="field compact-field"><span>きっぷを増減</span><input id="ticketAdjustment" type="number" value="0"></label><button id="applyTicketAdjustment" class="soft-button" type="button">反映</button></div>
+                </section>
+              </div>
+
+              <section class="mission-today-section">
+                <div class="section-head compact"><div><p class="eyebrow">きょう</p><h3>当日のミッション確認</h3></div></div>
+                <div id="teacherDailyMissions" class="daily-mission-list teacher-daily-mission-list"></div>
+              </section>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="students">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">先生ページ</p>
+                  <h2>児童管理</h2>
+                </div>
+              </div>
+              <form id="studentForm" class="form-grid">
+                <input type="hidden" id="studentId">
+                <label class="field">
+                  <span>名前</span>
+                  <input id="studentName" type="text" autocomplete="off" required placeholder="例: 山田さん">
+                </label>
+                <label class="field">
+                  <span>メモ</span>
+                  <input id="studentNote" type="text" autocomplete="off" placeholder="例: 3年 / Aグループ">
+                </label>
+                <label class="field">
+                  <span>組</span>
+                  <select id="studentGroup" class="select"></select>
+                </label>
+                <label class="check-row development-setting">
+                  <input id="studentTestMode" type="checkbox">
+                  <span><strong>開発・動作確認用</strong><br>テスト児童として使用する</span>
+                </label>
+                <button class="primary-button wide" type="submit">保存</button>
+              </form>
+              <div class="test-student-create">
+                <div>
+                  <p class="eyebrow">動作テスト用</p>
+                  <p>制限なしで試せて、児童数やスタンプ合計には入りません。</p>
+                </div>
+                <button class="soft-button" type="button" id="createTestStudentButton">テスト児童をつくる</button>
+              </div>
+              <div class="student-list teacher-student-list" id="teacherStudentList"></div>
+            </section>
+
+            <section class="detail-panel teacher-detail" id="teacherStudentDetail" data-teacher-tab-panel="students" hidden>
+              <div class="section-head detail-head">
+                <div>
+                  <p class="eyebrow">児童詳細</p>
+                  <h2 id="selectedStudentName">未選択</h2>
+                </div>
+                <div class="detail-actions">
+                  <button class="soft-button" type="button" id="editStudentButton">編集</button>
+                  <button class="danger-button" type="button" id="deleteStudentButton">削除</button>
+                </div>
+              </div>
+
+              <div class="score-row">
+                <div class="score-box">
+                  <span>今までに集めたスタンプ</span>
+                  <strong id="selectedTotal">0</strong>
+                </div>
+                <div class="score-box">
+                  <span>使えるシート</span>
+                  <strong id="selectedAvailable">0</strong>
+                </div>
+                <div class="score-box">
+                  <span>ほうにゃんLv.</span>
+                  <strong id="selectedLevel">1</strong>
+                </div>
+                <div class="score-box">
+                  <span>次のレベル</span>
+                  <strong id="nextLevelText">あと5</strong>
+                </div>
+              </div>
+
+              <div class="level-current-card">
+                <img src="assets/hounyan-home.png" alt="ほうにゃん" id="teacherLevelImage">
+                <div>
+                  <p class="eyebrow">ほうにゃんレベル</p>
+                  <strong id="teacherLevelName">Lv.1 いつものほうにゃん</strong>
+                  <span id="teacherLevelRequirement">次の条件を確認します</span>
+                </div>
+              </div>
+
+              <div class="sheet-head">
+                <h3 id="teacherSheetTitle">シート 1</h3>
+                <p id="teacherSheetProgress">あと20個でシートが埋まります</p>
+              </div>
+              <div class="stamp-sheet teacher-sheet" id="teacherSheetGrid" aria-label="20個スタンプシート"></div>
+
+              <div class="stamp-workbench">
+                <section>
+                  <div class="section-head compact">
+                    <div>
+                      <p class="eyebrow">スタンプ</p>
+                      <h3>プリント1枚できたら押す</h3>
+                    </div>
+                  </div>
+                  <button class="primary-button wide stamp-press-button" type="button" id="addStampButton">スタンプを押す</button>
+                  <label class="field">
+                    <span>一気に押す数</span>
+                    <input id="teacherStampBatchCount" type="number" min="1" max="20" step="1" value="1">
+                  </label>
+                  <label class="field">
+                    <span>メモ</span>
+                    <input id="stampMemo" type="text" placeholder="例: 国語プリント、計算プリント">
+                  </label>
+                </section>
+
+                <section>
+                  <div class="section-head compact">
+                    <div>
+                      <p class="eyebrow">履歴</p>
+                      <h3>最近の記録</h3>
+                    </div>
+                  </div>
+                  <div class="history-list" id="historyList"></div>
+                </section>
+              </div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="groups">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">組</p>
+                  <h2>組の管理</h2>
+                </div>
+                <label class="field compact-field">
+                  <span>現在の組</span>
+                  <select id="currentGroupSelect" class="select"></select>
+                </label>
+              </div>
+              <form id="groupForm" class="form-grid group-form">
+                <input id="groupId" type="hidden">
+                <label class="field">
+                  <span>組名</span>
+                  <input id="groupName" type="text" autocomplete="off" required placeholder="例: 支援学級A">
+                </label>
+                <label class="check-row">
+                  <input id="groupEnabled" type="checkbox" checked>
+                  この組を使う
+                </label>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">組を保存</button>
+                  <button class="soft-button" type="button" id="clearGroupForm">新規入力</button>
+                </div>
+              </form>
+              <p class="hint">使わなくなった組は「無効」にすると、過去の時間割や予定を残したまま一覧から外せます。</p>
+              <div id="groupList" class="management-list"></div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="timetable">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">時間割</p>
+                  <h2>基本時間割</h2>
+                </div>
+                <label class="field compact-field">
+                  <span>対象の組</span>
+                  <select id="timetableGroupSelect" class="select"></select>
+                </label>
+              </div>
+              <form id="timetableForm" class="form-grid timetable-meta-form">
+                <label class="field">
+                  <span>時間割名</span>
+                  <input id="timetableName" type="text" value="基本時間割" required>
+                </label>
+                <label class="field">
+                  <span>時間数</span>
+                  <input id="timetablePeriodCount" type="number" min="1" max="10" value="6">
+                </label>
+                <details class="detail-settings">
+                  <summary>適用期間（将来の学期用）</summary>
+                  <div class="detail-settings-grid">
+                    <label class="field"><span>開始日</span><input id="timetableStartsOn" type="date"></label>
+                    <label class="field"><span>終了日</span><input id="timetableEndsOn" type="date"></label>
+                  </div>
+                </details>
+                <div class="form-actions">
+                  <button class="soft-button" type="button" id="applyTimetablePeriods">時間数を反映</button>
+                  <button class="primary-button" type="submit">時間割を保存</button>
+                  <button class="danger-button" type="button" id="resetTimetableButton">初期化</button>
+                </div>
+              </form>
+              <div class="timetable-scroll"><div id="timetableEditor" class="timetable-editor"></div></div>
+              <div class="timetable-copy-row">
+                <label class="field"><span>コピー先の組</span><select id="timetableCopyTarget" class="select"></select></label>
+                <button id="copyTimetableButton" class="soft-button" type="button">この時間割をコピー</button>
+              </div>
+              <details class="subject-settings">
+                <summary>教科を管理</summary>
+                <form id="subjectForm" class="form-grid compact-form">
+                  <input id="subjectId" type="hidden">
+                  <label class="field"><span>教科名</span><input id="subjectName" type="text" required placeholder="例: プログラミング"></label>
+                  <div class="form-actions"><button class="soft-button" type="submit">教科を保存</button><button id="clearSubjectForm" class="text-button" type="button">新規入力</button></div>
+                </form>
+                <div id="subjectList" class="subject-list"></div>
+              </details>
+            </section>
+
+            <section class="work-panel calendar-work-panel" data-teacher-tab-panel="calendar">
+              <div class="section-head calendar-head">
+                <div>
+                  <p class="eyebrow">カレンダー</p>
+                  <h2 id="calendarMonthLabel">年月</h2>
+                </div>
+                <div class="calendar-toolbar">
+                  <label class="field compact-field"><span>対象の組</span><select id="calendarGroupSelect" class="select"></select></label>
+                  <button class="icon-button" id="calendarPreviousButton" type="button" title="前の月" aria-label="前の月">‹</button>
+                  <button class="soft-button" id="calendarTodayButton" type="button">今日</button>
+                  <button class="icon-button" id="calendarNextButton" type="button" title="次の月" aria-label="次の月">›</button>
+                </div>
+              </div>
+              <div class="calendar-weekdays" aria-hidden="true"><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span></div>
+              <div id="calendarGrid" class="calendar-grid" aria-label="月間カレンダー"></div>
+              <div class="calendar-detail-grid">
+                <section class="calendar-day-detail">
+                  <div class="section-head compact"><div><p class="eyebrow">選んだ日</p><h3 id="calendarSelectedDateLabel">日付</h3></div><span id="calendarDayStatus" class="calendar-status"></span></div>
+                  <div id="calendarEventList" class="calendar-event-list"></div>
+                  <div class="day-timetable"><h4>当日の時間割</h4><div id="calendarDayTimetable"></div></div>
+                  <form id="timetableOverrideForm" class="form-grid compact-form">
+                    <label class="field"><span>変更する時間</span><select id="overridePeriod" class="select"></select></label>
+                    <label class="field"><span>変更後の教科</span><select id="overrideSubject" class="select"></select></label>
+                    <label class="field"><span>メモ</span><input id="overrideMemo" type="text" placeholder="例: 水泳"></label>
+                    <div class="form-actions"><button class="soft-button" type="submit">この時間を変更</button></div>
+                  </form>
+                  <div id="timetableOverrideList" class="override-list"></div>
+                </section>
+                <section class="calendar-event-editor">
+                  <div class="section-head compact"><div><p class="eyebrow">予定</p><h3>予定を追加・編集</h3></div></div>
+                  <form id="calendarEventForm" class="form-grid">
+                    <input id="calendarEventId" type="hidden">
+                    <label class="field"><span>予定名</span><input id="calendarEventTitle" type="text" required placeholder="例: 夏季休業"></label>
+                    <div class="date-range-row"><label class="field"><span>開始日</span><input id="calendarEventStart" type="date" required></label><label class="field"><span>終了日</span><input id="calendarEventEnd" type="date"></label></div>
+                    <label class="check-row"><input id="calendarEventAllDay" type="checkbox" checked> 終日予定</label>
+                    <div id="calendarEventTimeFields" class="date-range-row" hidden><label class="field"><span>開始時刻</span><input id="calendarEventStartTime" type="time"></label><label class="field"><span>終了時刻</span><input id="calendarEventEndTime" type="time"></label></div>
+                    <details class="detail-settings"><summary>詳細設定</summary><div class="detail-settings-grid">
+                      <label class="field"><span>種類</span><select id="calendarEventType" class="select"></select></label>
+                      <label class="field"><span>対象</span><select id="calendarEventScope" class="select"><option value="school">学校全体</option><option value="groups">特定の組</option></select></label>
+                      <label id="calendarEventGroupsField" class="field" hidden><span>対象の組（複数選択可）</span><select id="calendarEventGroups" class="select" multiple></select></label>
+                      <label class="field"><span>繰り返し</span><select id="calendarEventRepeat" class="select"><option value="none">なし</option><option value="weekly">毎週</option></select></label>
+                      <label class="field"><span>登校日への影響</span><select id="calendarEventSchoolDayEffect" class="select"><option value="auto">種類に合わせる</option><option value="school-day">登校日にする</option><option value="holiday">休業日にする</option><option value="shortened">短縮授業日にする</option><option value="event-day">行事日にする</option></select></label>
+                      <label class="field"><span>時間割への影響</span><select id="calendarEventTimetableEffect" class="select"><option value="none">なし</option><option value="shortened">短縮授業</option><option value="event">行事日</option></select></label>
+                      <label class="field full-width"><span>メモ</span><input id="calendarEventNote" type="text" placeholder="必要なときだけ入力"></label>
+                    </div></details>
+                    <div class="form-actions"><button class="primary-button" type="submit">予定を保存</button><button id="clearCalendarEventForm" class="soft-button" type="button">新規入力</button></div>
+                  </form>
+                </section>
+              </div>
+            </section>
+
+            <section class="work-panel prize-settings-panel" data-teacher-tab-panel="rewards">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">景品設定</p>
+                  <h2>景品の追加・編集</h2>
+                </div>
+              </div>
+              <form id="prizeForm" class="form-grid prize-form">
+                <input id="prizeId" type="hidden">
+                <label>
+                  景品名
+                  <input id="prizeName" type="text" placeholder="例: シール 1枚" required>
+                </label>
+                <label>
+                  必要なシート数
+                  <input id="prizeCostSheets" type="number" min="1" step="1" value="1" required>
+                </label>
+                <label>
+                  説明
+                  <input id="prizeDescription" type="text" placeholder="例: 使えるシート1枚と交換します。">
+                </label>
+                <label class="check-row">
+                  <input id="prizeEnabled" type="checkbox" checked>
+                  買い物ページに表示する
+                </label>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">景品を保存</button>
+                  <button class="soft-button" type="button" id="clearPrizeForm">新規入力</button>
+                </div>
+              </form>
+              <div id="prizeSettingsList" class="reward-list"></div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="rewards">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">解放</p>
+                  <h2>スタンプ解放状況</h2>
+                </div>
+              </div>
+              <div class="rewards-grid teacher-rewards-grid">
+                <section>
+                  <h3>今までに集めたスタンプで解放</h3>
+                  <div id="unlockRewards" class="reward-list"></div>
+                </section>
+                <section>
+                  <h3>着せ替え</h3>
+                  <div class="mascot-upgrade is-disabled">
+                    <img src="assets/hounyan-home.png" alt="ほうにゃん" class="mini-hounyan">
+                    <div>
+                      <p>使用不可</p>
+                      <span>着せ替えはまだ解禁していません。</span>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="rewards">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">交換履歴</p>
+                  <h2>交換済みシート</h2>
+                </div>
+              </div>
+              <div id="redemptionList" class="redemption-list"></div>
+            </section>
+
+            <section class="work-panel" data-teacher-tab-panel="data">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">データ</p>
+                  <h2>バックアップ</h2>
+                </div>
+              </div>
+              <div class="backup-actions">
+                <button class="soft-button" type="button" id="exportButton">JSONを書き出す</button>
+                <label class="file-button">
+                  JSONを読み込む
+                  <input id="importInput" type="file" accept="application/json">
+                </label>
+              </div>
+              <div class="auto-backup-box">
+                <div>
+                  <p class="eyebrow">自動バックアップ</p>
+                  <h3>保存履歴</h3>
+                  <p class="hint" id="autoBackupStatus">保存すると自動でバックアップを作成します。</p>
+                </div>
+                <button class="soft-button" type="button" id="createAutoBackupButton">今すぐバックアップ</button>
+              </div>
+              <div id="autoBackupList" class="auto-backup-list"></div>
+              <p class="hint">保存はこのPCのブラウザ内です。ブラウザのデータを削除すると自動バックアップも消えるため、大事な節目ではJSONを書き出してください。</p>
+            </section>
+
+            <section class="work-panel stamp-assets-panel" data-teacher-tab-panel="stamps">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">スタンプ画像</p>
+                  <h2>解放条件</h2>
+                </div>
+              </div>
+              <form id="stampAssetForm" class="form-grid stamp-asset-form">
+                <input id="stampAssetId" type="hidden">
+                <label>
+                  スタンプ名
+                  <input id="stampAssetName" type="text" placeholder="例: すばらしい" required>
+                </label>
+                <label>
+                  解放方法
+                  <select id="stampAssetUnlockMode" class="select">
+                    <option value="count">累計スタンプ数で解放</option>
+                    <option value="purchase">シートで購入</option>
+                  </select>
+                </label>
+                <label>
+                  解放する累計スタンプ数
+                  <input id="stampAssetUnlockAt" type="number" min="0" step="1" value="20" required>
+                </label>
+                <label>
+                  購入に必要なシート数
+                  <input id="stampAssetShopPriceSheets" type="number" min="1" step="1" value="1" required>
+                </label>
+                <label class="check-row">
+                  <input id="stampAssetVisible" type="checkbox" checked>
+                  <span>児童ページ・おかいものページに表示する</span>
+                </label>
+                <label class="file-button stamp-file-button">
+                  画像を選ぶ
+                  <input id="stampAssetImage" type="file" accept="image/*">
+                </label>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">スタンプを保存</button>
+                  <button class="soft-button" type="button" id="clearStampAssetForm">新規入力</button>
+                </div>
+                <p class="hint">追加した画像は自動で小さくして、このブラウザ内に保存します。別端末で使う時はJSONを書き出してください。</p>
+              </form>
+              <div id="stampAssetsList" class="asset-list"></div>
+            </section>
+
+            <section class="work-panel stamp-sets-panel" data-teacher-tab-panel="stamps">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">スタンプセット</p>
+                  <h2>セットで売るスタンプ</h2>
+                </div>
+              </div>
+              <form id="stampSetForm" class="form-grid stamp-set-form">
+                <input id="stampSetId" type="hidden">
+                <label>
+                  セットの名前
+                  <input id="stampSetName" type="text" placeholder="例: でんしゃセット" required>
+                </label>
+                <label>
+                  買うのに必要なシート
+                  <input id="stampSetPriceSheets" type="number" min="1" step="1" value="1" required>
+                </label>
+                <label class="check-row">
+                  <input id="stampSetVisible" type="checkbox" checked>
+                  <span>おかいものページに表示する</span>
+                </label>
+                <label class="file-button stamp-file-button stamp-set-file-button">
+                  スタンプ画像をまとめて選ぶ
+                  <input id="stampSetImages" type="file" accept="image/*" multiple>
+                </label>
+                <div id="stampSetMembersDraft" class="stamp-set-draft"></div>
+                <div class="form-actions">
+                  <button class="primary-button" type="submit">スタンプセットを保存</button>
+                  <button class="soft-button" type="button" id="clearStampSetForm">新規入力</button>
+                </div>
+                <p class="hint">画像を選ぶと、ファイル名をもとにスタンプ名が入ります。名前はあとから変えられます。</p>
+              </form>
+              <div id="stampSetsList" class="stamp-sets-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view settings-page" data-view="settings" aria-labelledby="settings-title">
+          <div class="settings-grid">
+            <section class="work-panel level-settings-panel">
+              <div class="section-head">
+                <div>
+                  <p class="eyebrow">先生用設定</p>
+                  <h2 id="settings-title">ほうにゃんレベル設定</h2>
+                </div>
+                <button class="soft-button compact-button" type="button" id="resetLevelRulesButton">既定に戻す</button>
+              </div>
+
+              <form id="levelRuleForm" class="form-grid level-rule-form">
+                <label>
+                  レベル
+                  <select id="levelRuleLevel" class="select"></select>
+                </label>
+                <label>
+                  かぶりもの名
+                  <input id="levelRuleName" type="text" required>
+                </label>
+                <label>
+                  必要な完成シート数
+                  <input id="levelRuleRequiredSheets" type="number" min="0" step="1" value="0" required>
+                </label>
+                <label>
+                  画像パス
+                  <input id="levelRuleImage" type="text" placeholder="assets/hounyan-levels/hounyan-lv02-paper-crown.png">
+                </label>
+                <button class="primary-button wide" type="submit">レベル条件を保存</button>
+                <p class="hint">Lv.1は0シート固定です。画像を追加したら、ここに画像パスを入れると表示を差し替えられます。</p>
+              </form>
+
+              <div id="levelRulesList" class="level-rule-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="preview-layer" id="stampCountLayer" hidden>
+      <div class="preview-card" role="dialog" aria-modal="true" aria-labelledby="stampCountTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="stampCountStudent">スタンプ</p>
+            <h2 id="stampCountTitle">いくつおす？</h2>
+          </div>
+        </div>
+        <div class="count-picker" aria-label="押すスタンプの合計数">
+          <button type="button" id="stampCountMinus" aria-label="スタンプを減らす">-</button>
+          <output id="stampCountValue" aria-live="polite">0こ</output>
+          <button type="button" id="stampCountPlus" aria-label="スタンプを増やす">+</button>
+        </div>
+        <p class="count-hint" id="stampCountHint">先に、全部で押す数を決めます。</p>
+        <div class="preview-actions">
+          <button class="soft-button" type="button" id="stampCountCancelButton">戻る</button>
+          <button class="primary-button" type="button" id="stampCountNextButton">つぎへ</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-layer" id="stampPreviewLayer" hidden>
+      <div class="preview-card" role="dialog" aria-modal="true" aria-labelledby="stampPreviewTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="stampPreviewStudent">スタンプ</p>
+            <h2 id="stampPreviewTitle">押すスタンプを選ぶ</h2>
+          </div>
+        </div>
+        <div class="stamp-preview-tabs" id="stampPreviewTabs" role="tablist" aria-label="スタンプのセット"></div>
+        <div class="stamp-preview-random">
+          <button class="soft-button compact-button" type="button" id="stampPreviewRandomButton">ランダムにえらぶ</button>
+        </div>
+        <div class="preview-list" id="stampPreviewList"></div>
+        <p class="preview-total" id="stampPreviewTotal">合計 0こ</p>
+        <div class="preview-actions">
+          <button class="soft-button" type="button" id="stampPreviewCancelButton">戻る</button>
+          <button class="primary-button" type="button" id="stampPreviewConfirmButton">まとめて押す</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="confirm-layer" id="exchangeConfirmLayer" hidden>
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="exchangeConfirmTitle">
+        <p class="eyebrow">シート交換</p>
+        <h2 id="exchangeConfirmTitle">こうかんする？</h2>
+        <p id="exchangeConfirmMessage">使えるシートを使って交換します。</p>
+        <div class="confirm-actions">
+          <button class="soft-button" type="button" id="exchangeCancelButton">やめる</button>
+          <button class="primary-button" type="button" id="exchangeConfirmButton">こうかんする</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-layer" id="hounyanClosetLayer" hidden>
+      <div class="preview-card hounyan-closet-card" role="dialog" aria-modal="true" aria-labelledby="hounyanClosetTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="hounyanClosetStudent">ほうにゃん</p>
+            <h2 id="hounyanClosetTitle">かぶりものをえらぶ</h2>
+          </div>
+        </div>
+        <div class="hounyan-closet-list" id="hounyanClosetList"></div>
+        <div class="preview-actions single">
+          <button class="primary-button" type="button" id="hounyanClosetCloseButton">とじる</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-layer" id="sheetAlbumLayer" hidden>
+      <div class="preview-card sheet-album-card" role="dialog" aria-modal="true" aria-labelledby="sheetAlbumTitle">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow" id="sheetAlbumStudent">がんばり</p>
+            <h2 id="sheetAlbumTitle">がんばりアルバム</h2>
+          </div>
+        </div>
+        <p class="sheet-album-intro" id="sheetAlbumSummary">できあがったシートがここにならぶよ。</p>
+        <div class="sheet-album-list" id="sheetAlbumList"></div>
+        <div class="preview-actions single">
+          <button class="primary-button" type="button" id="sheetAlbumCloseButton">とじる</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="animation-layer" id="hounyanAnimationLayer" hidden>
+      <div class="animation-card" id="animationCard" role="dialog" aria-modal="true" aria-labelledby="animationTitle">
+        <div class="animation-burst" aria-hidden="true"></div>
+        <div class="animation-confetti" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <img id="animationHounyan" src="assets/hounyan-home.png" alt="ほうにゃん" class="animation-hounyan">
+        <img id="animationFeatureImage" src="" alt="" class="animation-feature-image" hidden>
+        <div class="animation-stamp-gallery" id="animationStampGallery" aria-label="新しく使えるスタンプ" hidden></div>
+        <div class="animation-milestone" id="animationMilestone" hidden>
+          <strong id="animationMilestoneValue"></strong>
+          <span id="animationMilestoneLabel"></span>
+        </div>
+        <p class="eyebrow" id="animationEyebrow">ほうにゃん</p>
+        <h2 id="animationTitle">シート完成！</h2>
+        <p id="animationMessage">20こあつまったよ。</p>
+        <button class="primary-button wide" type="button" id="animationCloseButton">OK</button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="calendar-service.js"></script>
+    <script src="app.js?v=tab-layout-v1"></script>
+  </body>
+</html>
