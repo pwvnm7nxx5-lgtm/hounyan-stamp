@@ -16,7 +16,7 @@ const defaultSubjects = [
   "外国語", "外国語活動", "総合", "学級活動", "自立活動", "交流", "行事", "その他",
 ].map((name, index) => ({ id: `subject-${index + 1}`, name, sortOrder: index, enabled: true }));
 const calendarEventTypes = [
-  ["school-event", "学校行事"], ["grade-event", "学年行事"], ["group-event", "組の予定"],
+  ["school-event", "学校行事"], ["grade-event", "学年行事"], ["group-event", "クラスの予定"],
   ["holiday", "休業日"], ["substitute-holiday", "振替休日"], ["school-closure", "臨時休校"],
   ["long-vacation", "長期休業"], ["saturday-school", "土曜授業"], ["shortened", "短縮授業"],
   ["timetable-change", "時間割変更"], ["deadline", "締切"], ["other", "その他"],
@@ -692,7 +692,9 @@ const defaultMissionTemplates = [
 
 const defaultState = {
   students: [],
+  schoolYears: [],
   groups: [],
+  classMemberships: [],
   subjects: defaultSubjects,
   timetables: [],
   calendarEvents: [],
@@ -714,6 +716,7 @@ const defaultState = {
   rewardGoalsByStudent: {},
   equippedHounyanLevelByStudent: {},
   selectedStudentId: "",
+  selectedSchoolYearId: "",
   selectedGroupId: "",
   selectedStampId: "sonochoshi",
 };
@@ -879,6 +882,8 @@ const els = {
   studentId: document.querySelector("#studentId"),
   studentName: document.querySelector("#studentName"),
   studentNote: document.querySelector("#studentNote"),
+  studentGrade: document.querySelector("#studentGrade"),
+  studentSchoolYearLabel: document.querySelector("#studentSchoolYearLabel"),
   studentGroup: document.querySelector("#studentGroup"),
   studentTestMode: document.querySelector("#studentTestMode"),
   createTestStudentButton: document.querySelector("#createTestStudentButton"),
@@ -887,6 +892,10 @@ const els = {
   groupName: document.querySelector("#groupName"),
   groupEnabled: document.querySelector("#groupEnabled"),
   clearGroupForm: document.querySelector("#clearGroupForm"),
+  schoolYearSelect: document.querySelector("#schoolYearSelect"),
+  activeSchoolYearStatus: document.querySelector("#activeSchoolYearStatus"),
+  addNextSchoolYearButton: document.querySelector("#addNextSchoolYearButton"),
+  setActiveSchoolYearButton: document.querySelector("#setActiveSchoolYearButton"),
   currentGroupSelect: document.querySelector("#currentGroupSelect"),
   groupList: document.querySelector("#groupList"),
   timetableForm: document.querySelector("#timetableForm"),
@@ -1058,6 +1067,9 @@ function bindEvents() {
     saveGroup();
   });
   els.clearGroupForm.addEventListener("click", clearGroupForm);
+  els.schoolYearSelect.addEventListener("change", () => selectSchoolYear(els.schoolYearSelect.value));
+  els.addNextSchoolYearButton.addEventListener("click", addNextSchoolYear);
+  els.setActiveSchoolYearButton.addEventListener("click", setSelectedSchoolYearActive);
   els.currentGroupSelect.addEventListener("change", () => selectGroup(els.currentGroupSelect.value));
   els.timetableGroupSelect.addEventListener("change", () => selectGroup(els.timetableGroupSelect.value));
   els.calendarGroupSelect.addEventListener("change", () => selectGroup(els.calendarGroupSelect.value));
@@ -1237,7 +1249,7 @@ function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return structuredClone(defaultState);
+      return normalizeState(structuredClone(defaultState));
     }
     const parsed = JSON.parse(raw);
     return normalizeState(parsed);
@@ -1252,7 +1264,7 @@ function loadState() {
         console.error(backupError);
       }
     }
-    return structuredClone(defaultState);
+    return normalizeState(structuredClone(defaultState));
   }
 }
 
@@ -1270,7 +1282,18 @@ function normalizeState(input) {
       ticketBalance: Math.max(0, Math.floor(Number(student?.ticketBalance || 0))),
     }))
     : [];
-  merged.groups = normalizeGroups(input.groups);
+  merged.schoolYears = normalizeSchoolYears(input.schoolYears);
+  merged.selectedSchoolYearId = merged.schoolYears.some((schoolYear) => schoolYear.id === input.selectedSchoolYearId)
+    ? String(input.selectedSchoolYearId)
+    : merged.schoolYears.find((schoolYear) => schoolYear.active)?.id || merged.schoolYears[0]?.id || "";
+  merged.groups = normalizeGroups(input.groups, merged.selectedSchoolYearId);
+  merged.classMemberships = normalizeClassMemberships(
+    input.classMemberships,
+    merged.students,
+    merged.groups,
+    merged.schoolYears,
+  );
+  syncLegacyStudentGroups(merged);
   merged.subjects = normalizeSubjects(input.subjects);
   merged.timetables = normalizeTimetables(input.timetables);
   merged.calendarEvents = normalizeCalendarEvents(input.calendarEvents);
@@ -1298,6 +1321,108 @@ function normalizeState(input) {
   merged.rewardGoalsByStudent = normalizeRewardGoalsByStudent(input.rewardGoalsByStudent);
   merged.equippedHounyanLevelByStudent = normalizeEquippedHounyanLevels(input.equippedHounyanLevelByStudent);
   return merged;
+}
+
+function currentAcademicYearNumber(date = new Date()) {
+  return date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+}
+
+function schoolYearIdForNumber(year) {
+  return `school-year-${year}`;
+}
+
+function makeSchoolYear(year, { active = false } = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: schoolYearIdForNumber(year),
+    name: `${year}年度`,
+    year,
+    startsOn: `${year}-04-01`,
+    endsOn: `${year + 1}-03-31`,
+    active,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function normalizeSchoolYears(input) {
+  const currentYear = currentAcademicYearNumber();
+  const source = Array.isArray(input) && input.length ? input : [makeSchoolYear(currentYear, { active: true })];
+  const years = source
+    .filter((schoolYear) => schoolYear && schoolYear.id && String(schoolYear.name || "").trim())
+    .map((schoolYear) => {
+      const numericYear = Number(schoolYear.year || String(schoolYear.name).match(/\d{4}/)?.[0] || currentYear);
+      return {
+        id: String(schoolYear.id),
+        name: String(schoolYear.name).trim(),
+        year: numericYear,
+        startsOn: String(schoolYear.startsOn || `${numericYear}-04-01`),
+        endsOn: String(schoolYear.endsOn || `${numericYear + 1}-03-31`),
+        active: schoolYear.active === true,
+        createdAt: schoolYear.createdAt || new Date().toISOString(),
+        updatedAt: schoolYear.updatedAt || schoolYear.createdAt || new Date().toISOString(),
+      };
+    })
+    .sort((left, right) => right.year - left.year);
+  if (!years.some((schoolYear) => schoolYear.active) && years[0]) years[0].active = true;
+  let foundActive = false;
+  years.forEach((schoolYear) => {
+    if (schoolYear.active && !foundActive) foundActive = true;
+    else if (schoolYear.active) schoolYear.active = false;
+  });
+  return years;
+}
+
+function normalizeClassMemberships(input, students, groups, schoolYears) {
+  const schoolYearIds = new Set(schoolYears.map((schoolYear) => schoolYear.id));
+  const studentIds = new Set(students.map((student) => student.id));
+  const groupIds = new Set(groups.map((group) => group.id));
+  const memberships = Array.isArray(input)
+    ? input.filter((membership) => membership && membership.id && studentIds.has(String(membership.studentId)) && groupIds.has(String(membership.groupId)))
+      .map((membership) => ({
+        id: String(membership.id),
+        studentId: String(membership.studentId),
+        groupId: String(membership.groupId),
+        schoolYearId: schoolYearIds.has(String(membership.schoolYearId))
+          ? String(membership.schoolYearId)
+          : groups.find((group) => group.id === String(membership.groupId))?.schoolYearId || schoolYears[0]?.id || "",
+        grade: String(membership.grade || ""),
+        active: membership.active !== false,
+        startedOn: String(membership.startedOn || ""),
+        endedOn: String(membership.endedOn || ""),
+        createdAt: membership.createdAt || new Date().toISOString(),
+        updatedAt: membership.updatedAt || membership.createdAt || new Date().toISOString(),
+      }))
+    : [];
+
+  students.forEach((student) => {
+    if (!student.groupId || !groupIds.has(student.groupId)) return;
+    const group = groups.find((item) => item.id === student.groupId);
+    if (!group || memberships.some((membership) => membership.studentId === student.id && membership.schoolYearId === group.schoolYearId)) return;
+    const schoolYear = schoolYears.find((item) => item.id === group.schoolYearId);
+    memberships.push({
+      id: `legacy-membership-${student.id}-${group.schoolYearId}`,
+      studentId: student.id,
+      groupId: group.id,
+      schoolYearId: group.schoolYearId,
+      grade: String(student.grade || ""),
+      active: true,
+      startedOn: schoolYear?.startsOn || "",
+      endedOn: "",
+      createdAt: student.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+  return memberships;
+}
+
+function syncLegacyStudentGroups(targetState = state) {
+  const activeYearId = targetState.schoolYears.find((schoolYear) => schoolYear.active)?.id || "";
+  targetState.students.forEach((student) => {
+    const membership = targetState.classMemberships.find((item) => item.studentId === student.id && item.schoolYearId === activeYearId && item.active);
+    student.groupId = membership?.groupId || "";
+    student.grade = membership?.grade || "";
+  });
 }
 
 function normalizeMissionTemplates(input) {
@@ -1362,13 +1487,14 @@ function normalizeRewardGoalsByStudent(input) {
   }));
 }
 
-function normalizeGroups(input) {
+function normalizeGroups(input, fallbackSchoolYearId = "") {
   if (!Array.isArray(input)) return [];
   return input
     .filter((group) => group && group.id && String(group.name || "").trim())
     .map((group, index) => ({
       id: String(group.id),
       name: String(group.name).trim(),
+      schoolYearId: String(group.schoolYearId || fallbackSchoolYearId),
       sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : index,
       enabled: group.enabled !== false,
       createdAt: group.createdAt || new Date().toISOString(),
@@ -1807,8 +1933,11 @@ function renderStudentList(container, { childMode }) {
         : childMode
         ? `シート ${stats.currentSheet.count}/${SHEET_SIZE}`
         : `累計 ${stats.total} / 使えるシート ${stats.availableSheets}`;
-      const group = groupById(student.groupId);
-      const meta = student.note || group?.name || (testStudent ? "制限なし・集計に入らない" : childMode ? "がんばり中" : "メモなし");
+      const membershipYearId = childMode ? activeSchoolYear()?.id || state.selectedSchoolYearId : state.selectedSchoolYearId;
+      const membership = studentMembershipForYear(student.id, membershipYearId);
+      const group = groupById(membership?.groupId);
+      const classMeta = [membership?.grade, group?.name].filter(Boolean).join(" / ");
+      const meta = student.note || classMeta || (testStudent ? "制限なし・集計に入らない" : childMode ? "がんばり中" : "所属未設定");
       return `
         <button class="student-card${selected}${testStudent ? " is-test" : ""}" type="button" data-select-student="${student.id}">
           <span>
@@ -2293,9 +2422,75 @@ function openHounyanCloset() {
   });
 }
 
-function sortedGroups({ includeDisabled = true } = {}) {
+function activeSchoolYear() {
+  return state.schoolYears.find((schoolYear) => schoolYear.active) || state.schoolYears[0] || null;
+}
+
+function selectedSchoolYear() {
+  return state.schoolYears.find((schoolYear) => schoolYear.id === state.selectedSchoolYearId) || activeSchoolYear();
+}
+
+function studentMembershipForYear(studentId, schoolYearId = activeSchoolYear()?.id || "") {
+  return state.classMemberships.find((membership) =>
+    membership.studentId === studentId && membership.schoolYearId === schoolYearId && membership.active
+  ) || null;
+}
+
+function studentGroupIdForYear(studentId, schoolYearId = activeSchoolYear()?.id || "") {
+  return studentMembershipForYear(studentId, schoolYearId)?.groupId || "";
+}
+
+function classMembers(groupId) {
+  const group = groupById(groupId);
+  if (!group) return [];
+  return state.classMemberships
+    .filter((membership) => membership.groupId === groupId && membership.schoolYearId === group.schoolYearId && membership.active)
+    .map((membership) => ({
+      membership,
+      student: state.students.find((student) => student.id === membership.studentId),
+    }))
+    .filter((item) => item.student)
+    .sort((left, right) => left.student.name.localeCompare(right.student.name, "ja"));
+}
+
+function upsertStudentMembership(studentId, schoolYearId, groupId, grade = "") {
+  const now = new Date().toISOString();
+  const existing = state.classMemberships.find((membership) => membership.studentId === studentId && membership.schoolYearId === schoolYearId);
+  if (!groupId) {
+    if (existing) {
+      existing.active = false;
+      existing.endedOn = existing.endedOn || CalendarDate.dateKey(new Date());
+      existing.grade = String(grade || "");
+      existing.updatedAt = now;
+    }
+    return;
+  }
+  const schoolYear = state.schoolYears.find((item) => item.id === schoolYearId);
+  if (existing) {
+    existing.groupId = groupId;
+    existing.grade = String(grade || "");
+    existing.active = true;
+    existing.endedOn = "";
+    existing.updatedAt = now;
+  } else {
+    state.classMemberships.push({
+      id: crypto.randomUUID(),
+      studentId,
+      groupId,
+      schoolYearId,
+      grade: String(grade || ""),
+      active: true,
+      startedOn: schoolYear?.startsOn || "",
+      endedOn: "",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+}
+
+function sortedGroups({ includeDisabled = true, schoolYearId = state.selectedSchoolYearId } = {}) {
   return state.groups
-    .filter((group) => includeDisabled || group.enabled)
+    .filter((group) => (!schoolYearId || group.schoolYearId === schoolYearId) && (includeDisabled || group.enabled))
     .slice()
     .sort((left, right) => left.sortOrder - right.sortOrder);
 }
@@ -2310,7 +2505,7 @@ function selectedGroup() {
 
 function selectGroup(groupId) {
   const group = groupById(groupId);
-  if (!group || !group.enabled) {
+  if (!group || !group.enabled || group.schoolYearId !== state.selectedSchoolYearId) {
     state.selectedGroupId = "";
   } else {
     state.selectedGroupId = group.id;
@@ -2320,19 +2515,74 @@ function selectGroup(groupId) {
 }
 
 function ensureGroupSelection() {
-  if (selectedGroup()?.enabled) return;
+  if (selectedGroup()?.enabled && selectedGroup()?.schoolYearId === state.selectedSchoolYearId) return;
   state.selectedGroupId = sortedGroups({ includeDisabled: false })[0]?.id || "";
+}
+
+function selectSchoolYear(schoolYearId) {
+  if (!state.schoolYears.some((schoolYear) => schoolYear.id === schoolYearId)) return;
+  state.selectedSchoolYearId = schoolYearId;
+  state.selectedGroupId = "";
+  clearGroupForm();
+  clearStudentForm();
+  ensureGroupSelection();
+  persist();
+  render();
+}
+
+function addNextSchoolYear() {
+  const latestYear = Math.max(...state.schoolYears.map((schoolYear) => schoolYear.year), currentAcademicYearNumber());
+  const nextYear = latestYear + 1;
+  const existing = state.schoolYears.find((schoolYear) => schoolYear.year === nextYear);
+  if (existing) {
+    selectSchoolYear(existing.id);
+    return;
+  }
+  state.schoolYears.push(makeSchoolYear(nextYear));
+  state.schoolYears.sort((left, right) => right.year - left.year);
+  state.selectedSchoolYearId = schoolYearIdForNumber(nextYear);
+  state.selectedGroupId = "";
+  persist();
+  render();
+  showToast(`${nextYear}年度を追加しました。クラスを作成できます`);
+}
+
+function setSelectedSchoolYearActive() {
+  const schoolYear = selectedSchoolYear();
+  if (!schoolYear || schoolYear.active) return;
+  const ok = confirm(`${schoolYear.name}を現在年度にします。ミッション・時間割・登校日判定は、この年度の所属クラスを参照します。よろしいですか？`);
+  if (!ok) return;
+  createAutoBackup("before-school-year-change", { force: true });
+  state.schoolYears.forEach((item) => {
+    item.active = item.id === schoolYear.id;
+    item.updatedAt = new Date().toISOString();
+  });
+  syncLegacyStudentGroups();
+  persist();
+  render();
+  showToast(`${schoolYear.name}を現在年度にしました`);
 }
 
 function groupOptions(selectedId = "", { includeBlank = false, includeDisabled = false } = {}) {
   const groups = sortedGroups({ includeDisabled });
-  const blank = includeBlank ? '<option value="">組を選ばない</option>' : "";
+  const blank = includeBlank ? '<option value="">クラスを選ばない</option>' : "";
   return blank + groups.map((group) => `
     <option value="${escapeHtml(group.id)}"${group.id === selectedId ? " selected" : ""}>${escapeHtml(group.name)}${group.enabled ? "" : "（無効）"}</option>
   `).join("");
 }
 
 function renderGroups() {
+  const schoolYear = selectedSchoolYear();
+  const activeYear = activeSchoolYear();
+  els.schoolYearSelect.innerHTML = state.schoolYears.map((item) => `
+    <option value="${escapeHtml(item.id)}"${item.id === schoolYear?.id ? " selected" : ""}>${escapeHtml(item.name)}${item.active ? "（現在）" : ""}</option>
+  `).join("");
+  els.activeSchoolYearStatus.textContent = activeYear
+    ? `現在の年度: ${activeYear.name}　表示中: ${schoolYear?.name || "未設定"}`
+    : "現在年度が未設定です";
+  els.setActiveSchoolYearButton.disabled = !schoolYear || schoolYear.active;
+  els.setActiveSchoolYearButton.textContent = schoolYear?.active ? "現在使用中" : "この年度を現在にする";
+  els.studentSchoolYearLabel.textContent = schoolYear?.name ? `${schoolYear.name}の所属` : "所属";
   ensureGroupSelection();
   const currentId = state.selectedGroupId;
   els.currentGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
@@ -2344,26 +2594,39 @@ function renderGroups() {
   els.timetableCopyTarget.innerHTML = groupOptions("", { includeBlank: true });
 
   if (!state.groups.length) {
-    els.groupList.innerHTML = '<p class="empty-state">まだ組がありません。先に組を追加してください。</p>';
+    els.groupList.innerHTML = '<p class="empty-state">まだクラスがありません。上のフォームから追加してください。</p>';
     return;
   }
 
-  els.groupList.innerHTML = sortedGroups().map((group, index) => `
+  const yearGroups = sortedGroups();
+  if (!yearGroups.length) {
+    els.groupList.innerHTML = `<p class="empty-state">${escapeHtml(schoolYear?.name || "この年度")}には、まだクラスがありません。</p>`;
+    return;
+  }
+
+  els.groupList.innerHTML = yearGroups.map((group, index) => {
+    const members = classMembers(group.id);
+    const memberText = members.length
+      ? members.map(({ student, membership }) => `${student.name}${membership.grade ? `（${membership.grade}）` : ""}`).join("、")
+      : "所属児童なし";
+    return `
     <article class="management-item${group.enabled ? "" : " is-disabled"}">
       <div>
         <strong>${escapeHtml(group.name)}</strong>
-        <span>${group.enabled ? "使用中" : "無効（履歴は残っています）"}</span>
+        <span>${group.enabled ? `${members.length}人` : "無効（履歴は残っています）"}</span>
+        <span class="class-member-names">${escapeHtml(memberText)}</span>
       </div>
       <div class="management-actions">
         <button class="icon-button" type="button" title="上へ移動" aria-label="上へ移動" data-group-move="up" data-group-id="${escapeHtml(group.id)}"${index === 0 ? " disabled" : ""}>↑</button>
-        <button class="icon-button" type="button" title="下へ移動" aria-label="下へ移動" data-group-move="down" data-group-id="${escapeHtml(group.id)}"${index === state.groups.length - 1 ? " disabled" : ""}>↓</button>
+        <button class="icon-button" type="button" title="下へ移動" aria-label="下へ移動" data-group-move="down" data-group-id="${escapeHtml(group.id)}"${index === yearGroups.length - 1 ? " disabled" : ""}>↓</button>
         <button class="text-button" type="button" data-group-select="${escapeHtml(group.id)}">選択</button>
         <button class="text-button" type="button" data-group-edit="${escapeHtml(group.id)}">編集</button>
         <button class="text-button" type="button" data-group-toggle="${escapeHtml(group.id)}">${group.enabled ? "無効にする" : "有効にする"}</button>
         <button class="text-button danger-text" type="button" data-group-delete="${escapeHtml(group.id)}">完全削除</button>
       </div>
     </article>
-  `).join("");
+  `;
+  }).join("");
 
   els.groupList.querySelectorAll("[data-group-select]").forEach((button) => button.addEventListener("click", () => selectGroup(button.dataset.groupSelect)));
   els.groupList.querySelectorAll("[data-group-edit]").forEach((button) => button.addEventListener("click", () => editGroup(button.dataset.groupEdit)));
@@ -2375,7 +2638,7 @@ function renderGroups() {
 function saveGroup() {
   const name = els.groupName.value.trim();
   if (!name) {
-    showToast("組名を入力してください");
+    showToast("クラス名を入力してください");
     return;
   }
   const now = new Date().toISOString();
@@ -2389,6 +2652,7 @@ function saveGroup() {
     const group = {
       id: crypto.randomUUID(),
       name,
+      schoolYearId: state.selectedSchoolYearId,
       enabled: els.groupEnabled.checked,
       sortOrder: sortedGroups().length,
       createdAt: now,
@@ -2400,7 +2664,7 @@ function saveGroup() {
   clearGroupForm();
   persist();
   render();
-  showToast("組を保存しました");
+  showToast("クラスを保存しました");
 }
 
 function clearGroupForm() {
@@ -2426,7 +2690,7 @@ function toggleGroup(groupId) {
   if (!group.enabled && state.selectedGroupId === group.id) ensureGroupSelection();
   persist();
   render();
-  showToast(group.enabled ? "組を有効にしました" : "組を無効にしました");
+  showToast(group.enabled ? "クラスを有効にしました" : "クラスを無効にしました");
 }
 
 function moveGroup(groupId, direction) {
@@ -2447,21 +2711,20 @@ function deleteGroup(groupId) {
   const related = state.timetables.filter((timetable) => timetable.groupId === groupId).length
     + state.timetableOverrides.filter((override) => override.groupId === groupId).length
     + state.calendarEvents.filter((event) => event.groupIds.includes(groupId)).length;
-  const ok = confirm(`${group.name}を完全に削除します。関連する時間割・当日変更・組別予定も削除されます（${related}件）。よろしいですか？`);
+  const ok = confirm(`${group.name}を完全に削除します。関連する時間割・当日変更・クラス別予定も削除されます（${related}件）。よろしいですか？`);
   if (!ok) return;
   createAutoBackup("before-delete", { force: true });
   state.groups = state.groups.filter((item) => item.id !== groupId);
+  state.classMemberships = state.classMemberships.filter((membership) => membership.groupId !== groupId);
   state.timetables = state.timetables.filter((timetable) => timetable.groupId !== groupId);
   state.timetableOverrides = state.timetableOverrides.filter((override) => override.groupId !== groupId);
   state.calendarEvents = state.calendarEvents.map((event) => ({ ...event, groupIds: event.groupIds.filter((id) => id !== groupId) }))
     .filter((event) => event.scope !== "groups" || event.groupIds.length);
-  state.students.forEach((student) => {
-    if (student.groupId === groupId) student.groupId = "";
-  });
+  syncLegacyStudentGroups();
   ensureGroupSelection();
   persist();
   render();
-  showToast("組と関連データを削除しました");
+  showToast("クラスと関連データを削除しました");
 }
 
 function activeSubjects({ includeDisabled = false } = {}) {
@@ -2509,7 +2772,7 @@ function readTimetableEditor() {
 function renderTimetableEditor(draft = null) {
   const group = selectedGroup();
   if (!group) {
-    els.timetableEditor.innerHTML = '<p class="empty-state">先に「組の管理」で組を追加・選択してください。</p>';
+    els.timetableEditor.innerHTML = '<p class="empty-state">先に「クラス管理」でクラスを追加・選択してください。</p>';
     return;
   }
   const timetable = timetableForEditor(group.id);
@@ -2533,7 +2796,7 @@ function renderTimetableEditor(draft = null) {
 function saveTimetable() {
   const group = selectedGroup();
   if (!group) {
-    showToast("先に対象の組を選んでください");
+    showToast("先に対象のクラスを選んでください");
     return;
   }
   const draft = readTimetableEditor();
@@ -2560,7 +2823,7 @@ function copyTimetableToGroup() {
   const sourceGroup = selectedGroup();
   const targetGroup = groupById(els.timetableCopyTarget.value);
   if (!sourceGroup || !targetGroup || sourceGroup.id === targetGroup.id) {
-    showToast("コピー先の別の組を選んでください");
+    showToast("コピー先の別のクラスを選んでください");
     return;
   }
   const draft = readTimetableEditor();
@@ -2750,18 +3013,20 @@ function countSchoolDaysBetween(startDate, endDate, groupId = "") {
 
 function canGenerateDailyMission(studentId, date = CalendarDate.dateKey(new Date())) {
   const student = state.students.find((item) => item.id === studentId);
-  return Boolean(student && (isTestStudent(student) || isSchoolDay(date, student.groupId)));
+  const groupId = student ? studentGroupIdForYear(student.id, activeSchoolYear()?.id || "") : "";
+  return Boolean(student && (isTestStudent(student) || isSchoolDay(date, groupId)));
 }
 
 function missionCalendarContext(studentId, date = CalendarDate.dateKey(new Date())) {
   const student = state.students.find((item) => item.id === studentId);
   const testMode = isTestStudent(student);
-  const day = schoolDayInfo(date, student?.groupId || "");
+  const groupId = student ? studentGroupIdForYear(student.id, activeSchoolYear()?.id || "") : "";
+  const day = schoolDayInfo(date, groupId);
   return {
     canGenerate: Boolean(student && (testMode || day.isSchoolDay)),
     isTestStudent: testMode,
     schoolDay: day,
-    timetable: !testMode || student?.testUseTimetable ? getDayTimetable(student?.groupId || "", date) : { ...day, timetable: null, periods: [] },
+    timetable: !testMode || student?.testUseTimetable ? getDayTimetable(groupId, date) : { ...day, timetable: null, periods: [] },
   };
 }
 
@@ -3097,7 +3362,7 @@ function renderCalendarDisplay() {
   els.calendarViewDayTimetable.innerHTML = !info.isSchoolDay
     ? '<p class="empty-state compact-empty">休業日のため授業はありません。</p>'
     : !dayTimetable.timetable
-      ? '<p class="empty-state compact-empty">この組の基本時間割は未設定です。</p>'
+      ? '<p class="empty-state compact-empty">このクラスの基本時間割は未設定です。</p>'
       : `<ol class="day-timetable-list">${dayTimetable.periods.map((period) => `<li><span>${period.periodNumber}時間目</span><strong>${escapeHtml(period.subject?.name || "未設定")}</strong>${period.override ? '<em>変更</em>' : ""}</li>`).join("")}</ol>`;
 }
 
@@ -3133,13 +3398,13 @@ function renderTimetableDisplay() {
     button.setAttribute("aria-pressed", String(active));
   });
   if (!groups.length) {
-    els.calendarTimetableBoard.innerHTML = '<p class="empty-state">先生ページの「組の管理」で組を追加してください。</p>';
+    els.calendarTimetableBoard.innerHTML = '<p class="empty-state">先生ページの「クラス管理」でクラスを追加してください。</p>';
     return;
   }
   if (timetableViewMode === "group") {
     els.calendarTimetableBoard.innerHTML = selected
       ? timetableDisplayMarkup(selected)
-      : '<p class="empty-state">組を選んでください。</p>';
+      : '<p class="empty-state">クラスを選んでください。</p>';
     return;
   }
   els.calendarTimetableBoard.innerHTML = groups.map(timetableDisplayMarkup).join("");
@@ -3227,7 +3492,7 @@ function saveCalendarEvent() {
     return;
   }
   if (draft.scope === "groups" && !draft.groupIds.length) {
-    showToast("対象の組を選んでください");
+    showToast("対象のクラスを選んでください");
     return;
   }
   const now = new Date().toISOString();
@@ -3286,7 +3551,7 @@ function deleteCalendarEvent(eventId) {
 function saveTimetableOverride() {
   const group = selectedGroup();
   if (!group) {
-    showToast("先に対象の組を選んでください");
+    showToast("先に対象のクラスを選んでください");
     return;
   }
   const periodNumber = Math.max(1, Math.floor(Number(els.overridePeriod.value || 1)));
@@ -4908,6 +5173,7 @@ function formatTimerTime(totalSeconds) {
 function saveStudent() {
   const name = els.studentName.value.trim();
   const note = els.studentNote.value.trim();
+  const grade = els.studentGrade.value.trim();
   const groupId = els.studentGroup.value;
   const isTest = Boolean(els.studentTestMode.checked);
   if (!name) {
@@ -4921,7 +5187,6 @@ function saveStudent() {
     if (student) {
       student.name = name;
       student.note = note;
-      student.groupId = groupId;
       student.isTest = isTest;
       savedStudent = student;
     }
@@ -4930,7 +5195,8 @@ function saveStudent() {
       id: crypto.randomUUID(),
       name,
       note,
-      groupId,
+      groupId: "",
+      grade: "",
       isTest,
       ticketBalance: 0,
       createdAt: new Date().toISOString(),
@@ -4938,6 +5204,11 @@ function saveStudent() {
     state.students.push(student);
     state.selectedStudentId = student.id;
     savedStudent = student;
+  }
+
+  if (savedStudent) {
+    upsertStudentMembership(savedStudent.id, state.selectedSchoolYearId, groupId, grade);
+    syncLegacyStudentGroups();
   }
 
   if (isTestStudent(savedStudent)) ensureTestStudentMissionSettings(savedStudent);
@@ -4952,6 +5223,7 @@ function clearStudentForm() {
   els.studentId.value = "";
   els.studentName.value = "";
   els.studentNote.value = "";
+  els.studentGrade.value = "";
   els.studentGroup.value = "";
   els.studentTestMode.checked = false;
 }
@@ -5717,7 +5989,9 @@ function editSelectedStudent() {
   els.studentId.value = student.id;
   els.studentName.value = student.name;
   els.studentNote.value = student.note || "";
-  els.studentGroup.value = student.groupId || "";
+  const membership = studentMembershipForYear(student.id, state.selectedSchoolYearId);
+  els.studentGrade.value = membership?.grade || "";
+  els.studentGroup.value = membership?.groupId || "";
   els.studentTestMode.checked = isTestStudent(student);
   showView("teacher");
   els.studentName.focus();
@@ -5736,6 +6010,7 @@ function deleteSelectedStudent() {
 
   createAutoBackup("before-delete", { force: true });
   state.students = state.students.filter((item) => item.id !== student.id);
+  state.classMemberships = state.classMemberships.filter((membership) => membership.studentId !== student.id);
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
   state.studentMissionSettings = state.studentMissionSettings.filter((setting) => setting.studentId !== student.id);
   state.dailyMissions = state.dailyMissions.filter((mission) => mission.studentId !== student.id);

@@ -966,6 +966,34 @@ button:disabled {
   gap: 10px;
 }
 
+.school-year-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: #f6fbf7;
+}
+
+.school-year-status {
+  align-self: center;
+  margin: 0;
+  color: var(--green-dark);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.class-member-names {
+  display: block;
+  max-width: 620px;
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
 .override-item {
   padding: 8px 10px;
   font-size: 0.84rem;
@@ -3581,6 +3609,15 @@ input:focus,
     grid-template-columns: 1fr;
   }
 
+  .school-year-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .school-year-toolbar .form-actions {
+    justify-content: flex-start;
+  }
+
   .mission-management-grid > section + section {
     padding-top: 20px;
     padding-left: 0;
@@ -3641,6 +3678,14 @@ input:focus,
   .ticket-adjustment {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .school-year-toolbar .form-actions {
+    flex-direction: column;
+  }
+
+  .school-year-toolbar .form-actions button {
+    width: 100%;
   }
 
   .mission-card-actions .field,

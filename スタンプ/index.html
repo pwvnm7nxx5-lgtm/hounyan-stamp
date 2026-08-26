@@ -217,7 +217,7 @@
             <div>
               <p class="eyebrow">学校の予定と授業</p>
               <h2 id="calendar-view-title">カレンダーと時間割</h2>
-              <p>予定を確認して、組ごとの時間割をすぐに見られます。</p>
+              <p>予定を確認して、クラスごとの時間割をすぐに見られます。</p>
             </div>
             <img src="assets/hounyan-home.png" alt="ほうにゃん" class="calendar-overview-hounyan">
           </section>
@@ -235,7 +235,7 @@
                   <h3 id="calendarViewMonthLabel">年月</h3>
                 </div>
                 <div class="calendar-toolbar">
-                  <label class="field compact-field"><span>対象の組</span><select id="calendarViewGroupSelect" class="select"></select></label>
+                  <label class="field compact-field"><span>対象のクラス</span><select id="calendarViewGroupSelect" class="select"></select></label>
                   <button class="icon-button" id="calendarViewPreviousButton" type="button" title="前の月" aria-label="前の月">‹</button>
                   <button class="soft-button" id="calendarViewTodayButton" type="button">今日</button>
                   <button class="icon-button" id="calendarViewNextButton" type="button" title="次の月" aria-label="次の月">›</button>
@@ -256,13 +256,13 @@
               <div class="section-head calendar-head">
                 <div>
                   <p class="eyebrow">基本時間割</p>
-                  <h3>組の時間割</h3>
+                  <h3>クラスの時間割</h3>
                 </div>
-                <label class="field compact-field"><span>組を選ぶ</span><select id="calendarTimetableGroupSelect" class="select"></select></label>
+                <label class="field compact-field"><span>クラスを選ぶ</span><select id="calendarTimetableGroupSelect" class="select"></select></label>
               </div>
               <div class="timetable-view-mode" role="group" aria-label="時間割の表示方法">
-                <button class="soft-button is-active" type="button" aria-pressed="true" data-timetable-view-mode="all">全ての組を一覧</button>
-                <button class="soft-button" type="button" aria-pressed="false" data-timetable-view-mode="group">選んだ組を表示</button>
+                <button class="soft-button is-active" type="button" aria-pressed="true" data-timetable-view-mode="all">全クラスを一覧</button>
+                <button class="soft-button" type="button" aria-pressed="false" data-timetable-view-mode="group">選んだクラスを表示</button>
               </div>
               <div id="calendarTimetableBoard" class="calendar-timetable-board"></div>
             </section>
@@ -340,7 +340,7 @@
               </div>
               <div class="teacher-tab-list" role="group" aria-label="先生ページの操作を切り替え">
                 <button class="teacher-tab is-active" type="button" aria-pressed="true" data-teacher-tab-button="students">児童とスタンプ</button>
-                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="groups">組の管理</button>
+                <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="groups">クラス管理</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="timetable">時間割</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="calendar">カレンダー</button>
                 <button class="teacher-tab" type="button" aria-pressed="false" data-teacher-tab-button="missions">ミッション管理</button>
@@ -432,8 +432,12 @@
                   <input id="studentNote" type="text" autocomplete="off" placeholder="例: 3年 / Aグループ">
                 </label>
                 <label class="field">
-                  <span>組</span>
+                  <span id="studentSchoolYearLabel">今年度の所属</span>
                   <select id="studentGroup" class="select"></select>
+                </label>
+                <label class="field">
+                  <span>学年</span>
+                  <input id="studentGrade" type="text" autocomplete="off" placeholder="例: 2年生">
                 </label>
                 <label class="check-row development-setting">
                   <input id="studentTestMode" type="checkbox">
@@ -531,30 +535,41 @@
             <section class="work-panel" data-teacher-tab-panel="groups">
               <div class="section-head">
                 <div>
-                  <p class="eyebrow">組</p>
-                  <h2>組の管理</h2>
+                  <p class="eyebrow">年度と所属</p>
+                  <h2>クラス管理</h2>
                 </div>
                 <label class="field compact-field">
-                  <span>現在の組</span>
+                  <span>選択中のクラス</span>
                   <select id="currentGroupSelect" class="select"></select>
                 </label>
+              </div>
+              <div class="school-year-toolbar">
+                <label class="field compact-field">
+                  <span>表示年度</span>
+                  <select id="schoolYearSelect" class="select"></select>
+                </label>
+                <p id="activeSchoolYearStatus" class="school-year-status"></p>
+                <div class="form-actions">
+                  <button class="soft-button" type="button" id="addNextSchoolYearButton">翌年度を追加</button>
+                  <button class="soft-button" type="button" id="setActiveSchoolYearButton">この年度を現在にする</button>
+                </div>
               </div>
               <form id="groupForm" class="form-grid group-form">
                 <input id="groupId" type="hidden">
                 <label class="field">
-                  <span>組名</span>
-                  <input id="groupName" type="text" autocomplete="off" required placeholder="例: 支援学級A">
+                  <span>クラス名</span>
+                  <input id="groupName" type="text" autocomplete="off" required placeholder="例: クラス1 / 支援学級A">
                 </label>
                 <label class="check-row">
                   <input id="groupEnabled" type="checkbox" checked>
-                  この組を使う
+                  このクラスを使う
                 </label>
                 <div class="form-actions">
-                  <button class="primary-button" type="submit">組を保存</button>
+                  <button class="primary-button" type="submit">クラスを保存</button>
                   <button class="soft-button" type="button" id="clearGroupForm">新規入力</button>
                 </div>
               </form>
-              <p class="hint">使わなくなった組は「無効」にすると、過去の時間割や予定を残したまま一覧から外せます。</p>
+              <p class="hint">児童編集で、この年度の学年とクラスを設定できます。使わなくなったクラスは「無効」にすると履歴を残せます。</p>
               <div id="groupList" class="management-list"></div>
             </section>
 
@@ -565,7 +580,7 @@
                   <h2>基本時間割</h2>
                 </div>
                 <label class="field compact-field">
-                  <span>対象の組</span>
+                  <span>対象のクラス</span>
                   <select id="timetableGroupSelect" class="select"></select>
                 </label>
               </div>
@@ -593,7 +608,7 @@
               </form>
               <div class="timetable-scroll"><div id="timetableEditor" class="timetable-editor"></div></div>
               <div class="timetable-copy-row">
-                <label class="field"><span>コピー先の組</span><select id="timetableCopyTarget" class="select"></select></label>
+                <label class="field"><span>コピー先のクラス</span><select id="timetableCopyTarget" class="select"></select></label>
                 <button id="copyTimetableButton" class="soft-button" type="button">この時間割をコピー</button>
               </div>
               <details class="subject-settings">
@@ -614,7 +629,7 @@
                   <h2 id="calendarMonthLabel">年月</h2>
                 </div>
                 <div class="calendar-toolbar">
-                  <label class="field compact-field"><span>対象の組</span><select id="calendarGroupSelect" class="select"></select></label>
+                  <label class="field compact-field"><span>対象のクラス</span><select id="calendarGroupSelect" class="select"></select></label>
                   <button class="icon-button" id="calendarPreviousButton" type="button" title="前の月" aria-label="前の月">‹</button>
                   <button class="soft-button" id="calendarTodayButton" type="button">今日</button>
                   <button class="icon-button" id="calendarNextButton" type="button" title="次の月" aria-label="次の月">›</button>
@@ -645,8 +660,8 @@
                     <div id="calendarEventTimeFields" class="date-range-row" hidden><label class="field"><span>開始時刻</span><input id="calendarEventStartTime" type="time"></label><label class="field"><span>終了時刻</span><input id="calendarEventEndTime" type="time"></label></div>
                     <details class="detail-settings"><summary>詳細設定</summary><div class="detail-settings-grid">
                       <label class="field"><span>種類</span><select id="calendarEventType" class="select"></select></label>
-                      <label class="field"><span>対象</span><select id="calendarEventScope" class="select"><option value="school">学校全体</option><option value="groups">特定の組</option></select></label>
-                      <label id="calendarEventGroupsField" class="field" hidden><span>対象の組（複数選択可）</span><select id="calendarEventGroups" class="select" multiple></select></label>
+                      <label class="field"><span>対象</span><select id="calendarEventScope" class="select"><option value="school">学校全体</option><option value="groups">特定のクラス</option></select></label>
+                      <label id="calendarEventGroupsField" class="field" hidden><span>対象のクラス（複数選択可）</span><select id="calendarEventGroups" class="select" multiple></select></label>
                       <label class="field"><span>繰り返し</span><select id="calendarEventRepeat" class="select"><option value="none">なし</option><option value="weekly">毎週</option></select></label>
                       <label class="field"><span>登校日への影響</span><select id="calendarEventSchoolDayEffect" class="select"><option value="auto">種類に合わせる</option><option value="school-day">登校日にする</option><option value="holiday">休業日にする</option><option value="shortened">短縮授業日にする</option><option value="event-day">行事日にする</option></select></label>
                       <label class="field"><span>時間割への影響</span><select id="calendarEventTimetableEffect" class="select"><option value="none">なし</option><option value="shortened">短縮授業</option><option value="event">行事日</option></select></label>
