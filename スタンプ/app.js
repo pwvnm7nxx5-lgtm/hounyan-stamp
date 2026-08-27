@@ -4,7 +4,7 @@ const AUTO_BACKUP_STORAGE_KEY = `${STORAGE_KEY}-auto-backups`;
 const AUTO_BACKUP_LIMIT = 6;
 const AUTO_BACKUP_BUCKET_MS = 3 * 60 * 1000;
 const SHEET_SIZE = 20;
-const STAMP_BATCH_MAX = SHEET_SIZE;
+const STAMP_BATCH_MAX = 100;
 const STAMP_SET_MAX_MEMBERS = 12;
 const TEST_STUDENT_NAME = "テスト児童";
 const TEST_AVAILABLE_SHEETS = Number.MAX_SAFE_INTEGER;
@@ -997,9 +997,12 @@ const els = {
   stampSetsList: document.querySelector("#stampSetsList"),
   stampCountLayer: document.querySelector("#stampCountLayer"),
   stampCountStudent: document.querySelector("#stampCountStudent"),
+  stampCountMinusTen: document.querySelector("#stampCountMinusTen"),
   stampCountMinus: document.querySelector("#stampCountMinus"),
   stampCountValue: document.querySelector("#stampCountValue"),
+  stampCountUnit: document.querySelector("#stampCountUnit"),
   stampCountPlus: document.querySelector("#stampCountPlus"),
+  stampCountPlusTen: document.querySelector("#stampCountPlusTen"),
   stampCountHint: document.querySelector("#stampCountHint"),
   stampCountCancelButton: document.querySelector("#stampCountCancelButton"),
   stampCountNextButton: document.querySelector("#stampCountNextButton"),
@@ -1174,8 +1177,12 @@ function bindEvents() {
   els.openSheetAlbumButton.addEventListener("click", openSheetAlbum);
   els.childAddStampButton.addEventListener("click", () => openStampCountChoice({ source: "child" }));
   els.addStampButton.addEventListener("click", openTeacherStampPreview);
+  els.stampCountMinusTen.addEventListener("click", () => updateStampCountTarget(-10));
   els.stampCountMinus.addEventListener("click", () => updateStampCountTarget(-1));
   els.stampCountPlus.addEventListener("click", () => updateStampCountTarget(1));
+  els.stampCountPlusTen.addEventListener("click", () => updateStampCountTarget(10));
+  els.stampCountValue.addEventListener("input", updateStampCountFromInput);
+  els.stampCountValue.addEventListener("change", updateStampCountFromInput);
   els.stampCountCancelButton.addEventListener("click", closeStampCountChoice);
   els.stampCountNextButton.addEventListener("click", continueToStampPreview);
   els.stampCountLayer.addEventListener("click", (event) => {
@@ -4759,11 +4766,11 @@ function studentOwnsStamp(studentId, stampId) {
 }
 
 function stampIsAvailableForStudent(stamp, student, total) {
-  if (!stamp) {
+  if (!stamp || stamp.hidden || stamp.missionOnly || !stampSetIsVisible(stamp)) {
     return false;
   }
-  if (stamp.hidden) {
-    return false;
+  if (stamp.purchaseOnly) {
+    return Boolean(student && studentOwnsStamp(student.id, stamp.id));
   }
   if (isTestStudent(student)) {
     return true;
@@ -4771,10 +4778,22 @@ function stampIsAvailableForStudent(stamp, student, total) {
   if (student && studentOwnsStamp(student.id, stamp.id)) {
     return true;
   }
-  if (stamp.purchaseOnly) {
-    return false;
+  return Number(total || 0) >= stamp.unlockAt;
+}
+
+function pressStampOptionsForStudent(student, total = student ? studentStats(student.id).total : 0) {
+  if (!student) {
+    return { visibleStamps: [], availableStamps: [], total };
   }
-  return total >= stamp.unlockAt;
+
+  const visibleStamps = visibleStampAssets().filter((stamp) =>
+    !stamp.purchaseOnly || studentOwnsStamp(student.id, stamp.id)
+  );
+  return {
+    visibleStamps,
+    availableStamps: visibleStamps.filter((stamp) => stampIsAvailableForStudent(stamp, student, total)),
+    total,
+  };
 }
 
 function stampPriceSheets(stamp) {
@@ -5590,16 +5609,21 @@ function createTestStudent() {
   showToast("テスト児童を追加しました。制限なしで試せます");
 }
 
+function clampStampCount(value, minimum = 0) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return minimum;
+  }
+  return Math.min(STAMP_BATCH_MAX, Math.max(minimum, Math.floor(numericValue)));
+}
+
 function openTeacherStampPreview() {
   const student = selectedStudent();
   if (!student) {
     showToast("先に児童を登録してください");
     return;
   }
-  const plannedCount = Math.min(
-    STAMP_BATCH_MAX,
-    Math.max(1, Math.floor(Number(els.teacherStampBatchCount.value || 1)))
-  );
+  const plannedCount = clampStampCount(els.teacherStampBatchCount.value, 1);
   els.teacherStampBatchCount.value = String(plannedCount);
 
   openStampPreview({
@@ -5618,8 +5642,7 @@ function openStampCountChoice({ source }) {
   }
 
   const stats = studentStats(student.id);
-  const stamps = visibleStampAssets();
-  const availableStamps = stamps.filter((stamp) => stampIsAvailableForStudent(stamp, student, stats.total));
+  const { availableStamps } = pressStampOptionsForStudent(student, stats.total);
   if (!availableStamps.length) {
     showToast("使えるスタンプがありません");
     return;
@@ -5638,24 +5661,33 @@ function openStampCountChoice({ source }) {
   els.stampCountLayer.classList.remove("is-showing");
   requestAnimationFrame(() => {
     els.stampCountLayer.classList.add("is-showing");
-    els.stampCountPlus.focus();
+    els.stampCountValue.focus();
   });
 }
 
 function renderStampCountChoice() {
   const childMode = stampCountContext?.source === "child";
   const unit = childMode ? "こ" : "個";
-  els.stampCountValue.textContent = `${stampCountTarget}${unit}`;
+  els.stampCountValue.value = String(stampCountTarget);
+  els.stampCountUnit.textContent = unit;
+  els.stampCountValue.setAttribute("aria-label", `押すスタンプの数（${stampCountTarget}${unit}）`);
   els.stampCountHint.textContent = stampCountTarget > 0
     ? `このあと、${stampCountTarget}${unit}ぶんのスタンプを選びます。`
     : "先に、全部で押す数を決めます。";
+  els.stampCountMinusTen.disabled = stampCountTarget <= 0;
   els.stampCountMinus.disabled = stampCountTarget <= 0;
   els.stampCountPlus.disabled = stampCountTarget >= STAMP_BATCH_MAX;
+  els.stampCountPlusTen.disabled = stampCountTarget >= STAMP_BATCH_MAX;
   els.stampCountNextButton.disabled = stampCountTarget <= 0;
 }
 
 function updateStampCountTarget(delta) {
-  stampCountTarget = Math.min(STAMP_BATCH_MAX, Math.max(0, stampCountTarget + delta));
+  stampCountTarget = clampStampCount(stampCountTarget + delta, 0);
+  renderStampCountChoice();
+}
+
+function updateStampCountFromInput() {
+  stampCountTarget = clampStampCount(els.stampCountValue.value, 0);
   renderStampCountChoice();
 }
 
@@ -5696,8 +5728,7 @@ function openStampPreview(context) {
   }
 
   const stats = studentStats(student.id);
-  const stamps = visibleStampAssets();
-  const availableStamps = stamps.filter((stamp) => stampIsAvailableForStudent(stamp, student, stats.total));
+  const { visibleStamps, availableStamps } = pressStampOptionsForStudent(student, stats.total);
   if (!availableStamps.length) {
     showToast("使えるスタンプがありません");
     return;
@@ -5705,13 +5736,14 @@ function openStampPreview(context) {
 
   stampPreviewContext = {
     ...context,
+    plannedCount: clampStampCount(context.plannedCount, 0),
     totalBefore: stats.total,
   };
-  stampPreviewCounts = Object.fromEntries(stamps.map((stamp) => [stamp.id, 0]));
-  const categories = stampPreviewCategories(stamps);
-  if (context.source === "teacher" && Number(context.plannedCount || 0) > 0) {
+  stampPreviewCounts = Object.fromEntries(visibleStamps.map((stamp) => [stamp.id, 0]));
+  const categories = stampPreviewCategories(visibleStamps);
+  if (context.source === "teacher" && stampPreviewContext.plannedCount > 0) {
     const defaultStamp = availableStamps.find((stamp) => stamp.id === state.selectedStampId) || availableStamps[0];
-    stampPreviewCounts[defaultStamp.id] = Math.min(STAMP_BATCH_MAX, Number(context.plannedCount || 0));
+    stampPreviewCounts[defaultStamp.id] = stampPreviewContext.plannedCount;
     stampPreviewCategoryId = stampPreviewCategoryForStamp(defaultStamp, categories);
   } else {
     stampPreviewCategoryId = categories.find((category) => category.id === "basic")?.id || categories[0]?.id || "all";
@@ -5729,11 +5761,16 @@ function openStampPreview(context) {
 function renderStampPreview() {
   const student = selectedStudent();
   const stats = student ? studentStats(student.id) : emptyStats();
+  const { visibleStamps } = pressStampOptionsForStudent(student, stats.total);
+  stampPreviewCounts = Object.fromEntries(visibleStamps.map((stamp) => [
+    stamp.id,
+    clampStampCount(stampPreviewCounts[stamp.id], 0),
+  ]));
   const childMode = stampPreviewContext?.source === "child";
-  const totalCount = stampPreviewTotalCount();
-  const plannedCount = Number(stampPreviewContext?.plannedCount || 0);
+  const totalCount = stampPreviewTotalCount(student, visibleStamps);
+  const plannedCount = clampStampCount(stampPreviewContext?.plannedCount, 0);
   const unit = childMode ? "こ" : "個";
-  const categories = stampPreviewCategories(visibleStampAssets());
+  const categories = stampPreviewCategories(visibleStamps);
   if (!categories.some((category) => category.id === stampPreviewCategoryId)) {
     stampPreviewCategoryId = categories[0]?.id || "all";
   }
@@ -5806,10 +5843,19 @@ function renderStampPreview() {
     button.addEventListener("click", () => {
       const stampId = button.dataset.previewCount;
       const delta = Number(button.dataset.delta || 0);
-      if (delta > 0 && plannedCount > 0 && stampPreviewTotalCount() >= plannedCount) {
+      const currentStudent = selectedStudent();
+      const currentOptions = pressStampOptionsForStudent(currentStudent);
+      if (!currentOptions.visibleStamps.some((stamp) => stamp.id === stampId)) {
+        renderStampPreview();
         return;
       }
-      stampPreviewCounts[stampId] = Math.max(0, Number(stampPreviewCounts[stampId] || 0) + delta);
+      if (delta > 0 && plannedCount > 0 && stampPreviewTotalCount(currentStudent) >= plannedCount) {
+        return;
+      }
+      stampPreviewCounts[stampId] = clampStampCount(
+        Number(stampPreviewCounts[stampId] || 0) + delta,
+        0,
+      );
       renderStampPreview();
     });
   });
@@ -5831,14 +5877,14 @@ function chooseRandomPreviewStamps() {
     return;
   }
   const stats = studentStats(student.id);
-  const availableStamps = visibleStampAssets().filter((stamp) => stampIsAvailableForStudent(stamp, student, stats.total));
+  const { visibleStamps, availableStamps } = pressStampOptionsForStudent(student, stats.total);
   if (!availableStamps.length) {
     showToast("使えるスタンプがありません");
     return;
   }
 
-  const plannedCount = Math.max(1, Number(stampPreviewContext.plannedCount || 1));
-  stampPreviewCounts = Object.fromEntries(visibleStampAssets().map((stamp) => [stamp.id, 0]));
+  const plannedCount = clampStampCount(stampPreviewContext.plannedCount, 1);
+  stampPreviewCounts = Object.fromEntries(visibleStamps.map((stamp) => [stamp.id, 0]));
   for (let index = 0; index < plannedCount; index += 1) {
     const stamp = availableStamps[Math.floor(Math.random() * availableStamps.length)];
     stampPreviewCounts[stamp.id] += 1;
@@ -5902,43 +5948,70 @@ function confirmStampPreview() {
     return;
   }
 
-  const selections = stampPreviewSelections();
+  const stats = studentStats(student.id);
+  const pressOptions = pressStampOptionsForStudent(student, stats.total);
+  const selections = stampPreviewSelections(student, pressOptions.visibleStamps);
   if (!selections.length) {
     showToast("押すスタンプを選んでください");
     return;
   }
-  const plannedCount = Number(stampPreviewContext.plannedCount || 0);
-  const totalCount = stampPreviewTotalCount();
+  const plannedCount = clampStampCount(stampPreviewContext.plannedCount, 0);
+  const totalCount = stampPreviewTotalCount(student, pressOptions.visibleStamps);
   if (plannedCount > 0 && totalCount !== plannedCount) {
     showToast(`決めた数と同じ ${plannedCount} 個にしてください`);
     renderStampPreview();
     return;
   }
+  if (totalCount > STAMP_BATCH_MAX) {
+    showToast(`一度に押せるのは${STAMP_BATCH_MAX}個までです`);
+    renderStampPreview();
+    return;
+  }
 
-  const stats = studentStats(student.id);
-  const lockedSelection = selections.find(({ stamp }) => !stampIsAvailableForStudent(stamp, student, stats.total));
+  const lockedSelection = selections.find(({ stamp }) =>
+    !pressOptions.availableStamps.some((availableStamp) => availableStamp.id === stamp.id)
+  );
   if (lockedSelection) {
     showToast("まだ使えないスタンプがあります");
     renderStampPreview();
     return;
   }
 
-  addStampBatch({
+  const added = addStampBatch({
     student,
     selections,
     source: stampPreviewContext.source,
     memo: stampPreviewContext.memo,
   });
-  closeStampPreview();
+  if (added) {
+    closeStampPreview();
+  }
 }
 
 function addStampBatch({ student, selections, source, memo }) {
   const stats = studentStats(student.id);
-  const totalAdded = selections.reduce((sum, selection) => sum + selection.count, 0);
+  const pressOptions = pressStampOptionsForStudent(student, stats.total);
+  const normalizedSelections = selections.map(({ stamp, count }) => ({
+    stamp,
+    count: clampStampCount(count, 0),
+  }));
+  const totalAdded = normalizedSelections.reduce((sum, selection) => sum + selection.count, 0);
+  const validSelections = normalizedSelections.filter(({ stamp, count }) =>
+    count > 0 && pressOptions.availableStamps.some((availableStamp) => availableStamp.id === stamp.id)
+  );
+  if (
+    !totalAdded ||
+    totalAdded > STAMP_BATCH_MAX ||
+    validSelections.length !== normalizedSelections.length
+  ) {
+    showToast("使えるスタンプを選び直してください");
+    return false;
+  }
+
   const createdAt = new Date().toISOString();
   const events = [];
 
-  selections.forEach(({ stamp, count }) => {
+  normalizedSelections.forEach(({ stamp, count }) => {
     for (let index = 0; index < count; index += 1) {
       events.push({
         id: crypto.randomUUID(),
@@ -5956,7 +6029,7 @@ function addStampBatch({ student, selections, source, memo }) {
   const completedSheets = sheetsCompletedBetween(stats.total, nextTotal);
   const unlockedStamps = stampsUnlockedBetween(stats.total, nextTotal);
   const unlockedLevels = levelsUnlockedBetween(stats.total, nextTotal);
-  const dominantStamp = dominantStampFromSelections(selections);
+  const dominantStamp = dominantStampFromSelections(normalizedSelections, student);
   state.stampEvents.push(...events);
   const missionDate = CalendarDate.dateKey(new Date(createdAt));
   generateDailyMissions(student.id, missionDate);
@@ -5994,6 +6067,7 @@ function addStampBatch({ student, selections, source, memo }) {
     lastStampedEventIds.clear();
     renderStudentDetails();
   }, 900);
+  return true;
 }
 
 function autoEquipLatestUnlockedHounyan(studentId, unlockedLevels) {
@@ -6011,26 +6085,28 @@ function autoEquipLatestUnlockedHounyan(studentId, unlockedLevels) {
   }
 }
 
-function stampPreviewSelections() {
-  return visibleStampAssets()
+function stampPreviewSelections(student = selectedStudent(), visibleStamps) {
+  const stamps = visibleStamps || pressStampOptionsForStudent(student).visibleStamps;
+  return stamps
     .map((stamp) => ({
       stamp,
-      count: Number(stampPreviewCounts[stamp.id] || 0),
+      count: clampStampCount(stampPreviewCounts[stamp.id], 0),
     }))
     .filter((selection) => selection.count > 0);
 }
 
-function stampPreviewTotalCount() {
-  return Object.values(stampPreviewCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+function stampPreviewTotalCount(student = selectedStudent(), visibleStamps) {
+  return stampPreviewSelections(student, visibleStamps)
+    .reduce((sum, selection) => sum + selection.count, 0);
 }
 
-function dominantStampFromSelections(selections) {
+function dominantStampFromSelections(selections, student) {
   return selections.reduce((best, current) => {
     if (!best || current.count > best.count) {
       return current;
     }
     return best;
-  }, null)?.stamp || visibleStampAssets()[0] || activeStampAssets()[0];
+  }, null)?.stamp || pressStampOptionsForStudent(student).availableStamps[0] || null;
 }
 
 function playDominantStampVoice(stamp) {

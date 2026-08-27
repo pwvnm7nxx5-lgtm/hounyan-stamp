@@ -2954,32 +2954,70 @@ input:focus,
 
 .count-picker {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 58px;
+  grid-template-columns: repeat(2, minmax(48px, 1fr)) minmax(96px, 1.4fr) repeat(2, minmax(48px, 1fr));
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 8px 0 4px;
 }
 
 .count-picker button {
-  width: 58px;
-  height: 58px;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 0 4px;
   border: 0;
   border-radius: var(--radius);
   background: #e8f6ed;
   color: var(--green-deep);
-  font-size: 1.55rem;
+  font-size: 1.05rem;
   font-weight: 900;
+  white-space: nowrap;
 }
 
-.count-picker output {
+.count-picker-field {
   display: grid;
-  min-height: 74px;
-  place-items: center;
+  min-width: 0;
+  gap: 4px;
+  align-content: center;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.count-picker-field > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  min-height: 40px;
+  padding: 0 8px;
   border: 2px solid rgba(48, 165, 73, 0.28);
   border-radius: var(--radius);
   background: #f7fff9;
   color: var(--green-deep);
-  font-size: 2rem;
+}
+
+.count-picker-field > div:focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(66, 180, 51, 0.16);
+}
+
+.count-picker-field input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--green-deep);
+  font-size: 1.65rem;
+  font-weight: 900;
+  text-align: right;
+}
+
+.count-picker-field > div > span {
+  padding-left: 4px;
+  font-size: 0.9rem;
   font-weight: 900;
 }
 
@@ -3931,6 +3969,24 @@ input:focus,
 
   .sheet-album-list {
     grid-template-columns: 1fr;
+  }
+
+  .count-picker {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(82px, 1.25fr) repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .count-picker button {
+    min-height: 52px;
+    font-size: 0.94rem;
+  }
+
+  .count-picker-field > div {
+    padding: 0 5px;
+  }
+
+  .count-picker-field input {
+    font-size: 1.45rem;
   }
 
   .preview-stamp {

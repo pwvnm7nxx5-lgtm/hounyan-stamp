@@ -520,7 +520,7 @@
                   <button class="primary-button wide stamp-press-button" type="button" id="addStampButton">スタンプを押す</button>
                   <label class="field">
                     <span>一気に押す数</span>
-                    <input id="teacherStampBatchCount" type="number" min="1" max="20" step="1" value="1">
+                    <input id="teacherStampBatchCount" type="number" min="1" max="100" step="1" value="1">
                   </label>
                   <label class="field">
                     <span>メモ</span>
@@ -912,9 +912,17 @@
           </div>
         </div>
         <div class="count-picker" aria-label="押すスタンプの合計数">
-          <button type="button" id="stampCountMinus" aria-label="スタンプを減らす">-</button>
-          <output id="stampCountValue" aria-live="polite">0こ</output>
-          <button type="button" id="stampCountPlus" aria-label="スタンプを増やす">+</button>
+          <button type="button" id="stampCountMinusTen" aria-label="スタンプを10こ減らす">-10</button>
+          <button type="button" id="stampCountMinus" aria-label="スタンプを1こ減らす">-1</button>
+          <label class="count-picker-field">
+            <span>合計</span>
+            <div>
+              <input id="stampCountValue" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" aria-label="押すスタンプの数" aria-describedby="stampCountHint">
+              <span id="stampCountUnit" aria-hidden="true">こ</span>
+            </div>
+          </label>
+          <button type="button" id="stampCountPlus" aria-label="スタンプを1こ増やす">+1</button>
+          <button type="button" id="stampCountPlusTen" aria-label="スタンプを10こ増やす">+10</button>
         </div>
         <p class="count-hint" id="stampCountHint">先に、全部で押す数を決めます。</p>
         <div class="preview-actions">
