@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 2200">
+  <title>ほうにゃん装備プレビュー</title>
+  <style>
+    text { font: 700 34px system-ui, sans-serif; fill: #20322f; }
+    .frame { fill: #f7fbf5; stroke: #cfe5d7; stroke-width: 4; }
+  </style>
+  <rect width="1800" height="2200" fill="#ffffff"/>
+  <g transform="translate(40 60)">
+    <rect class="frame" x="0" y="0" width="820" height="620" rx="20"/>
+    <image href="../hounyan-home.png" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <image href="equipment-train.svg" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <text x="32" y="52">でんしゃそうび</text>
+  </g>
+  <g transform="translate(940 60)">
+    <rect class="frame" x="0" y="0" width="820" height="620" rx="20"/>
+    <image href="../hounyan-home.png" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <image href="equipment-hero-cape.svg" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <text x="32" y="52">ヒーローマント</text>
+  </g>
+  <g transform="translate(40 760)">
+    <rect class="frame" x="0" y="0" width="820" height="620" rx="20"/>
+    <image href="../hounyan-home.png" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <image href="equipment-raincoat.svg" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <text x="32" y="52">レインコート</text>
+  </g>
+  <g transform="translate(940 760)">
+    <rect class="frame" x="0" y="0" width="820" height="620" rx="20"/>
+    <image href="../hounyan-home.png" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <image href="equipment-apron.svg" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <text x="32" y="52">おてつだいエプロン</text>
+  </g>
+  <g transform="translate(490 1460)">
+    <rect class="frame" x="0" y="0" width="820" height="620" rx="20"/>
+    <image href="../hounyan-home.png" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <image href="equipment-space-suit.svg" x="45" y="80" width="730" height="584" preserveAspectRatio="xMidYMid meet"/>
+    <text x="32" y="52">うちゅうそうび</text>
+  </g>
+</svg>

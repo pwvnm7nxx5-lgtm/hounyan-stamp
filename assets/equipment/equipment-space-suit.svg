@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1402 1122" fill="none">
+  <title>うちゅうそうび</title>
+  <desc>Transparent body equipment layer for Hounyan. Space suit body only, no helmet.</desc>
+  <g stroke="#151515" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M528 606 C570 560 649 545 721 547 C807 549 880 584 914 642 C934 710 922 780 880 829 C787 870 620 866 540 825 C496 754 492 665 528 606Z" fill="#f7fbff" stroke-width="14"/>
+    <path d="M545 625 C511 646 465 674 426 704 C444 744 482 776 528 785 C543 718 550 668 545 625Z" fill="#dff1ff" stroke-width="12"/>
+    <path d="M899 631 C938 652 980 680 1018 709 C998 750 961 780 914 787 C897 720 891 672 899 631Z" fill="#dff1ff" stroke-width="12"/>
+    <rect x="626" y="624" width="176" height="112" rx="28" fill="#233447" stroke-width="12"/>
+    <circle cx="668" cy="678" r="16" fill="#63d2ff" stroke-width="6"/>
+    <circle cx="716" cy="678" r="16" fill="#ffd84c" stroke-width="6"/>
+    <circle cx="764" cy="678" r="16" fill="#ff6e8a" stroke-width="6"/>
+    <path d="M574 596 C640 626 794 626 861 596" stroke="#b9d8ef" stroke-width="14"/>
+    <path d="M609 825 C671 848 778 848 840 825" stroke="#b9d8ef" stroke-width="10"/>
+    <path d="M534 760 L488 813" stroke="#7aa5c2" stroke-width="10"/>
+    <path d="M906 762 L952 815" stroke="#7aa5c2" stroke-width="10"/>
+    <path d="M820 590 L860 540 L904 556 L872 620" fill="#dff1ff" stroke-width="10"/>
+  </g>
+</svg>

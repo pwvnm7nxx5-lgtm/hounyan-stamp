@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1402 1122" fill="none">
+  <title>でんしゃそうび</title>
+  <desc>Transparent body equipment layer for Hounyan. Train outfit only, no headwear.</desc>
+  <g stroke="#161616" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M505 605 C560 548 665 530 770 552 C868 574 937 634 960 720 C900 790 792 825 665 812 C566 802 495 756 470 690 C466 656 478 627 505 605Z" fill="#f7fbff" stroke-width="14"/>
+    <path d="M506 622 C570 584 848 598 930 680 L918 743 C822 785 650 787 525 730Z" fill="#e9f7ff" stroke-width="10"/>
+    <path d="M545 612 H892 C914 612 933 632 933 655 V689 H504 V653 C504 630 522 612 545 612Z" fill="#fffdf2" stroke-width="12"/>
+    <rect x="542" y="640" width="90" height="62" rx="12" fill="#86d7ff" stroke-width="8"/>
+    <rect x="661" y="640" width="90" height="62" rx="12" fill="#86d7ff" stroke-width="8"/>
+    <rect x="780" y="640" width="90" height="62" rx="12" fill="#86d7ff" stroke-width="8"/>
+    <path d="M512 708 H927" stroke="#e94848" stroke-width="22"/>
+    <path d="M529 744 H908" stroke="#f6c034" stroke-width="16"/>
+    <circle cx="584" cy="770" r="25" fill="#2f3438" stroke-width="8"/>
+    <circle cx="853" cy="770" r="25" fill="#2f3438" stroke-width="8"/>
+    <circle cx="584" cy="770" r="9" fill="#ffffff"/>
+    <circle cx="853" cy="770" r="9" fill="#ffffff"/>
+    <path d="M487 675 C442 672 412 646 396 608 C444 622 478 639 506 670Z" fill="#e94848" stroke-width="10"/>
+    <path d="M935 681 C986 680 1024 654 1045 613 C992 626 954 645 925 674Z" fill="#e94848" stroke-width="10"/>
+    <path d="M612 580 C646 556 796 556 836 580" stroke="#2f3438" stroke-width="10"/>
+  </g>
+</svg>

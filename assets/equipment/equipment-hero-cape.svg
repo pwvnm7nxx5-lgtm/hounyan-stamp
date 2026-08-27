@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1402 1122" fill="none">
+  <title>ヒーローマント</title>
+  <desc>Transparent body equipment layer for Hounyan. Cape and collar only, no headwear.</desc>
+  <g stroke="#151515" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M492 590 C425 640 314 690 274 780 C353 760 443 787 514 842 C544 755 546 666 492 590Z" fill="#f22d22" stroke-width="14"/>
+    <path d="M914 590 C985 638 1096 690 1138 782 C1056 759 971 789 899 845 C872 754 866 664 914 590Z" fill="#f22d22" stroke-width="14"/>
+    <path d="M500 622 C441 684 380 735 324 764" stroke="#9f1010" stroke-width="10"/>
+    <path d="M905 625 C966 687 1028 736 1087 766" stroke="#9f1010" stroke-width="10"/>
+    <path d="M520 552 C572 615 641 647 710 647 C778 647 842 614 886 553 C852 538 812 536 781 558 C733 592 682 591 630 559 C594 536 553 538 520 552Z" fill="#f52a22" stroke-width="14"/>
+    <path d="M636 620 C676 658 742 657 782 620" stroke="#9f1010" stroke-width="10"/>
+    <circle cx="710" cy="648" r="50" fill="#ffe14a" stroke-width="12"/>
+    <circle cx="694" cy="641" r="8" fill="#151515"/>
+    <circle cx="727" cy="641" r="8" fill="#151515"/>
+    <path d="M691 674 C707 688 726 687 741 672" stroke="#151515" stroke-width="8"/>
+  </g>
+</svg>

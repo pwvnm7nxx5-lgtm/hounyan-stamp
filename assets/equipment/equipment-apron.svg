@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1402 1122" fill="none">
+  <title>おてつだいエプロン</title>
+  <desc>Transparent body equipment layer for Hounyan. Apron only, no headwear.</desc>
+  <g stroke="#151515" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M592 570 C620 610 667 631 714 631 C762 631 807 610 834 570" stroke="#5eb6ff" stroke-width="24"/>
+    <path d="M569 625 C605 596 822 596 859 625 L896 820 C810 870 615 870 532 820Z" fill="#8ed8ff" stroke-width="14"/>
+    <path d="M562 664 C526 682 485 700 446 717" stroke="#5eb6ff" stroke-width="16"/>
+    <path d="M865 665 C903 683 946 702 985 719" stroke="#5eb6ff" stroke-width="16"/>
+    <rect x="621" y="710" width="182" height="82" rx="24" fill="#ffffff" stroke-width="10"/>
+    <path d="M647 750 H777" stroke="#5eb6ff" stroke-width="8"/>
+    <path d="M708 710 V792" stroke="#5eb6ff" stroke-width="8"/>
+    <path d="M559 824 C635 856 792 856 874 824" stroke="#5eb6ff" stroke-width="10"/>
+    <circle cx="646" cy="655" r="12" fill="#ffffff" stroke-width="7"/>
+    <circle cx="781" cy="655" r="12" fill="#ffffff" stroke-width="7"/>
+  </g>
+</svg>

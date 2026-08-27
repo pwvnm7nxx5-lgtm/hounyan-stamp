@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1402 1122" fill="none">
+  <title>レインコート</title>
+  <desc>Transparent body equipment layer for Hounyan. Raincoat body only, no hood.</desc>
+  <g stroke="#151515" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M520 600 C566 558 643 546 716 548 C798 551 870 576 912 629 C938 684 936 762 900 824 C814 864 618 866 522 824 C486 747 484 657 520 600Z" fill="#ffe45c" stroke-width="14"/>
+    <path d="M531 625 C498 654 453 686 410 704 C430 747 465 770 516 775 C532 719 537 671 531 625Z" fill="#ffd83f" stroke-width="12"/>
+    <path d="M900 628 C936 658 982 687 1026 707 C1006 751 970 775 918 778 C901 722 894 674 900 628Z" fill="#ffd83f" stroke-width="12"/>
+    <path d="M713 555 V842" stroke="#f4b800" stroke-width="10"/>
+    <circle cx="682" cy="638" r="12" fill="#ffffff" stroke-width="7"/>
+    <circle cx="682" cy="711" r="12" fill="#ffffff" stroke-width="7"/>
+    <circle cx="682" cy="784" r="12" fill="#ffffff" stroke-width="7"/>
+    <path d="M557 588 C614 617 807 617 873 587" stroke="#fff6a8" stroke-width="16"/>
+    <path d="M572 828 C650 861 784 861 876 827" stroke="#f4b800" stroke-width="10"/>
+    <path d="M608 585 C640 615 682 630 715 630 C748 630 790 615 824 585" stroke="#151515" stroke-width="8"/>
+  </g>
+</svg>

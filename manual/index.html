@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ほうにゃんスタンプ台帳 説明書</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --green: #32b331;
+        --green-dark: #1f7f35;
+        --ink: #20322f;
+        --muted: #60736e;
+        --line: #cfe8d5;
+        --paper: #ffffff;
+        --wash: #eef8ef;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 20% 10%, rgba(255, 232, 139, 0.45), transparent 28%),
+          linear-gradient(135deg, #f2fbf3 0%, #ffffff 48%, #e9f6f2 100%);
+      }
+
+      main {
+        width: min(100%, 720px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: 28px 18px 36px;
+        display: grid;
+        align-content: center;
+        gap: 20px;
+      }
+
+      .hero {
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 24px 20px;
+        box-shadow: 0 20px 50px rgba(31, 127, 53, 0.12);
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--green-dark);
+        font-weight: 800;
+        font-size: 0.9rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.9rem, 8vw, 3.4rem);
+        line-height: 1.12;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-size: 1rem;
+        line-height: 1.75;
+      }
+
+      .hounyan {
+        width: min(72vw, 280px);
+        display: block;
+        margin: 22px auto 14px;
+        border-radius: 20px;
+        background: var(--wash);
+      }
+
+      .actions {
+        display: grid;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .button {
+        display: flex;
+        min-height: 58px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        padding: 14px 18px;
+        text-align: center;
+        text-decoration: none;
+        font-weight: 800;
+        line-height: 1.3;
+      }
+
+      .button.primary {
+        color: #fff;
+        background: var(--green);
+        box-shadow: 0 10px 24px rgba(50, 179, 49, 0.28);
+      }
+
+      .button.secondary {
+        color: var(--green-dark);
+        background: #fff;
+        border: 1px solid var(--line);
+      }
+
+      .note {
+        margin: 0;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.72);
+        font-size: 0.9rem;
+        line-height: 1.7;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero" aria-labelledby="title">
+        <p class="eyebrow">はじめての先生向け</p>
+        <h1 id="title">ほうにゃんスタンプ台帳 説明書</h1>
+        <p class="lead">
+          児童登録、スタンプ、シート交換、ほうにゃんレベル、タイマーまでをまとめたPDFです。
+          スマホでもそのまま開けます。
+        </p>
+        <img class="hounyan" src="../assets/hounyan-home.png" alt="ほうにゃん">
+        <div class="actions">
+          <a class="button primary" href="hounyan-stamp-manual.pdf">PDFを開く</a>
+          <a class="button secondary" href="../">アプリを開く</a>
+        </div>
+      </section>
+      <p class="note">
+        PDFが開かない時は、長押しして「新しいタブで開く」または「ダウンロード」を選んでください。
+      </p>
+    </main>
+  </body>
+</html>
