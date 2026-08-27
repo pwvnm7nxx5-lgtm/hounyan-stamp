@@ -10,6 +10,10 @@ const TEST_STUDENT_NAME = "テスト児童";
 const TEST_AVAILABLE_SHEETS = Number.MAX_SAFE_INTEGER;
 const WEEKDAYS = ["月", "火", "水", "木", "金"];
 const DEFAULT_PERIOD_COUNT = 6;
+const GROUP_TYPE_MAINSTREAM = "mainstream";
+const GROUP_TYPE_SUPPORT = "support";
+const SUPPORT_GROUP_FILTER_ALL = "all";
+const SUPPORT_GROUP_FILTER_UNASSIGNED = "unassigned";
 const CalendarDate = window.HounyanCalendar;
 const defaultSubjects = [
   "国語", "算数", "理科", "社会", "生活", "音楽", "図工", "体育", "道徳",
@@ -718,6 +722,8 @@ const defaultState = {
   selectedStudentId: "",
   selectedSchoolYearId: "",
   selectedGroupId: "",
+  selectedSupportGroupId: SUPPORT_GROUP_FILTER_ALL,
+  selectedSupportGroupIdByYear: {},
   selectedStampId: "sonochoshi",
 };
 
@@ -763,6 +769,8 @@ const els = {
   timerPage: document.querySelector('[data-view="timer"]'),
   currentStudentLabel: document.querySelector("#currentStudentLabel"),
   studentSwitchList: document.querySelector("#studentSwitchList"),
+  studentSupportFilter: document.querySelector("#studentSupportFilter"),
+  teacherStudentSupportFilter: document.querySelector("#teacherStudentSupportFilter"),
   childHounyanButton: document.querySelector("#childHounyanButton"),
   childHounyanImage: document.querySelector("#childHounyanImage"),
   totalStudents: document.querySelector("#totalStudents"),
@@ -884,12 +892,14 @@ const els = {
   studentNote: document.querySelector("#studentNote"),
   studentGrade: document.querySelector("#studentGrade"),
   studentSchoolYearLabel: document.querySelector("#studentSchoolYearLabel"),
-  studentGroup: document.querySelector("#studentGroup"),
+  studentMainstreamGroup: document.querySelector("#studentMainstreamGroup"),
+  studentSupportGroup: document.querySelector("#studentSupportGroup"),
   studentTestMode: document.querySelector("#studentTestMode"),
   createTestStudentButton: document.querySelector("#createTestStudentButton"),
   groupForm: document.querySelector("#groupForm"),
   groupId: document.querySelector("#groupId"),
   groupName: document.querySelector("#groupName"),
+  groupType: document.querySelector("#groupType"),
   groupEnabled: document.querySelector("#groupEnabled"),
   clearGroupForm: document.querySelector("#clearGroupForm"),
   schoolYearSelect: document.querySelector("#schoolYearSelect"),
@@ -1053,6 +1063,14 @@ function bindEvents() {
   });
   els.stampTabButtons.forEach((button) => {
     button.addEventListener("click", () => showStampTab(button.dataset.stampTabButton));
+  });
+  [els.studentSupportFilter, els.teacherStudentSupportFilter].forEach((container) => {
+    container?.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-support-filter]");
+      if (!button) return;
+      const filterContainer = button.closest("[data-support-filter-year]");
+      setStudentSupportFilter(button.dataset.supportFilter, filterContainer?.dataset.supportFilterYear || "");
+    });
   });
   els.calendarDisplayTabButtons.forEach((button) => {
     button.addEventListener("click", () => showCalendarDisplayTab(button.dataset.calendarDisplayTabButton));
@@ -1299,6 +1317,22 @@ function normalizeState(input) {
   merged.calendarEvents = normalizeCalendarEvents(input.calendarEvents);
   merged.timetableOverrides = normalizeTimetableOverrides(input.timetableOverrides);
   merged.selectedGroupId = String(input.selectedGroupId || "");
+  const activeYearId = merged.schoolYears.find((schoolYear) => schoolYear.active)?.id || merged.schoolYears[0]?.id || "";
+  const legacySupportFilter = String(input.selectedSupportGroupId || SUPPORT_GROUP_FILTER_ALL);
+  const legacyFilterYearId = merged.groups.find((group) => group.id === legacySupportFilter)?.schoolYearId || activeYearId;
+  const inputSupportFilters = input.selectedSupportGroupIdByYear && typeof input.selectedSupportGroupIdByYear === "object"
+    ? input.selectedSupportGroupIdByYear
+    : {};
+  merged.selectedSupportGroupIdByYear = Object.fromEntries(merged.schoolYears.map((schoolYear) => {
+    const hasYearFilter = Object.prototype.hasOwnProperty.call(inputSupportFilters, schoolYear.id);
+    const candidate = hasYearFilter
+      ? inputSupportFilters[schoolYear.id]
+      : schoolYear.id === legacyFilterYearId
+        ? legacySupportFilter
+        : SUPPORT_GROUP_FILTER_ALL;
+    return [schoolYear.id, normalizeSupportGroupFilter(candidate, merged.groups, merged.schoolYears, schoolYear.id)];
+  }));
+  merged.selectedSupportGroupId = merged.selectedSupportGroupIdByYear[activeYearId] || SUPPORT_GROUP_FILTER_ALL;
   merged.stampEvents = Array.isArray(input.stampEvents) ? input.stampEvents : [];
   merged.missionTemplates = normalizeMissionTemplates(input.missionTemplates);
   merged.studentMissionSettings = normalizeStudentMissionSettings(input.studentMissionSettings);
@@ -1373,6 +1407,69 @@ function normalizeSchoolYears(input) {
   return years;
 }
 
+function normalizeGroupType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["mainstream", "regular", "normal", "main", "通常", "通常学級"].includes(normalized)
+    ? GROUP_TYPE_MAINSTREAM
+    : GROUP_TYPE_SUPPORT;
+}
+
+function groupTypeLabel(type) {
+  return type === GROUP_TYPE_MAINSTREAM ? "通常学級" : "特支学級";
+}
+
+function groupTypeShortLabel(type) {
+  return type === GROUP_TYPE_MAINSTREAM ? "通常" : "特支";
+}
+
+function normalizeSupportGroupFilter(value, groups, schoolYears, schoolYearId = "") {
+  const filter = String(value || SUPPORT_GROUP_FILTER_ALL);
+  if ([SUPPORT_GROUP_FILTER_ALL, SUPPORT_GROUP_FILTER_UNASSIGNED].includes(filter)) return filter;
+  const targetYearId = schoolYearId || schoolYears.find((schoolYear) => schoolYear.active)?.id || schoolYears[0]?.id || "";
+  return groups.some((group) => group.id === filter
+    && group.type === GROUP_TYPE_SUPPORT
+    && group.enabled
+    && group.schoolYearId === targetYearId)
+    ? filter
+    : SUPPORT_GROUP_FILTER_ALL;
+}
+
+function normalizeActiveMembershipConflicts(memberships, groups, preferredGroupId = "") {
+  const groupsById = new Map(groups.map((group) => [group.id, group]));
+  const winners = new Map();
+  memberships.forEach((membership, index) => {
+    if (!membership.active) return;
+    const group = groupsById.get(membership.groupId);
+    if (!group) return;
+    const key = `${membership.studentId}|${membership.schoolYearId}|${group.type}`;
+    const current = winners.get(key);
+    if (!current) {
+      winners.set(key, { membership, index });
+      return;
+    }
+    const candidatePreferred = membership.groupId === preferredGroupId;
+    const currentPreferred = current.membership.groupId === preferredGroupId;
+    const candidateIsNewer = String(membership.updatedAt || "") >= String(current.membership.updatedAt || "");
+    if ((candidatePreferred && !currentPreferred) || (candidatePreferred === currentPreferred && candidateIsNewer)) {
+      winners.set(key, { membership, index });
+    }
+  });
+
+  const endedOn = CalendarDate.dateKey(new Date());
+  const updatedAt = new Date().toISOString();
+  memberships.forEach((membership) => {
+    if (!membership.active) return;
+    const group = groupsById.get(membership.groupId);
+    if (!group) return;
+    const key = `${membership.studentId}|${membership.schoolYearId}|${group.type}`;
+    if (winners.get(key)?.membership === membership) return;
+    membership.active = false;
+    membership.endedOn = membership.endedOn || endedOn;
+    membership.updatedAt = updatedAt;
+  });
+  return memberships;
+}
+
 function normalizeClassMemberships(input, students, groups, schoolYears) {
   const schoolYearIds = new Set(schoolYears.map((schoolYear) => schoolYear.id));
   const studentIds = new Set(students.map((student) => student.id));
@@ -1398,7 +1495,9 @@ function normalizeClassMemberships(input, students, groups, schoolYears) {
   students.forEach((student) => {
     if (!student.groupId || !groupIds.has(student.groupId)) return;
     const group = groups.find((item) => item.id === student.groupId);
-    if (!group || memberships.some((membership) => membership.studentId === student.id && membership.schoolYearId === group.schoolYearId)) return;
+    if (!group || memberships.some((membership) => membership.studentId === student.id
+      && membership.schoolYearId === group.schoolYearId
+      && membership.active)) return;
     const schoolYear = schoolYears.find((item) => item.id === group.schoolYearId);
     memberships.push({
       id: `legacy-membership-${student.id}-${group.schoolYearId}`,
@@ -1413,15 +1512,25 @@ function normalizeClassMemberships(input, students, groups, schoolYears) {
       updatedAt: new Date().toISOString(),
     });
   });
-  return memberships;
+  return normalizeActiveMembershipConflicts(memberships, groups);
 }
 
 function syncLegacyStudentGroups(targetState = state) {
   const activeYearId = targetState.schoolYears.find((schoolYear) => schoolYear.active)?.id || "";
+  const groupsById = new Map(targetState.groups.map((group) => [group.id, group]));
   targetState.students.forEach((student) => {
-    const membership = targetState.classMemberships.find((item) => item.studentId === student.id && item.schoolYearId === activeYearId && item.active);
+    const memberships = targetState.classMemberships
+      .filter((item) => item.studentId === student.id && item.schoolYearId === activeYearId && item.active && groupsById.has(item.groupId))
+      .sort((left, right) => {
+        const leftType = groupsById.get(left.groupId)?.type;
+        const rightType = groupsById.get(right.groupId)?.type;
+        return leftType === rightType ? 0 : leftType === GROUP_TYPE_MAINSTREAM ? -1 : 1;
+      });
+    const membership = memberships[0];
     student.groupId = membership?.groupId || "";
-    student.grade = membership?.grade || "";
+    const grade = memberships.find((item) => String(item.grade || "").trim())?.grade;
+    if (grade) student.grade = grade;
+    else if (memberships.length) student.grade = "";
   });
 }
 
@@ -1494,6 +1603,7 @@ function normalizeGroups(input, fallbackSchoolYearId = "") {
     .map((group, index) => ({
       id: String(group.id),
       name: String(group.name).trim(),
+      type: normalizeGroupType(group.type ?? group.classType ?? group.groupType),
       schoolYearId: String(group.schoolYearId || fallbackSchoolYearId),
       sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : index,
       enabled: group.enabled !== false,
@@ -1819,14 +1929,14 @@ function stampSetIsVisible(stamp) {
   return Boolean(stampSet && !stampSet.hidden);
 }
 
-function persist() {
+function persist({ createBackup = true } = {}) {
   if (stateLoadFailed) {
     showToast("保存データの読み込みに失敗しました。上書きを止めています");
     return false;
   }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    createAutoBackup("auto");
+    if (createBackup) createAutoBackup("auto");
     return true;
   } catch (error) {
     console.error(error);
@@ -1861,6 +1971,13 @@ function render() {
 }
 
 function renderStudentSwitch() {
+  const schoolYearId = supportFilterSchoolYearId({ childMode: true });
+  renderStudentSupportFilter({ schoolYearId, label: "特支クラスから選ぶ" });
+  const { visibleStudents, selectionChanged } = reconcileSelectedStudentForSupportFilter({
+    schoolYearId,
+    reconcile: activeView() !== "teacher",
+  });
+  if (selectionChanged) persist({ createBackup: false });
   const student = selectedStudent();
   els.currentStudentLabel.textContent = student
     ? `選択中：${student.name}${isTestStudent(student) ? "（テスト）" : ""}`
@@ -1871,13 +1988,19 @@ function renderStudentSwitch() {
     return;
   }
 
-  els.studentSwitchList.innerHTML = state.students
+  if (!visibleStudents.length) {
+    els.studentSwitchList.innerHTML = '<p class="empty-state switch-empty">この条件に該当する児童はいません。</p>';
+    return;
+  }
+
+  els.studentSwitchList.innerHTML = visibleStudents
     .map((studentItem) => {
       const stats = studentStats(studentItem.id);
       const selected = studentItem.id === state.selectedStudentId ? " is-selected" : "";
       const selectedText = studentItem.id === state.selectedStudentId ? "true" : "false";
+      const membershipMeta = studentMembershipSummary(studentItem.id, schoolYearId);
       return `
-        <button class="student-tab-button${selected}${isTestStudent(studentItem) ? " is-test" : ""}" type="button" role="tab" aria-selected="${selectedText}" data-switch-student="${studentItem.id}">
+        <button class="student-tab-button${selected}${isTestStudent(studentItem) ? " is-test" : ""}" type="button" role="tab" aria-selected="${selectedText}" title="${escapeHtml(membershipMeta)}" data-switch-student="${studentItem.id}">
           <strong>${escapeHtml(studentItem.name)}</strong>
           <span>${isTestStudent(studentItem) ? "テスト" : `${stats.currentSheet.count}/${SHEET_SIZE}`}</span>
         </button>
@@ -1909,10 +2032,96 @@ function renderTopStats() {
 }
 
 function renderStudentLists() {
+  renderStudentSupportFilter({
+    container: els.teacherStudentSupportFilter,
+    schoolYearId: supportFilterSchoolYearId({ childMode: false }),
+    label: "表示年度の特支クラスから選ぶ",
+  });
   if (els.childStudentList) {
     renderStudentList(els.childStudentList, { childMode: true });
   }
   renderStudentList(els.teacherStudentList, { childMode: false });
+}
+
+function supportFilterSchoolYearId({ childMode = true } = {}) {
+  return (childMode ? activeSchoolYear()?.id : state.selectedSchoolYearId)
+    || activeSchoolYear()?.id
+    || state.selectedSchoolYearId
+    || "";
+}
+
+function selectedSupportFilterForYear(schoolYearId) {
+  const filters = state.selectedSupportGroupIdByYear && typeof state.selectedSupportGroupIdByYear === "object"
+    ? state.selectedSupportGroupIdByYear
+    : {};
+  return normalizeSupportGroupFilter(filters[schoolYearId], state.groups, state.schoolYears, schoolYearId);
+}
+
+function studentsForSupportFilter({ schoolYearId = supportFilterSchoolYearId(), filter = "" } = {}) {
+  const normalizedFilter = filter || selectedSupportFilterForYear(schoolYearId);
+  return state.students.filter((student) => {
+    if (normalizedFilter === SUPPORT_GROUP_FILTER_ALL) return true;
+    const memberships = studentMembershipsForYear(student.id, schoolYearId);
+    if (normalizedFilter === SUPPORT_GROUP_FILTER_UNASSIGNED) {
+      return !memberships.some((membership) => groupById(membership.groupId)?.type === GROUP_TYPE_SUPPORT);
+    }
+    return memberships.some((membership) => membership.groupId === normalizedFilter
+      && groupById(membership.groupId)?.type === GROUP_TYPE_SUPPORT);
+  });
+}
+
+function reconcileSelectedStudentForSupportFilter({ schoolYearId = supportFilterSchoolYearId(), filter = "", reconcile = true, selectFirstWhenEmpty = false } = {}) {
+  const visibleStudents = studentsForSupportFilter({ schoolYearId, filter });
+  const previousStudentId = state.selectedStudentId;
+  const selectedIsVisible = Boolean(state.selectedStudentId)
+    && visibleStudents.some((student) => student.id === state.selectedStudentId);
+  if (reconcile && !selectedIsVisible && (state.selectedStudentId || selectFirstWhenEmpty)) {
+    state.selectedStudentId = visibleStudents[0]?.id || "";
+  }
+  return {
+    visibleStudents,
+    selectionChanged: state.selectedStudentId !== previousStudentId,
+  };
+}
+
+function setStudentSupportFilter(filter, schoolYearId = supportFilterSchoolYearId()) {
+  const normalized = normalizeSupportGroupFilter(filter, state.groups, state.schoolYears, schoolYearId);
+  const current = selectedSupportFilterForYear(schoolYearId);
+  if (current === normalized) return;
+  state.selectedSupportGroupIdByYear = {
+    ...(state.selectedSupportGroupIdByYear || {}),
+    [schoolYearId]: normalized,
+  };
+  state.selectedSupportGroupId = normalized;
+  reconcileSelectedStudentForSupportFilter({
+    schoolYearId,
+    filter: normalized,
+    selectFirstWhenEmpty: true,
+  });
+  persist();
+  render();
+}
+
+function renderStudentSupportFilter({ container = els.studentSupportFilter, schoolYearId = supportFilterSchoolYearId(), label = "特支クラスから選ぶ" } = {}) {
+  if (!container) return;
+  const supportGroups = sortedGroups({ includeDisabled: false, schoolYearId })
+    .filter((group) => group.type === GROUP_TYPE_SUPPORT);
+  const filter = selectedSupportFilterForYear(schoolYearId);
+  const options = [
+    [SUPPORT_GROUP_FILTER_ALL, "すべて"],
+    ...supportGroups.map((group) => [group.id, group.name]),
+    [SUPPORT_GROUP_FILTER_UNASSIGNED, "所属未設定"],
+  ];
+  container.dataset.supportFilterYear = schoolYearId;
+  container.innerHTML = `
+    <span class="student-filter-label">${escapeHtml(label)}</span>
+    <div class="student-filter-options" role="group" aria-label="特支クラスで児童を絞り込む">
+      ${options.map(([value, label]) => `
+        <button class="support-filter-button${value === filter ? " is-selected" : ""}" type="button"
+          aria-pressed="${value === filter}" data-support-filter="${escapeHtml(value)}" data-support-filter-year="${escapeHtml(schoolYearId)}">${escapeHtml(label)}</button>
+      `).join("")}
+    </div>
+  `;
 }
 
 function renderStudentList(container, { childMode }) {
@@ -1923,7 +2132,20 @@ function renderStudentList(container, { childMode }) {
     return;
   }
 
-  container.innerHTML = state.students
+  const schoolYearId = supportFilterSchoolYearId({ childMode });
+  const { visibleStudents: students, selectionChanged } = reconcileSelectedStudentForSupportFilter({
+    schoolYearId,
+    reconcile: activeView() === (childMode ? "stamp" : "teacher"),
+  });
+  if (selectionChanged) persist({ createBackup: false });
+  if (!students.length) {
+    container.innerHTML = childMode
+      ? '<p class="empty-state">この特支クラスに児童はいません。</p>'
+      : '<p class="empty-state">この条件に該当する児童はいません。</p>';
+    return;
+  }
+
+  container.innerHTML = students
     .map((student) => {
       const stats = studentStats(student.id);
       const selected = student.id === state.selectedStudentId ? " is-selected" : "";
@@ -1933,16 +2155,13 @@ function renderStudentList(container, { childMode }) {
         : childMode
         ? `シート ${stats.currentSheet.count}/${SHEET_SIZE}`
         : `累計 ${stats.total} / 使えるシート ${stats.availableSheets}`;
-      const membershipYearId = childMode ? activeSchoolYear()?.id || state.selectedSchoolYearId : state.selectedSchoolYearId;
-      const membership = studentMembershipForYear(student.id, membershipYearId);
-      const group = groupById(membership?.groupId);
-      const classMeta = [membership?.grade, group?.name].filter(Boolean).join(" / ");
-      const meta = student.note || classMeta || (testStudent ? "制限なし・集計に入らない" : childMode ? "がんばり中" : "所属未設定");
+      const membershipMeta = studentMembershipSummary(student.id, schoolYearId);
       return `
         <button class="student-card${selected}${testStudent ? " is-test" : ""}" type="button" data-select-student="${student.id}">
-          <span>
+          <span class="student-card-main">
             <span class="student-name">${escapeHtml(student.name)}${testStudent ? '<span class="test-student-badge">テスト</span>' : ""}</span>
-            <span class="student-meta">${escapeHtml(meta)}</span>
+            <span class="student-meta student-membership-meta">${escapeHtml(membershipMeta)}</span>
+            ${student.note ? `<span class="student-meta student-note-meta">メモ: ${escapeHtml(student.note)}</span>` : ""}
           </span>
           <span class="student-meta">${escapeHtml(sheetText)}</span>
         </button>
@@ -2430,14 +2649,44 @@ function selectedSchoolYear() {
   return state.schoolYears.find((schoolYear) => schoolYear.id === state.selectedSchoolYearId) || activeSchoolYear();
 }
 
+function studentMembershipsForYear(studentId, schoolYearId = activeSchoolYear()?.id || "") {
+  return state.classMemberships
+    .filter((membership) => membership.studentId === studentId
+      && membership.schoolYearId === schoolYearId
+      && membership.active
+      && groupById(membership.groupId))
+    .sort((left, right) => {
+      const leftType = groupById(left.groupId)?.type;
+      const rightType = groupById(right.groupId)?.type;
+      return leftType === rightType ? 0 : leftType === GROUP_TYPE_MAINSTREAM ? -1 : 1;
+    });
+}
+
+function studentMembershipForType(studentId, schoolYearId, type) {
+  return studentMembershipsForYear(studentId, schoolYearId)
+    .find((membership) => groupById(membership.groupId)?.type === type) || null;
+}
+
 function studentMembershipForYear(studentId, schoolYearId = activeSchoolYear()?.id || "") {
-  return state.classMemberships.find((membership) =>
-    membership.studentId === studentId && membership.schoolYearId === schoolYearId && membership.active
-  ) || null;
+  return studentMembershipsForYear(studentId, schoolYearId)[0] || null;
 }
 
 function studentGroupIdForYear(studentId, schoolYearId = activeSchoolYear()?.id || "") {
   return studentMembershipForYear(studentId, schoolYearId)?.groupId || "";
+}
+
+function preferredTimetableGroupIdForYear(studentId, schoolYearId = activeSchoolYear()?.id || "") {
+  return studentGroupIdForYear(studentId, schoolYearId);
+}
+
+function studentMembershipSummary(studentId, schoolYearId = activeSchoolYear()?.id || "") {
+  const memberships = studentMembershipsForYear(studentId, schoolYearId);
+  const groupForType = (type) => memberships.find((membership) => groupById(membership.groupId)?.type === type);
+  const groupNameForType = (type) => {
+    const membership = groupForType(type);
+    return membership ? groupById(membership.groupId)?.name || "未設定" : "未設定";
+  };
+  return `通常: ${groupNameForType(GROUP_TYPE_MAINSTREAM)} / 特支: ${groupNameForType(GROUP_TYPE_SUPPORT)}`;
 }
 
 function classMembers(groupId) {
@@ -2453,25 +2702,39 @@ function classMembers(groupId) {
     .sort((left, right) => left.student.name.localeCompare(right.student.name, "ja"));
 }
 
-function upsertStudentMembership(studentId, schoolYearId, groupId, grade = "") {
+function upsertStudentMembership(studentId, schoolYearId, membershipType, groupId, grade = "") {
   const now = new Date().toISOString();
-  const existing = state.classMemberships.find((membership) => membership.studentId === studentId && membership.schoolYearId === schoolYearId);
-  if (!groupId) {
-    if (existing) {
-      existing.active = false;
-      existing.endedOn = existing.endedOn || CalendarDate.dateKey(new Date());
-      existing.grade = String(grade || "");
-      existing.updatedAt = now;
-    }
+  const group = groupById(groupId);
+  const isValidGroup = Boolean(group && group.schoolYearId === schoolYearId && group.type === membershipType);
+  const activeMemberships = state.classMemberships.filter((membership) => {
+    const membershipGroup = groupById(membership.groupId);
+    return membership.studentId === studentId
+      && membership.schoolYearId === schoolYearId
+      && membership.active
+      && membershipGroup?.type === membershipType;
+  });
+  if (!isValidGroup) {
+    activeMemberships.forEach((membership) => {
+      membership.active = false;
+      membership.endedOn = membership.endedOn || CalendarDate.dateKey(new Date());
+      membership.grade = String(grade || "");
+      membership.updatedAt = now;
+    });
     return;
   }
   const schoolYear = state.schoolYears.find((item) => item.id === schoolYearId);
+  const existing = state.classMemberships
+    .filter((membership) => membership.studentId === studentId
+      && membership.schoolYearId === schoolYearId
+      && membership.groupId === groupId)
+    .sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))[0];
   if (existing) {
-    existing.groupId = groupId;
-    existing.grade = String(grade || "");
-    existing.active = true;
-    existing.endedOn = "";
-    existing.updatedAt = now;
+    Object.assign(existing, {
+      grade: String(grade || ""),
+      active: true,
+      endedOn: "",
+      updatedAt: now,
+    });
   } else {
     state.classMemberships.push({
       id: crypto.randomUUID(),
@@ -2486,6 +2749,17 @@ function upsertStudentMembership(studentId, schoolYearId, groupId, grade = "") {
       updatedAt: now,
     });
   }
+  state.classMemberships.forEach((membership) => {
+    const membershipGroup = groupById(membership.groupId);
+    if (membership.studentId !== studentId
+      || membership.schoolYearId !== schoolYearId
+      || membership.groupId === groupId
+      || !membership.active
+      || membershipGroup?.type !== membershipType) return;
+    membership.active = false;
+    membership.endedOn = membership.endedOn || CalendarDate.dateKey(new Date());
+    membership.updatedAt = now;
+  });
 }
 
 function sortedGroups({ includeDisabled = true, schoolYearId = state.selectedSchoolYearId } = {}) {
@@ -2563,11 +2837,11 @@ function setSelectedSchoolYearActive() {
   showToast(`${schoolYear.name}を現在年度にしました`);
 }
 
-function groupOptions(selectedId = "", { includeBlank = false, includeDisabled = false } = {}) {
-  const groups = sortedGroups({ includeDisabled });
-  const blank = includeBlank ? '<option value="">クラスを選ばない</option>' : "";
+function groupOptions(selectedId = "", { includeBlank = false, includeDisabled = false, type = "" } = {}) {
+  const groups = sortedGroups({ includeDisabled }).filter((group) => !type || group.type === type);
+  const blank = includeBlank ? '<option value="">所属なし</option>' : "";
   return blank + groups.map((group) => `
-    <option value="${escapeHtml(group.id)}"${group.id === selectedId ? " selected" : ""}>${escapeHtml(group.name)}${group.enabled ? "" : "（無効）"}</option>
+    <option value="${escapeHtml(group.id)}"${group.id === selectedId ? " selected" : ""}>${escapeHtml(groupTypeShortLabel(group.type))}：${escapeHtml(group.name)}${group.enabled ? "" : "（無効）"}</option>
   `).join("");
 }
 
@@ -2590,7 +2864,18 @@ function renderGroups() {
   els.calendarGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
   els.calendarViewGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
   els.calendarTimetableGroupSelect.innerHTML = groupOptions(currentId, { includeBlank: true });
-  els.studentGroup.innerHTML = groupOptions(els.studentGroup.value, { includeBlank: true, includeDisabled: true });
+  const mainstreamGroupId = els.studentMainstreamGroup.value;
+  const supportGroupId = els.studentSupportGroup.value;
+  els.studentMainstreamGroup.innerHTML = groupOptions(mainstreamGroupId, {
+    includeBlank: true,
+    includeDisabled: true,
+    type: GROUP_TYPE_MAINSTREAM,
+  });
+  els.studentSupportGroup.innerHTML = groupOptions(supportGroupId, {
+    includeBlank: true,
+    includeDisabled: true,
+    type: GROUP_TYPE_SUPPORT,
+  });
   els.timetableCopyTarget.innerHTML = groupOptions("", { includeBlank: true });
 
   if (!state.groups.length) {
@@ -2612,7 +2897,7 @@ function renderGroups() {
     return `
     <article class="management-item${group.enabled ? "" : " is-disabled"}">
       <div>
-        <strong>${escapeHtml(group.name)}</strong>
+        <strong>${escapeHtml(group.name)} <span class="class-type-badge is-${escapeHtml(group.type)}">${escapeHtml(groupTypeLabel(group.type))}</span></strong>
         <span>${group.enabled ? `${members.length}人` : "無効（履歴は残っています）"}</span>
         <span class="class-member-names">${escapeHtml(memberText)}</span>
       </div>
@@ -2645,13 +2930,28 @@ function saveGroup() {
   if (els.groupId.value) {
     const group = groupById(els.groupId.value);
     if (!group) return;
+    const previousType = group.type;
+    const nextType = normalizeGroupType(els.groupType.value);
+    if (previousType !== nextType) {
+      const conflicts = activeMembershipConflictsForGroupTypeChange(group, nextType);
+      if (conflicts.length) {
+        const names = conflicts.map((student) => student.name).join("、");
+        showToast(`クラス種別を変更できません。${names}はすでに${groupTypeLabel(nextType)}に所属しています。先に該当児童の所属を変更してください。`);
+        els.groupType.focus();
+        return;
+      }
+    }
     group.name = name;
+    group.type = nextType;
     group.enabled = els.groupEnabled.checked;
     group.updatedAt = now;
+    normalizeActiveMembershipConflicts(state.classMemberships, state.groups, previousType === group.type ? "" : group.id);
+    syncLegacyStudentGroups();
   } else {
     const group = {
       id: crypto.randomUUID(),
       name,
+      type: normalizeGroupType(els.groupType.value),
       schoolYearId: state.selectedSchoolYearId,
       enabled: els.groupEnabled.checked,
       sortOrder: sortedGroups().length,
@@ -2667,9 +2967,28 @@ function saveGroup() {
   showToast("クラスを保存しました");
 }
 
+function activeMembershipConflictsForGroupTypeChange(group, nextType) {
+  const memberStudentIds = new Set(state.classMemberships
+    .filter((membership) => membership.groupId === group.id
+      && membership.schoolYearId === group.schoolYearId
+      && membership.active)
+    .map((membership) => membership.studentId));
+  const conflictingStudentIds = new Set(state.classMemberships
+    .filter((membership) => memberStudentIds.has(membership.studentId)
+      && membership.schoolYearId === group.schoolYearId
+      && membership.groupId !== group.id
+      && membership.active
+      && groupById(membership.groupId)?.type === nextType)
+    .map((membership) => membership.studentId));
+  return state.students
+    .filter((student) => conflictingStudentIds.has(student.id))
+    .sort((left, right) => left.name.localeCompare(right.name, "ja"));
+}
+
 function clearGroupForm() {
   els.groupId.value = "";
   els.groupName.value = "";
+  els.groupType.value = GROUP_TYPE_SUPPORT;
   els.groupEnabled.checked = true;
 }
 
@@ -2678,6 +2997,7 @@ function editGroup(groupId) {
   if (!group) return;
   els.groupId.value = group.id;
   els.groupName.value = group.name;
+  els.groupType.value = normalizeGroupType(group.type);
   els.groupEnabled.checked = group.enabled;
   els.groupName.focus();
 }
@@ -4875,6 +5195,7 @@ function resetLevelRules() {
 }
 
 function showView(viewName) {
+  const previousView = activeView();
   els.views.forEach((view) => {
     view.classList.toggle("is-active", view.dataset.view === viewName);
   });
@@ -4882,6 +5203,16 @@ function showView(viewName) {
   els.viewButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.viewButton === viewName);
   });
+  const enteringChildWorkflow = viewName === "stamp" && previousView !== "stamp";
+  const enteringTeacherWorkflow = viewName === "teacher" && previousView !== "teacher";
+  if (enteringChildWorkflow || enteringTeacherWorkflow) {
+    const { selectionChanged } = reconcileSelectedStudentForSupportFilter({
+      schoolYearId: supportFilterSchoolYearId({ childMode: viewName !== "teacher" }),
+      selectFirstWhenEmpty: true,
+    });
+    if (selectionChanged) persist({ createBackup: false });
+    render();
+  }
 }
 
 function showStampTab(tabName) {
@@ -5174,7 +5505,8 @@ function saveStudent() {
   const name = els.studentName.value.trim();
   const note = els.studentNote.value.trim();
   const grade = els.studentGrade.value.trim();
-  const groupId = els.studentGroup.value;
+  const mainstreamGroupId = els.studentMainstreamGroup.value;
+  const supportGroupId = els.studentSupportGroup.value;
   const isTest = Boolean(els.studentTestMode.checked);
   if (!name) {
     showToast("名前を入力してください");
@@ -5187,6 +5519,7 @@ function saveStudent() {
     if (student) {
       student.name = name;
       student.note = note;
+      student.grade = grade;
       student.isTest = isTest;
       savedStudent = student;
     }
@@ -5196,7 +5529,7 @@ function saveStudent() {
       name,
       note,
       groupId: "",
-      grade: "",
+      grade,
       isTest,
       ticketBalance: 0,
       createdAt: new Date().toISOString(),
@@ -5207,7 +5540,10 @@ function saveStudent() {
   }
 
   if (savedStudent) {
-    upsertStudentMembership(savedStudent.id, state.selectedSchoolYearId, groupId, grade);
+    savedStudent.grade = grade;
+    upsertStudentMembership(savedStudent.id, state.selectedSchoolYearId, GROUP_TYPE_MAINSTREAM, mainstreamGroupId, grade);
+    upsertStudentMembership(savedStudent.id, state.selectedSchoolYearId, GROUP_TYPE_SUPPORT, supportGroupId, grade);
+    normalizeActiveMembershipConflicts(state.classMemberships, state.groups);
     syncLegacyStudentGroups();
   }
 
@@ -5224,7 +5560,8 @@ function clearStudentForm() {
   els.studentName.value = "";
   els.studentNote.value = "";
   els.studentGrade.value = "";
-  els.studentGroup.value = "";
+  els.studentMainstreamGroup.value = "";
+  els.studentSupportGroup.value = "";
   els.studentTestMode.checked = false;
 }
 
@@ -5989,9 +6326,11 @@ function editSelectedStudent() {
   els.studentId.value = student.id;
   els.studentName.value = student.name;
   els.studentNote.value = student.note || "";
-  const membership = studentMembershipForYear(student.id, state.selectedSchoolYearId);
-  els.studentGrade.value = membership?.grade || "";
-  els.studentGroup.value = membership?.groupId || "";
+  const schoolYearId = state.selectedSchoolYearId || activeSchoolYear()?.id || "";
+  const memberships = studentMembershipsForYear(student.id, schoolYearId);
+  els.studentGrade.value = memberships.find((membership) => membership.grade)?.grade || student.grade || "";
+  els.studentMainstreamGroup.value = studentMembershipForType(student.id, schoolYearId, GROUP_TYPE_MAINSTREAM)?.groupId || "";
+  els.studentSupportGroup.value = studentMembershipForType(student.id, schoolYearId, GROUP_TYPE_SUPPORT)?.groupId || "";
   els.studentTestMode.checked = isTestStudent(student);
   showView("teacher");
   els.studentName.focus();

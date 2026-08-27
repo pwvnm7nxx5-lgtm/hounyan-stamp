@@ -213,6 +213,43 @@ button:disabled {
   font-size: 1.14rem;
 }
 
+.student-support-filter {
+  display: grid;
+  gap: 6px;
+}
+
+.student-filter-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.student-filter-options {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 1px 1px 4px;
+  scrollbar-width: thin;
+}
+
+.support-filter-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--green-deep);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.support-filter-button.is-selected,
+.support-filter-button:hover {
+  border-color: var(--green);
+  background: #e8f6ed;
+}
+
 .student-tab-list {
   display: flex;
   gap: 8px;
@@ -994,6 +1031,27 @@ button:disabled {
   line-height: 1.6;
 }
 
+.class-type-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.class-type-badge.is-support {
+  background: #e9f7ee;
+  color: var(--green-deep);
+}
+
+.class-type-badge.is-mainstream {
+  background: #eaf4ff;
+  color: #216da0;
+}
+
 .override-item {
   padding: 8px 10px;
   font-size: 0.84rem;
@@ -1323,6 +1381,20 @@ button:disabled {
   text-align: left;
   width: 100%;
   color: var(--ink);
+}
+
+.student-card-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.student-membership-meta {
+  overflow-wrap: anywhere;
+}
+
+.student-note-meta {
+  font-size: 0.78rem;
 }
 
 .child-student-list .student-card {

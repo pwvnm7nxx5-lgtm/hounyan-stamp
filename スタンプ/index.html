@@ -27,6 +27,7 @@
           <span>児童切り替え</span>
           <strong id="currentStudentLabel">選択中：児童未選択</strong>
         </div>
+        <div class="student-support-filter" id="studentSupportFilter" aria-label="特支クラスで児童を絞り込む"></div>
         <div class="student-tab-list" id="studentSwitchList" role="tablist" aria-label="児童を選択"></div>
       </div>
 
@@ -431,12 +432,18 @@
                   <span>メモ</span>
                   <input id="studentNote" type="text" autocomplete="off" placeholder="例: 3年 / Aグループ">
                 </label>
+                <div class="date-range-row student-membership-fields">
+                  <label class="field">
+                    <span>通常学級</span>
+                    <select id="studentMainstreamGroup" class="select"></select>
+                  </label>
+                  <label class="field">
+                    <span>特支学級</span>
+                    <select id="studentSupportGroup" class="select"></select>
+                  </label>
+                </div>
                 <label class="field">
-                  <span id="studentSchoolYearLabel">今年度の所属</span>
-                  <select id="studentGroup" class="select"></select>
-                </label>
-                <label class="field">
-                  <span>学年</span>
+                  <span id="studentSchoolYearLabel">表示年度の学年</span>
                   <input id="studentGrade" type="text" autocomplete="off" placeholder="例: 2年生">
                 </label>
                 <label class="check-row development-setting">
@@ -445,6 +452,7 @@
                 </label>
                 <button class="primary-button wide" type="submit">保存</button>
               </form>
+              <div class="student-support-filter teacher-student-support-filter" id="teacherStudentSupportFilter" aria-label="表示年度の特支クラスで児童を絞り込む"></div>
               <div class="test-student-create">
                 <div>
                   <p class="eyebrow">動作テスト用</p>
@@ -559,6 +567,13 @@
                 <label class="field">
                   <span>クラス名</span>
                   <input id="groupName" type="text" autocomplete="off" required placeholder="例: クラス1 / 支援学級A">
+                </label>
+                <label class="field">
+                  <span>クラス種別</span>
+                  <select id="groupType" class="select">
+                    <option value="support">特支学級</option>
+                    <option value="mainstream">通常学級</option>
+                  </select>
                 </label>
                 <label class="check-row">
                   <input id="groupEnabled" type="checkbox" checked>
