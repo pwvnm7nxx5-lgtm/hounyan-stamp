@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ほうにゃんスタンプ台帳</title>
-    <link rel="stylesheet" href="styles.css?v=tab-layout-v1">
+    <link rel="stylesheet" href="styles.css?v=20260918-print">
   </head>
   <body>
     <div class="app-shell">
@@ -21,6 +21,8 @@
           <button class="page-tab" type="button" data-view-button="settings">設定</button>
         </div>
       </header>
+
+      <div id="storageStatus" class="storage-status" role="status" aria-live="polite" hidden></div>
 
       <div class="student-switcher" id="studentSwitcher" aria-label="児童切り替え">
         <div class="switch-status">
@@ -990,7 +992,8 @@
         </div>
         <p class="sheet-album-intro" id="sheetAlbumSummary">できあがったシートがここにならぶよ。</p>
         <div class="sheet-album-list" id="sheetAlbumList"></div>
-        <div class="preview-actions single">
+        <div class="preview-actions">
+          <button class="soft-button" type="button" id="sheetAlbumPrintAll" disabled>全部のシートを印刷</button>
           <button class="primary-button" type="button" id="sheetAlbumCloseButton">とじる</button>
         </div>
       </div>
@@ -1019,7 +1022,9 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <script src="storage-service.js"></script>
     <script src="calendar-service.js"></script>
-    <script src="app.js?v=tab-layout-v1"></script>
+    <script src="sheet-print.js?v=20260918-print"></script>
+    <script src="app.js?v=20260918-print"></script>
   </body>
 </html>
