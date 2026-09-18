@@ -213,6 +213,23 @@ button:disabled {
   font-size: 1.14rem;
 }
 
+.storage-status {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 2px solid rgba(217, 78, 72, 0.35);
+  border-radius: var(--radius);
+  background: #fff0ee;
+  color: #8e322d;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.storage-status.is-warning {
+  border-color: rgba(128, 85, 29, 0.35);
+  background: #fff8df;
+  color: #80551d;
+}
+
 .student-support-filter {
   display: grid;
   gap: 6px;
@@ -1734,6 +1751,11 @@ button:disabled {
 
 .completed-sheet-grid .stamp-slot {
   border-style: solid;
+}
+
+.sheet-print-button {
+  width: 100%;
+  margin-top: 10px;
 }
 
 .stamp-picker {

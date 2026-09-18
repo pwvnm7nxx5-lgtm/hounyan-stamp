@@ -1,8 +1,9 @@
-const STORAGE_KEY = "hounyan-stamp-ledger-v1";
-const BACKUP_STORAGE_KEY = `${STORAGE_KEY}-broken-backup`;
-const AUTO_BACKUP_STORAGE_KEY = `${STORAGE_KEY}-auto-backups`;
-const AUTO_BACKUP_LIMIT = 6;
-const AUTO_BACKUP_BUCKET_MS = 3 * 60 * 1000;
+const StorageService = window.HounyanStorageService || window.HounyanStorage;
+const STORAGE_KEY = StorageService.STORAGE_KEY;
+const BACKUP_STORAGE_KEY = StorageService.BACKUP_STORAGE_KEY;
+const AUTO_BACKUP_STORAGE_KEY = StorageService.AUTO_BACKUP_STORAGE_KEY;
+const AUTO_BACKUP_LIMIT = StorageService.AUTO_BACKUP_LIMIT;
+const AUTO_BACKUP_BUCKET_MS = StorageService.AUTO_BACKUP_BUCKET_MS;
 const SHEET_SIZE = 20;
 const STAMP_BATCH_MAX = 100;
 const STAMP_SET_MAX_MEMBERS = 12;
@@ -728,7 +729,13 @@ const defaultState = {
 };
 
 let stateLoadFailed = false;
+let storageUnavailable = false;
+let storageErrorMessage = "";
+let storageBackupWarning = "";
+let stateLoadRecoveryAvailable = false;
+let stateRecoveryRaw = "";
 let state = loadState();
+let committedStateSnapshot = StorageService.snapshot(state);
 let lastStampedEventIds = new Set();
 let stampAnimationTimer = 0;
 let hounyanAnimationQueue = [];
@@ -1028,6 +1035,7 @@ const els = {
   sheetAlbumSummary: document.querySelector("#sheetAlbumSummary"),
   sheetAlbumList: document.querySelector("#sheetAlbumList"),
   sheetAlbumCloseButton: document.querySelector("#sheetAlbumCloseButton"),
+  sheetAlbumPrintAll: document.querySelector("#sheetAlbumPrintAll"),
   hounyanAnimationLayer: document.querySelector("#hounyanAnimationLayer"),
   animationCard: document.querySelector("#animationCard"),
   animationHounyan: document.querySelector("#animationHounyan"),
@@ -1040,10 +1048,48 @@ const els = {
   animationTitle: document.querySelector("#animationTitle"),
   animationMessage: document.querySelector("#animationMessage"),
   animationCloseButton: document.querySelector("#animationCloseButton"),
+  storageStatus: document.querySelector("#storageStatus"),
   toast: document.querySelector("#toast"),
 };
 
 init();
+
+if (window.__HOUNYAN_TEST__) {
+  window.__HounyanStampTestApi = {
+    getState: () => StorageService.snapshot(state),
+    mutateAndPersist: (mutator, options) => {
+      if (typeof mutator === "function") mutator(state);
+      return persist(options);
+    },
+    replaceCandidate: (candidate) => commitCandidateState(candidate, { allowLoadRecovery: true }),
+    replaceImportedState,
+    importData,
+    restoreAutoBackup,
+    addStampBatch: ({ selections, source = "teacher", memo = "" }) => addStampBatch({
+      student: selectedStudent(),
+      selections: selections.map(({ stampId, count }) => ({ stamp: activeStampAssets().find((stamp) => stamp.id === stampId), count })),
+      source,
+      memo,
+    }),
+    completeMissionAndPersist: (missionId) => {
+      if (!completeMission(missionId)) return false;
+      return persist();
+    },
+    revertMissionAndPersist: (missionId) => revertMission(missionId),
+    buyStamp,
+    redeemReward,
+    cancelRedemption,
+    deleteStampAsset,
+    deleteStampSet,
+    getStorageStatus: () => ({
+      stateLoadFailed,
+      storageUnavailable,
+      stateLoadRecoveryAvailable,
+      storageErrorMessage,
+      storageBackupWarning,
+    }),
+  };
+}
 
 function init() {
   bindEvents();
@@ -1052,7 +1098,9 @@ function init() {
   showCalendarDisplayTab("calendar");
   showTeacherTab("students");
   updateStampAssetModeFields();
-  ensureSelection();
+  const selectionChanged = ensureSelection();
+  const missionsChanged = prepareDailyMissions();
+  if ((selectionChanged || missionsChanged) && !persist({ backupReason: "auto" })) return;
   renderTimer();
   render();
 }
@@ -1134,6 +1182,7 @@ function bindEvents() {
   els.createTestStudentButton.addEventListener("click", createTestStudent);
   els.missionStudentSelect.addEventListener("change", () => {
     missionStudentId = els.missionStudentSelect.value;
+    if (prepareDailyMissions() && !persist({ createBackup: false })) return;
     renderDailyMissions();
   });
   els.missionTemplateForm.addEventListener("submit", (event) => {
@@ -1202,7 +1251,7 @@ function bindEvents() {
   els.deleteStudentButton.addEventListener("click", deleteSelectedStudent);
   els.shopStudentSelect.addEventListener("change", () => {
     state.selectedStudentId = els.shopStudentSelect.value;
-    persist();
+    if (!persist({ createBackup: false })) return;
     render();
   });
   els.timerModeButtons.forEach((button) => {
@@ -1219,8 +1268,9 @@ function bindEvents() {
   els.importInput.addEventListener("change", importData);
   els.createAutoBackupButton.addEventListener("click", () => {
     const created = createAutoBackup("manual", { force: true });
+    renderStorageStatus();
     renderAutoBackups();
-    showToast(created ? "自動バックアップを作成しました" : "自動バックアップを更新できませんでした");
+    showToast(created ? "自動バックアップを作成しました" : "自動バックアップを更新できませんでした。主データは変更していません");
   });
   els.exchangeCancelButton.addEventListener("click", closeExchangeConfirm);
   els.exchangeConfirmButton.addEventListener("click", confirmExchange);
@@ -1236,6 +1286,11 @@ function bindEvents() {
     }
   });
   els.sheetAlbumCloseButton.addEventListener("click", closeSheetAlbum);
+  els.sheetAlbumPrintAll.addEventListener("click", () => printCompletedSheets());
+  els.sheetAlbumList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-print-sheet]");
+    if (button) printCompletedSheets(Number(button.dataset.printSheet));
+  });
   els.sheetAlbumLayer.addEventListener("click", (event) => {
     if (event.target === els.sheetAlbumLayer) {
       closeSheetAlbum();
@@ -1271,29 +1326,43 @@ function bindEvents() {
 }
 
 function loadState() {
+  const storage = getBrowserStorage();
+  const result = StorageService.loadState({
+    storage,
+    key: STORAGE_KEY,
+    recoveryKey: BACKUP_STORAGE_KEY,
+    defaultState,
+    normalize: normalizeState,
+  });
+  if (!result.ok) {
+    stateLoadFailed = true;
+    storageUnavailable = result.storageAvailable === false;
+    stateLoadRecoveryAvailable = result.recoveryAvailable === true;
+    stateRecoveryRaw = stateLoadRecoveryAvailable && typeof result.recoveryRaw === "string" ? result.recoveryRaw : "";
+    storageErrorMessage = result.error?.message || "保存データを読み込めませんでした。";
+    console.error(result.error || result.validation);
+  } else {
+    stateLoadFailed = false;
+    storageUnavailable = false;
+    stateLoadRecoveryAvailable = false;
+    stateRecoveryRaw = "";
+  }
+  return result.state;
+}
+
+function getBrowserStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return normalizeState(structuredClone(defaultState));
-    }
-    const parsed = JSON.parse(raw);
-    return normalizeState(parsed);
+    return window.localStorage;
   } catch (error) {
     console.error(error);
-    stateLoadFailed = true;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        localStorage.setItem(BACKUP_STORAGE_KEY, raw);
-      } catch (backupError) {
-        console.error(backupError);
-      }
-    }
-    return normalizeState(structuredClone(defaultState));
+    return null;
   }
 }
 
 function normalizeState(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("状態のルートはオブジェクトである必要があります");
+  }
   const merged = {
     ...structuredClone(defaultState),
     ...input,
@@ -1361,6 +1430,12 @@ function normalizeState(input) {
   merged.ownedStampIdsByStudent = normalizeOwnedStampIdsByStudent(input.ownedStampIdsByStudent);
   merged.rewardGoalsByStudent = normalizeRewardGoalsByStudent(input.rewardGoalsByStudent);
   merged.equippedHounyanLevelByStudent = normalizeEquippedHounyanLevels(input.equippedHounyanLevelByStudent);
+  merged.selectedStudentId = merged.students.some((student) => student.id === String(input.selectedStudentId || ""))
+    ? String(input.selectedStudentId)
+    : merged.students[0]?.id || "";
+  merged.selectedStampId = merged.stampAssets.some((stamp) => stamp.id === String(input.selectedStampId || ""))
+    ? String(input.selectedStampId)
+    : merged.stampAssets[0]?.id || "sonochoshi";
   return merged;
 }
 
@@ -1936,24 +2011,80 @@ function stampSetIsVisible(stamp) {
   return Boolean(stampSet && !stampSet.hidden);
 }
 
-function persist({ createBackup = true } = {}) {
-  if (stateLoadFailed) {
-    showToast("保存データの読み込みに失敗しました。上書きを止めています");
+function storageFailureMessage(result) {
+  return result?.error?.message || "保存できませんでした。現在の変更は反映していません。";
+}
+
+function commitCandidateState(candidate, { createBackup = true, backupReason = "auto", allowLoadRecovery = false } = {}) {
+  if (stateLoadFailed && (!allowLoadRecovery || storageUnavailable || !stateLoadRecoveryAvailable || !stateRecoveryRaw)) {
+    storageErrorMessage = storageErrorMessage || "保存データを読み込めなかったため、保護コピーを確認できるまで上書き保存を停止しています。";
+    state = StorageService.snapshot(committedStateSnapshot);
+    render();
+    showToast(storageErrorMessage);
     return false;
   }
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    if (createBackup) createAutoBackup("auto");
-    return true;
-  } catch (error) {
-    console.error(error);
-    showToast("保存容量がいっぱいです。画像を小さくしてもう一度試してください");
+  const result = StorageService.savePrimary({
+    storage: getBrowserStorage(),
+    key: STORAGE_KEY,
+    state: candidate,
+  });
+  if (!result.ok) {
+    storageUnavailable = result.error?.code === "storage_unavailable";
+    storageErrorMessage = storageFailureMessage(result);
+    state = StorageService.snapshot(committedStateSnapshot);
+    console.error(result.error);
+    render();
+    showToast(storageErrorMessage);
     return false;
   }
+
+  state = StorageService.snapshot(result.state);
+  committedStateSnapshot = StorageService.snapshot(state);
+  stateLoadFailed = false;
+  stateLoadRecoveryAvailable = false;
+  stateRecoveryRaw = "";
+  storageUnavailable = false;
+  storageErrorMessage = "";
+  if (createBackup) {
+    const backup = createAutoBackup(backupReason);
+    if (!backup) {
+      storageBackupWarning = "主データは保存済みですが、自動バックアップを更新できませんでした。自動バックアップには今回の変更がまだ反映されていません。";
+    } else {
+      storageBackupWarning = "";
+    }
+  }
+  return true;
+}
+
+function persist({ createBackup = true, backupReason = "auto" } = {}) {
+  return commitCandidateState(state, { createBackup, backupReason });
+}
+
+function renderStorageStatus() {
+  if (!els.storageStatus) return;
+  if (stateLoadFailed || storageUnavailable) {
+    els.storageStatus.hidden = false;
+    els.storageStatus.className = "storage-status";
+    const recoveryMessage = storageUnavailable
+      ? "保存領域が利用できないため、JSONの置き換え・復元も停止しています。"
+      : stateLoadRecoveryAvailable && stateRecoveryRaw
+        ? "読み込み失敗元データの復元用原本（保護コピー）を保持しています。検証済みJSONで復旧できます（確認必須）。"
+        : "読み込み失敗元データの保護コピーを確認できないため、JSONの置き換え・復元も停止しています。";
+    els.storageStatus.textContent = `保存不可：${storageErrorMessage || "保存領域を利用できません。"} 安全な表示状態を表示しています。${recoveryMessage}`;
+    return;
+  }
+  if (storageErrorMessage || storageBackupWarning) {
+    els.storageStatus.hidden = false;
+    els.storageStatus.className = "storage-status is-warning";
+    els.storageStatus.textContent = storageErrorMessage || storageBackupWarning;
+    return;
+  }
+  els.storageStatus.hidden = true;
+  els.storageStatus.textContent = "";
 }
 
 function render() {
-  if (expirePastDailyMissions()) persist();
+  renderStorageStatus();
   renderTopStats();
   renderStudentSwitch();
   renderStudentLists();
@@ -1980,11 +2111,10 @@ function render() {
 function renderStudentSwitch() {
   const schoolYearId = supportFilterSchoolYearId({ childMode: true });
   renderStudentSupportFilter({ schoolYearId, label: "特支クラスから選ぶ" });
-  const { visibleStudents, selectionChanged } = reconcileSelectedStudentForSupportFilter({
+  const { visibleStudents } = reconcileSelectedStudentForSupportFilter({
     schoolYearId,
-    reconcile: activeView() !== "teacher",
+    reconcile: false,
   });
-  if (selectionChanged) persist({ createBackup: false });
   const student = selectedStudent();
   els.currentStudentLabel.textContent = student
     ? `選択中：${student.name}${isTestStudent(student) ? "（テスト）" : ""}`
@@ -2091,6 +2221,14 @@ function reconcileSelectedStudentForSupportFilter({ schoolYearId = supportFilter
   };
 }
 
+function reconcileActiveStudentSelection({ selectFirstWhenEmpty = false } = {}) {
+  const childMode = activeView() !== "teacher";
+  return reconcileSelectedStudentForSupportFilter({
+    schoolYearId: supportFilterSchoolYearId({ childMode }),
+    selectFirstWhenEmpty,
+  }).selectionChanged;
+}
+
 function setStudentSupportFilter(filter, schoolYearId = supportFilterSchoolYearId()) {
   const normalized = normalizeSupportGroupFilter(filter, state.groups, state.schoolYears, schoolYearId);
   const current = selectedSupportFilterForYear(schoolYearId);
@@ -2105,7 +2243,8 @@ function setStudentSupportFilter(filter, schoolYearId = supportFilterSchoolYearI
     filter: normalized,
     selectFirstWhenEmpty: true,
   });
-  persist();
+  prepareDailyMissions();
+  if (!persist({ createBackup: false })) return;
   render();
 }
 
@@ -2140,11 +2279,10 @@ function renderStudentList(container, { childMode }) {
   }
 
   const schoolYearId = supportFilterSchoolYearId({ childMode });
-  const { visibleStudents: students, selectionChanged } = reconcileSelectedStudentForSupportFilter({
+  const { visibleStudents: students } = reconcileSelectedStudentForSupportFilter({
     schoolYearId,
-    reconcile: activeView() === (childMode ? "stamp" : "teacher"),
+    reconcile: false,
   });
-  if (selectionChanged) persist({ createBackup: false });
   if (!students.length) {
     container.innerHTML = childMode
       ? '<p class="empty-state">この特支クラスに児童はいません。</p>'
@@ -2275,18 +2413,6 @@ function renderDailyMissions() {
   if (!missionStudentId || !state.students.some((student) => student.id === missionStudentId)) {
     missionStudentId = childStudent?.id || state.students[0]?.id || "";
   }
-  const beforeMissionCount = state.dailyMissions.length;
-  const beforeSettingCount = state.studentMissionSettings.length;
-  let automaticChanged = false;
-  const missionStudents = [childStudent, state.students.find((student) => student.id === missionStudentId)]
-    .filter(Boolean)
-    .filter((student, index, students) => students.findIndex((item) => item.id === student.id) === index);
-  missionStudents.forEach((student) => {
-    generateDailyMissions(student.id, today);
-    automaticChanged = refreshAutomaticMissions(student.id, today) || automaticChanged;
-  });
-  if (state.dailyMissions.length !== beforeMissionCount || state.studentMissionSettings.length !== beforeSettingCount || automaticChanged) persist();
-
   if (!childStudent) {
     els.childTicketBalance.textContent = "きっぷ 0まい";
     els.childDailyMissions.innerHTML = '<p class="empty-state compact-empty">児童を選ぶと、きょうのミッションが表示されます。</p>';
@@ -2355,7 +2481,10 @@ function renderTeacherDailyMissions() {
   els.teacherDailyMissions.innerHTML = missions.length ? missions.map((mission) => dailyMissionCardMarkup(mission, { teacher: true })).join("") : '<p class="empty-state">表示するミッションはありません。</p>';
   els.teacherDailyMissions.querySelectorAll("[data-mission-complete]").forEach((button) => button.addEventListener("click", () => {
     if (!completeMission(button.dataset.missionComplete)) return;
-    persist(); render(); showToast("ミッション達成！ 報酬を追加しました");
+    if (!persist()) return;
+    render();
+    showMissionCompletionState(button.dataset.missionComplete);
+    showToast("ミッション達成！ 報酬を追加しました");
   }));
   els.teacherDailyMissions.querySelectorAll("[data-mission-revert]").forEach((button) => button.addEventListener("click", () => {
     if (revertMission(button.dataset.missionRevert)) showToast("未達成へ戻し、報酬も取り消しました");
@@ -2397,7 +2526,11 @@ function saveMissionTemplate() {
   if (!draft.name || !draft.displayText) return;
   if (existing) Object.assign(existing, draft);
   else state.missionTemplates.push({ id: crypto.randomUUID(), ...draft, createdAt: now });
-  clearMissionTemplateForm(); persist(); render(); showToast("ミッションひな形を保存しました");
+  prepareDailyMissions();
+  if (!persist()) return;
+  clearMissionTemplateForm();
+  render();
+  showToast("ミッションひな形を保存しました");
 }
 
 function editMissionTemplate(templateId) {
@@ -2412,12 +2545,17 @@ function editMissionTemplate(templateId) {
 function copyMissionTemplate(templateId) {
   const template = missionTemplateById(templateId); if (!template) return;
   const now = new Date().toISOString(); state.missionTemplates.push({ ...structuredClone(template), id: crypto.randomUUID(), name: `${template.name}（コピー）`, createdAt: now, updatedAt: now });
-  persist(); render(); showToast("ひな形を複製しました");
+  if (!persist()) return;
+  render();
+  showToast("ひな形を複製しました");
 }
 
 function toggleMissionTemplate(templateId) {
   const template = missionTemplateById(templateId); if (!template) return;
-  template.enabled = !template.enabled; template.updatedAt = new Date().toISOString(); persist(); render();
+  template.enabled = !template.enabled; template.updatedAt = new Date().toISOString();
+  prepareDailyMissions();
+  if (!persist()) return;
+  render();
 }
 
 function deleteMissionTemplate(templateId) {
@@ -2426,7 +2564,9 @@ function deleteMissionTemplate(templateId) {
     .forEach((setting) => removePendingMissionsForSetting(setting.id, { includeCompleted: true }));
   state.missionTemplates = state.missionTemplates.filter((item) => item.id !== templateId);
   state.studentMissionSettings = state.studentMissionSettings.filter((setting) => setting.missionTemplateId !== templateId);
-  persist(); render(); showToast("ミッションひな形を削除しました");
+  if (!persist()) return;
+  render();
+  showToast("ミッションひな形を削除しました");
 }
 
 function clearStudentMissionSettingForm() {
@@ -2445,7 +2585,11 @@ function saveStudentMissionSetting() {
   const now = new Date().toISOString(); const existing = missionSettingById(els.studentMissionSettingId.value);
   const draft = { studentId: student.id, missionTemplateId: template.id, targetValue: Math.max(1, Number(els.studentMissionTarget.value || 1)), stampReward: Math.max(0, Number(els.studentMissionStampReward.value || 0)), ticketReward: Math.max(0, Number(els.studentMissionTicketReward.value || 0)), enabled: els.studentMissionEnabled.checked, updatedAt: now };
   if (existing) Object.assign(existing, draft); else state.studentMissionSettings.push({ id: crypto.randomUUID(), ...draft, displayOrder: state.studentMissionSettings.filter((setting) => setting.studentId === student.id).length, validFrom: "", validUntil: "", createdAt: now });
-  clearStudentMissionSettingForm(); persist(); render(); showToast("児童のミッションを保存しました");
+  prepareDailyMissions();
+  if (!persist()) return;
+  clearStudentMissionSettingForm();
+  render();
+  showToast("児童のミッションを保存しました");
 }
 
 function editStudentMissionSetting(settingId) {
@@ -2459,19 +2603,27 @@ function toggleStudentMissionSetting(settingId) {
   setting.enabled = !setting.enabled;
   setting.updatedAt = new Date().toISOString();
   if (!setting.enabled) removePendingMissionsForSetting(settingId, { includeCompleted: true });
-  persist(); render();
+  prepareDailyMissions();
+  if (!persist()) return;
+  render();
 }
 
 function deleteStudentMissionSetting(settingId) {
   const setting = missionSettingById(settingId); if (!setting || !confirm("この児童のミッション設定を削除しますか？")) return;
   removePendingMissionsForSetting(settingId, { includeCompleted: true });
-  state.studentMissionSettings = state.studentMissionSettings.filter((item) => item.id !== settingId); persist(); render();
+  state.studentMissionSettings = state.studentMissionSettings.filter((item) => item.id !== settingId);
+  if (!persist()) return;
+  render();
 }
 
 function applyTicketAdjustment() {
   const student = state.students.find((item) => item.id === missionStudentId); const amount = Number(els.ticketAdjustment.value || 0);
   if (!student || !amount) return;
-  student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) + amount); els.ticketAdjustment.value = "0"; persist(); render(); showToast("きっぷ残高を更新しました");
+  student.ticketBalance = Math.max(0, Number(student.ticketBalance || 0) + amount);
+  if (!persist()) return;
+  els.ticketAdjustment.value = "0";
+  render();
+  showToast("きっぷ残高を更新しました");
 }
 
 function renderChildNextUnlock(total, student) {
@@ -2791,7 +2943,7 @@ function selectGroup(groupId) {
   } else {
     state.selectedGroupId = group.id;
   }
-  persist();
+  if (!persist({ createBackup: false })) return;
   render();
 }
 
@@ -2804,10 +2956,11 @@ function selectSchoolYear(schoolYearId) {
   if (!state.schoolYears.some((schoolYear) => schoolYear.id === schoolYearId)) return;
   state.selectedSchoolYearId = schoolYearId;
   state.selectedGroupId = "";
+  ensureGroupSelection();
+  reconcileActiveStudentSelection({ selectFirstWhenEmpty: true });
+  if (!persist({ createBackup: false })) return;
   clearGroupForm();
   clearStudentForm();
-  ensureGroupSelection();
-  persist();
   render();
 }
 
@@ -2823,7 +2976,7 @@ function addNextSchoolYear() {
   state.schoolYears.sort((left, right) => right.year - left.year);
   state.selectedSchoolYearId = schoolYearIdForNumber(nextYear);
   state.selectedGroupId = "";
-  persist();
+  if (!persist()) return;
   render();
   showToast(`${nextYear}年度を追加しました。クラスを作成できます`);
 }
@@ -2833,13 +2986,18 @@ function setSelectedSchoolYearActive() {
   if (!schoolYear || schoolYear.active) return;
   const ok = confirm(`${schoolYear.name}を現在年度にします。ミッション・時間割・登校日判定は、この年度の所属クラスを参照します。よろしいですか？`);
   if (!ok) return;
-  createAutoBackup("before-school-year-change", { force: true });
+  if (!createAutoBackup("before-school-year-change", { force: true, precondition: true })) {
+    showToast("年度変更前バックアップを作成できないため、変更を中止しました");
+    return;
+  }
   state.schoolYears.forEach((item) => {
     item.active = item.id === schoolYear.id;
     item.updatedAt = new Date().toISOString();
   });
   syncLegacyStudentGroups();
-  persist();
+  reconcileActiveStudentSelection({ selectFirstWhenEmpty: true });
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast(`${schoolYear.name}を現在年度にしました`);
 }
@@ -2968,8 +3126,10 @@ function saveGroup() {
     state.groups.push(group);
     if (group.enabled) state.selectedGroupId = group.id;
   }
+  reconcileActiveStudentSelection({ selectFirstWhenEmpty: true });
+  prepareDailyMissions();
+  if (!persist()) return;
   clearGroupForm();
-  persist();
   render();
   showToast("クラスを保存しました");
 }
@@ -3015,7 +3175,9 @@ function toggleGroup(groupId) {
   group.enabled = !group.enabled;
   group.updatedAt = new Date().toISOString();
   if (!group.enabled && state.selectedGroupId === group.id) ensureGroupSelection();
-  persist();
+  reconcileActiveStudentSelection({ selectFirstWhenEmpty: true });
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast(group.enabled ? "クラスを有効にしました" : "クラスを無効にしました");
 }
@@ -3028,7 +3190,7 @@ function moveGroup(groupId, direction) {
   const current = groups[index];
   const target = groups[targetIndex];
   [current.sortOrder, target.sortOrder] = [target.sortOrder, current.sortOrder];
-  persist();
+  if (!persist()) return;
   render();
 }
 
@@ -3040,7 +3202,10 @@ function deleteGroup(groupId) {
     + state.calendarEvents.filter((event) => event.groupIds.includes(groupId)).length;
   const ok = confirm(`${group.name}を完全に削除します。関連する時間割・当日変更・クラス別予定も削除されます（${related}件）。よろしいですか？`);
   if (!ok) return;
-  createAutoBackup("before-delete", { force: true });
+  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+    showToast("削除前バックアップを作成できないため、削除を中止しました");
+    return;
+  }
   state.groups = state.groups.filter((item) => item.id !== groupId);
   state.classMemberships = state.classMemberships.filter((membership) => membership.groupId !== groupId);
   state.timetables = state.timetables.filter((timetable) => timetable.groupId !== groupId);
@@ -3049,7 +3214,9 @@ function deleteGroup(groupId) {
     .filter((event) => event.scope !== "groups" || event.groupIds.length);
   syncLegacyStudentGroups();
   ensureGroupSelection();
-  persist();
+  reconcileActiveStudentSelection({ selectFirstWhenEmpty: true });
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast("クラスと関連データを削除しました");
 }
@@ -3141,7 +3308,8 @@ function saveTimetable() {
   } else {
     state.timetables.push({ id: crypto.randomUUID(), groupId: group.id, name, startsOn, endsOn, enabled: true, ...draft, createdAt: now, updatedAt: now });
   }
-  persist();
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast(`${group.name}の時間割を保存しました`);
 }
@@ -3159,7 +3327,8 @@ function copyTimetableToGroup() {
   const copied = { name: els.timetableName.value.trim() || "基本時間割", startsOn: els.timetableStartsOn.value, endsOn: els.timetableEndsOn.value, ...draft, updatedAt: now };
   if (existing) Object.assign(existing, copied);
   else state.timetables.push({ id: crypto.randomUUID(), groupId: targetGroup.id, enabled: true, createdAt: now, ...copied });
-  persist();
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast(`${targetGroup.name}へ時間割をコピーしました`);
 }
@@ -3174,7 +3343,8 @@ function resetTimetable() {
     timetable.periodCount = DEFAULT_PERIOD_COUNT;
     timetable.updatedAt = new Date().toISOString();
   }
-  persist();
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast("時間割を初期化しました");
 }
@@ -3196,8 +3366,8 @@ function saveSubject() {
   const subject = subjectById(els.subjectId.value);
   if (subject) subject.name = name;
   else state.subjects.push({ id: crypto.randomUUID(), name, sortOrder: state.subjects.length, enabled: true });
+  if (!persist()) return;
   clearSubjectForm();
-  persist();
   render();
 }
 
@@ -3218,7 +3388,7 @@ function toggleSubject(subjectId) {
   const subject = subjectById(subjectId);
   if (!subject) return;
   subject.enabled = !subject.enabled;
-  persist();
+  if (!persist()) return;
   render();
 }
 
@@ -3449,6 +3619,32 @@ function expirePastDailyMissions(today = CalendarDate.dateKey(new Date())) {
   return changed;
 }
 
+function prepareDailyMissions(today = CalendarDate.dateKey(new Date())) {
+  const before = StorageService.serialize({
+    students: state.students,
+    studentMissionSettings: state.studentMissionSettings,
+    dailyMissions: state.dailyMissions,
+    stampEvents: state.stampEvents,
+  });
+  expirePastDailyMissions(today);
+  const selectedIds = [
+    state.selectedStudentId,
+    missionStudentId,
+    state.students[0]?.id,
+  ].filter(Boolean);
+  [...new Set(selectedIds)].forEach((studentId) => {
+    generateDailyMissions(studentId, today);
+    refreshAutomaticMissions(studentId, today);
+  });
+  const after = StorageService.serialize({
+    students: state.students,
+    studentMissionSettings: state.studentMissionSettings,
+    dailyMissions: state.dailyMissions,
+    stampEvents: state.stampEvents,
+  });
+  return before !== after;
+}
+
 function automaticMissionBaseValue(mission) {
   const stampCount = state.stampEvents.filter((event) => event.studentId === mission.studentId && !event.canceled
     && !MISSION_REWARD_SOURCES.has(event.source) && CalendarDate.dateKey(new Date(event.createdAt)) === mission.targetDate).length;
@@ -3495,13 +3691,17 @@ function completeMission(missionId) {
   mission.completedAt = new Date().toISOString();
   mission.updatedAt = mission.completedAt;
   grantMissionReward(mission);
-  lastCompletedMissionId = mission.id;
+  return true;
+}
+
+function showMissionCompletionState(missionId) {
+  if (!missionId) return;
+  lastCompletedMissionId = missionId;
   clearTimeout(missionCelebrationTimer);
   missionCelebrationTimer = window.setTimeout(() => {
     lastCompletedMissionId = "";
     renderDailyMissions();
   }, 1800);
-  return true;
 }
 
 function refreshAutomaticMissions(studentId, date = CalendarDate.dateKey(new Date())) {
@@ -3509,9 +3709,13 @@ function refreshAutomaticMissions(studentId, date = CalendarDate.dateKey(new Dat
   getDailyMissions(studentId, date).forEach((mission) => {
     if (mission.evaluationType !== "automatic" || ["completed", "revoked"].includes(mission.status)) return;
     const value = missionProgressValue(mission);
-    mission.currentValue = value;
-    mission.status = value > 0 ? "in_progress" : "not_started";
-    mission.updatedAt = new Date().toISOString();
+    const nextStatus = value > 0 ? "in_progress" : "not_started";
+    if (mission.currentValue !== value || mission.status !== nextStatus) {
+      mission.currentValue = value;
+      mission.status = nextStatus;
+      mission.updatedAt = new Date().toISOString();
+      changed = true;
+    }
     if (value >= mission.targetValue) changed = completeMission(mission.id) || changed;
   });
   return changed;
@@ -3528,9 +3732,10 @@ function adjustMissionProgress(missionId, amount) {
   mission.currentValue = progress;
   mission.status = progress > 0 ? "in_progress" : "not_started";
   mission.updatedAt = new Date().toISOString();
-  if (progress >= mission.targetValue) completeMission(mission.id);
-  persist();
+  const completed = progress >= mission.targetValue && completeMission(mission.id);
+  if (!persist()) return false;
   render();
+  if (completed) showMissionCompletionState(mission.id);
   return true;
 }
 
@@ -3542,7 +3747,7 @@ function revertMission(missionId) {
   mission.completedAt = "";
   mission.currentValue = Math.min(mission.targetValue - 1, missionProgressValue(mission));
   mission.updatedAt = new Date().toISOString();
-  persist();
+  if (!persist()) return false;
   render();
   return true;
 }
@@ -3553,7 +3758,7 @@ function removeDailyMission(missionId) {
   if (mission.status === "completed") revokeMissionReward(mission);
   mission.status = "removed";
   mission.updatedAt = new Date().toISOString();
-  persist();
+  if (!persist()) return false;
   render();
   return true;
 }
@@ -3826,10 +4031,11 @@ function saveCalendarEvent() {
   const existing = state.calendarEvents.find((event) => event.id === els.calendarEventId.value);
   if (existing) Object.assign(existing, draft, { updatedAt: now });
   else state.calendarEvents.push({ id: crypto.randomUUID(), ...draft, createdAt: now, updatedAt: now });
+  prepareDailyMissions();
+  if (!persist()) return;
   calendarSelectedDate = draft.startDate;
   calendarCursor = new Date(CalendarDate.parseDateKey(draft.startDate).getFullYear(), CalendarDate.parseDateKey(draft.startDate).getMonth(), 1);
   clearCalendarEventForm();
-  persist();
   render();
   showToast("予定を保存しました");
 }
@@ -3869,8 +4075,9 @@ function deleteCalendarEvent(eventId) {
   const event = state.calendarEvents.find((item) => item.id === eventId);
   if (!event || !confirm(`「${event.title}」を削除します。よろしいですか？`)) return;
   state.calendarEvents = state.calendarEvents.filter((item) => item.id !== eventId);
+  prepareDailyMissions();
+  if (!persist()) return;
   clearCalendarEventForm();
-  persist();
   render();
   showToast("予定を削除しました");
 }
@@ -3886,7 +4093,8 @@ function saveTimetableOverride() {
   const existing = state.timetableOverrides.find((override) => override.groupId === group.id && override.date === calendarSelectedDate && override.periodNumber === periodNumber);
   if (!subjectId) {
     if (existing) state.timetableOverrides = state.timetableOverrides.filter((override) => override.id !== existing.id);
-    persist();
+    prepareDailyMissions();
+    if (!persist()) return;
     render();
     showToast("この時間の変更を取り消しました");
     return;
@@ -3894,8 +4102,9 @@ function saveTimetableOverride() {
   const now = new Date().toISOString();
   if (existing) Object.assign(existing, { subjectId, note: els.overrideMemo.value.trim(), updatedAt: now });
   else state.timetableOverrides.push({ id: crypto.randomUUID(), date: calendarSelectedDate, groupId: group.id, periodNumber, subjectId, note: els.overrideMemo.value.trim(), createdAt: now, updatedAt: now });
+  prepareDailyMissions();
+  if (!persist()) return;
   els.overrideMemo.value = "";
-  persist();
   render();
   showToast("当日の時間割を変更しました");
 }
@@ -3904,7 +4113,8 @@ function deleteTimetableOverride(overrideId) {
   const override = state.timetableOverrides.find((item) => item.id === overrideId);
   if (!override || !confirm(`${override.periodNumber}時間目の変更を取り消しますか？`)) return;
   state.timetableOverrides = state.timetableOverrides.filter((item) => item.id !== overrideId);
-  persist();
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast("基本時間割に戻しました");
 }
@@ -3975,7 +4185,7 @@ function equipHounyanLevel(levelNumber) {
     return;
   }
   state.equippedHounyanLevelByStudent[student.id] = rule.level;
-  persist();
+  if (!persist()) return;
   render();
   closeHounyanCloset();
   showToast(`${rule.name}にきがえたよ`);
@@ -4011,6 +4221,7 @@ function closeSheetAlbum() {
 
 function renderSheetAlbum() {
   const student = selectedStudent();
+  els.sheetAlbumPrintAll.disabled = true;
   if (!student) {
     els.sheetAlbumStudent.textContent = "がんばり";
     els.sheetAlbumSummary.textContent = "児童をえらぶと、できあがったシートがここにならぶよ。";
@@ -4019,6 +4230,7 @@ function renderSheetAlbum() {
   }
 
   const sheets = completedSheetsForStudent(student.id);
+  els.sheetAlbumPrintAll.disabled = !sheets.length;
   els.sheetAlbumStudent.textContent = `${student.name}のがんばり`;
   els.sheetAlbumSummary.textContent = sheets.length
     ? `これまでに${sheets.length}まい、${sheets.length * SHEET_SIZE}このスタンプをあつめたよ！`
@@ -4056,8 +4268,46 @@ function completedSheetCard(sheet) {
           return `<div class="stamp-slot is-filled"><img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}"></div>`;
         }).join("")}
       </div>
+      <button class="soft-button compact-button sheet-print-button" type="button" data-print-sheet="${sheet.number}" aria-label="${sheet.number}まいめを印刷">このシートを印刷</button>
     </article>
   `;
+}
+
+let sheetPrintBusy = false;
+
+async function printCompletedSheets(number = null) {
+  if (sheetPrintBusy) return;
+  const student = selectedStudent();
+  if (!student) return;
+  const sheets = completedSheetsForStudent(student.id)
+    .filter((sheet) => number === null || sheet.number === number)
+    .sort((a, b) => a.number - b.number)
+    .map((sheet) => ({
+      number: sheet.number,
+      completedAt: new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      }).format(new Date(sheet.events.at(-1).createdAt)),
+      stamps: sheet.events.map((event) => {
+        const stamp = stampById(event.stampId);
+        return { name: stamp.name, src: stamp.src };
+      }),
+    }));
+  if (!sheets.length) {
+    showToast("完成したシートがありません");
+    return;
+  }
+  sheetPrintBusy = true;
+  els.sheetAlbumLayer.setAttribute("aria-busy", "true");
+  showToast("印刷を準備しています");
+  try {
+    await window.HounyanSheetPrint.printSheets(student.name, sheets);
+  } catch (error) {
+    showToast(error.message || "印刷を開始できませんでした");
+  } finally {
+    sheetPrintBusy = false;
+    els.sheetAlbumLayer.removeAttribute("aria-busy");
+  }
 }
 
 function nextUnlockStamp(total) {
@@ -4471,14 +4721,20 @@ function deleteStampAsset(stampId) {
   if (!confirm(`「${stamp.name}」を完全に削除します。画像データは自動バックアップからも消え、元に戻せません。よろしいですか？`)) {
     return;
   }
+  if (state.stampSets.some((stampSet) => Array.isArray(stampSet.memberIds) && stampSet.memberIds.includes(stampId))) {
+    showToast("スタンプセットに含まれているため、スタンプ単体では削除できません");
+    return;
+  }
+  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+    showToast("削除前の自動バックアップを作成できないため、削除を中止しました");
+    return;
+  }
 
-  const previousStampAssets = state.stampAssets;
   state.stampAssets = normalizeStampAssets(activeStampAssets().filter((item) => item.id !== stampId));
   if (state.selectedStampId === stampId) {
     state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
   }
   if (!persist()) {
-    state.stampAssets = previousStampAssets;
     return;
   }
   if (els.stampAssetId.value === stampId) {
@@ -4507,18 +4763,20 @@ function deleteStampSet(stampSetId) {
   if (!confirm(`「${stampSet.name}」と中のスタンプ${members.length}こを完全に削除します。画像データは自動バックアップからも消え、元に戻せません。よろしいですか？`)) {
     return;
   }
+  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+    showToast("削除前の自動バックアップを作成できないため、削除を中止しました");
+    return;
+  }
 
-  const previousStampAssets = state.stampAssets;
-  const previousStampSets = state.stampSets;
   const memberIds = new Set(members.map((stamp) => stamp.id));
   state.stampAssets = normalizeStampAssets(activeStampAssets().filter((stamp) => !memberIds.has(stamp.id)));
-  state.stampSets = activeStampSets().filter((item) => item.id !== stampSetId);
+  state.stampSets = activeStampSets()
+    .filter((item) => item.id !== stampSetId)
+    .map((item) => item.requiresSetId === stampSetId ? { ...item, requiresSetId: "" } : item);
   if (memberIds.has(state.selectedStampId)) {
     state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
   }
   if (!persist()) {
-    state.stampAssets = previousStampAssets;
-    state.stampSets = previousStampSets;
     return;
   }
   if (els.stampSetId.value === stampSetId) {
@@ -4533,7 +4791,16 @@ function purgeDeletedStampData(stampIds, stampSetIds = []) {
   const deletedStampIds = new Set(stampIds);
   const deletedSetIds = new Set(stampSetIds);
   try {
-    const nextBackups = readAutoBackups().map((backup) => {
+    const currentBackups = readAutoBackupsResult();
+    if (!currentBackups.ok) {
+      storageBackupWarning = "主データは保存済みですが、自動バックアップを読み込めないため削除済み画像の整理を中止しました。";
+      console.error(currentBackups.error);
+      return;
+    }
+    const nextBackups = (currentBackups.backups || []).map((backup) => {
+      if (backup.protected || String(backup.reason || "").startsWith("before-")) {
+        return backup;
+      }
       const backupState = backup.state || {};
       const stampAssets = Array.isArray(backupState.stampAssets)
         ? backupState.stampAssets.filter((stamp) => !deletedStampIds.has(stamp.id))
@@ -4565,9 +4832,12 @@ function purgeDeletedStampData(stampIds, stampSetIds = []) {
         },
       };
     });
-    writeAutoBackups(nextBackups);
+    if (!writeAutoBackups(nextBackups)) {
+      storageBackupWarning = "主データは保存済みですが、自動バックアップ内の削除済み画像を整理できませんでした。";
+    }
   } catch (error) {
     console.error(error);
+    storageBackupWarning = "主データは保存済みですが、自動バックアップ内の削除済み画像を整理できませんでした。";
   }
 }
 
@@ -4706,8 +4976,6 @@ function saveStampSet() {
     setId: id,
   }));
   const nextById = new Map(nextMembers.map((stamp) => [stamp.id, stamp]));
-  const previousAssets = state.stampAssets;
-  const previousSets = state.stampSets;
   const existingMemberIds = new Set(existing?.memberIds || []);
   const untouchedAssets = activeStampAssets().map((stamp) => {
     if (!existingMemberIds.has(stamp.id)) {
@@ -4735,11 +5003,7 @@ function saveStampSet() {
   if (!visibleStampAssets().some((stamp) => stamp.id === state.selectedStampId)) {
     state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
   }
-  if (!persist()) {
-    state.stampAssets = previousAssets;
-    state.stampSets = previousSets;
-    return;
-  }
+  if (!persist()) return;
   clearStampSetForm();
   render();
   showToast(existing ? "スタンプセットを更新しました" : "スタンプセットを追加しました");
@@ -4856,7 +5120,6 @@ async function saveStampAsset() {
     missionOnly: Boolean(existing?.missionOnly),
   };
 
-  const previousStampAssets = state.stampAssets;
   const nextStampAssets = normalizeStampAssets([
     ...activeStampAssets().filter((stamp) => stamp.id !== nextStamp.id),
     nextStamp,
@@ -4865,10 +5128,7 @@ async function saveStampAsset() {
   if (!visibleStampAssets().some((stamp) => stamp.id === state.selectedStampId)) {
     state.selectedStampId = visibleStampAssets()[0]?.id || activeStampAssets()[0]?.id || "sonochoshi";
   }
-  if (!persist()) {
-    state.stampAssets = previousStampAssets;
-    return;
-  }
+  if (!persist()) return;
   clearStampAssetForm();
   render();
   showToast(existing ? "スタンプ設定を更新しました" : "新しいスタンプを追加しました");
@@ -4974,16 +5234,8 @@ function setRewardGoal(type, id) {
     }
   }
 
-  const previousGoal = state.rewardGoalsByStudent[student.id];
   state.rewardGoalsByStudent[student.id] = { type, id };
-  if (!persist()) {
-    if (previousGoal) {
-      state.rewardGoalsByStudent[student.id] = previousGoal;
-    } else {
-      delete state.rewardGoalsByStudent[student.id];
-    }
-    return;
-  }
+  if (!persist()) return;
   render();
   showToast(type === "stamp-set" ? "スタンプセットをねらいにしたよ！" : "スタンプをねらいにしたよ！");
 }
@@ -5166,8 +5418,8 @@ function savePrize() {
     ...state.rewards.filter((reward) => reward.id !== nextPrize.id),
     nextPrize,
   ]);
+  if (!persist()) return;
   clearPrizeForm();
-  persist();
   render();
   showToast(existing ? "景品を更新しました" : "景品を追加しました");
 }
@@ -5195,7 +5447,7 @@ function saveLevelRule() {
       ? { ...rule, name, requiredSheets: level === 1 ? 0 : requiredSheets, image }
       : rule
   )));
-  persist();
+  if (!persist()) return;
   render();
   editLevelRule(level);
   showToast(`Lv.${level}の条件を保存しました`);
@@ -5207,7 +5459,7 @@ function resetLevelRules() {
     return;
   }
   state.settings.levelRules = structuredClone(defaultLevelRules);
-  persist();
+  if (!persist()) return;
   render();
   editLevelRule(1);
   showToast("レベル設定を既定に戻しました");
@@ -5229,7 +5481,8 @@ function showView(viewName) {
       schoolYearId: supportFilterSchoolYearId({ childMode: viewName !== "teacher" }),
       selectFirstWhenEmpty: true,
     });
-    if (selectionChanged) persist({ createBackup: false });
+    const missionsChanged = prepareDailyMissions();
+    if ((selectionChanged || missionsChanged) && !persist({ createBackup: false })) return;
     render();
   }
 }
@@ -5568,8 +5821,10 @@ function saveStudent() {
 
   if (isTestStudent(savedStudent)) ensureTestStudentMissionSettings(savedStudent);
 
+  reconcileActiveStudentSelection({ selectFirstWhenEmpty: true });
+  prepareDailyMissions();
+  if (!persist()) return;
   clearStudentForm();
-  persist();
   render();
   showToast("児童を保存しました。上の切り替えに反映しました");
 }
@@ -5588,7 +5843,7 @@ function createTestStudent() {
   const existing = state.students.find((student) => isTestStudent(student));
   if (existing) {
     state.selectedStudentId = existing.id;
-    persist();
+    if (!persist({ createBackup: false })) return;
     render();
     showToast("テスト児童を選びました");
     return;
@@ -5604,7 +5859,8 @@ function createTestStudent() {
   state.students.push(student);
   ensureTestStudentMissionSettings(student);
   state.selectedStudentId = student.id;
-  persist();
+  prepareDailyMissions();
+  if (!persist()) return;
   render();
   showToast("テスト児童を追加しました。制限なしで試せます");
 }
@@ -6035,12 +6291,12 @@ function addStampBatch({ student, selections, source, memo }) {
   generateDailyMissions(student.id, missionDate);
   refreshAutomaticMissions(student.id, missionDate);
   autoEquipLatestUnlockedHounyan(student.id, unlockedLevels);
+  if (!persist()) return false;
   lastStampedEventIds = new Set(events.map((event) => event.id));
   if (source === "teacher") {
     els.stampMemo.value = "";
   }
   playDominantStampVoice(dominantStamp);
-  persist();
   render();
   showToast(source === "child" ? `${totalAdded}こスタンプをおしたよ` : `${student.name}に${totalAdded}個スタンプを押しました`);
   unlockedStamps.forEach((unlockedStamp) => {
@@ -6122,7 +6378,7 @@ function cancelStamp(eventId) {
 
   event.canceled = true;
   event.canceledAt = new Date().toISOString();
-  persist();
+  if (!persist()) return;
   render();
   showToast("スタンプを取り消しました");
 }
@@ -6255,7 +6511,7 @@ function redeemReward(rewardId) {
     createdAt: new Date().toISOString(),
     memo: reward.name,
   });
-  persist();
+  if (!persist()) return;
   render();
   showToast(`${reward.name}と交換しました`);
 }
@@ -6274,7 +6530,7 @@ function buyStamp(stampId) {
     return;
   }
 
-  const previousGoal = clearRewardGoalIfMatches(student.id, "stamp", stamp.id);
+  clearRewardGoalIfMatches(student.id, "stamp", stamp.id);
   ownedStampIdsForStudent(student.id).push(stamp.id);
   state.ownedStampIdsByStudent[student.id] = [...new Set(ownedStampIdsForStudent(student.id))];
   state.redemptions.push({
@@ -6288,11 +6544,6 @@ function buyStamp(stampId) {
     memo: `${stamp.name}スタンプ`,
   });
   if (!persist()) {
-    state.ownedStampIdsByStudent[student.id] = ownedStampIdsForStudent(student.id).filter((id) => id !== stamp.id);
-    state.redemptions = state.redemptions.filter((redemption) => redemption.stampId !== stamp.id || redemption.studentId !== student.id || redemption.type !== "stamp-purchase");
-    if (previousGoal) {
-      state.rewardGoalsByStudent[student.id] = previousGoal;
-    }
     return;
   }
   render();
@@ -6322,8 +6573,8 @@ function buyStampSet(stampSetId) {
     return;
   }
 
+  clearRewardGoalIfMatches(student.id, "stamp-set", stampSet.id);
   const previousOwnedStampIds = [...ownedStampIdsForStudent(student.id)];
-  const previousGoal = clearRewardGoalIfMatches(student.id, "stamp-set", stampSet.id);
   const stampIds = members.map((stamp) => stamp.id);
   const redemption = {
     id: crypto.randomUUID(),
@@ -6339,11 +6590,6 @@ function buyStampSet(stampSetId) {
   state.ownedStampIdsByStudent[student.id] = [...new Set([...previousOwnedStampIds, ...stampIds])];
   state.redemptions.push(redemption);
   if (!persist()) {
-    state.ownedStampIdsByStudent[student.id] = previousOwnedStampIds;
-    state.redemptions = state.redemptions.filter((item) => item.id !== redemption.id);
-    if (previousGoal) {
-      state.rewardGoalsByStudent[student.id] = previousGoal;
-    }
     return;
   }
   render();
@@ -6388,7 +6634,7 @@ function cancelRedemption(redemptionId) {
       }
     });
   }
-  persist();
+  if (!persist()) return;
   render();
   showToast("交換を取り消しました。シートを戻しました");
 }
@@ -6423,7 +6669,10 @@ function deleteSelectedStudent() {
     return;
   }
 
-  createAutoBackup("before-delete", { force: true });
+  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+    showToast("削除前バックアップを作成できないため、削除を中止しました");
+    return;
+  }
   state.students = state.students.filter((item) => item.id !== student.id);
   state.classMemberships = state.classMemberships.filter((membership) => membership.studentId !== student.id);
   state.stampEvents = state.stampEvents.filter((event) => event.studentId !== student.id);
@@ -6434,74 +6683,58 @@ function deleteSelectedStudent() {
   delete state.rewardGoalsByStudent[student.id];
   delete state.equippedHounyanLevelByStudent[student.id];
   state.selectedStudentId = state.students[0]?.id || "";
+  if (!persist()) return;
   clearStudentForm();
-  persist();
   render();
   showToast("児童データを削除しました");
 }
 
+function readAutoBackupsResult() {
+  const result = StorageService.readAutoBackups({
+    storage: getBrowserStorage(),
+    key: AUTO_BACKUP_STORAGE_KEY,
+    limit: AUTO_BACKUP_LIMIT,
+  });
+  if (!result.ok) console.error(result.error);
+  return result;
+}
+
 function readAutoBackups() {
-  try {
-    const raw = localStorage.getItem(AUTO_BACKUP_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .filter((backup) => backup && backup.id && backup.createdAt && backup.state)
-      .slice(0, AUTO_BACKUP_LIMIT);
-  } catch (error) {
-    console.error(error);
-    return [];
-  }
+  return readAutoBackupsResult().backups || [];
 }
 
 function writeAutoBackups(backups) {
-  localStorage.setItem(AUTO_BACKUP_STORAGE_KEY, JSON.stringify(backups.slice(0, AUTO_BACKUP_LIMIT)));
+  const result = StorageService.writeAutoBackups({
+    storage: getBrowserStorage(),
+    key: AUTO_BACKUP_STORAGE_KEY,
+    backups,
+    limit: AUTO_BACKUP_LIMIT,
+  });
+  if (!result.ok) console.error(result.error);
+  return result.ok;
 }
 
 function createAutoBackup(reason = "auto", options = {}) {
-  if (stateLoadFailed) {
+  if (stateLoadFailed || storageUnavailable) {
     return false;
   }
-
-  try {
-    const rawState = JSON.stringify(state);
-    const backups = readAutoBackups();
-    const now = new Date();
-    const newest = backups[0];
-    if (newest && JSON.stringify(newest.state) === rawState) {
-      return true;
-    }
-
-    const createdAt = now.toISOString();
-    const snapshot = {
-      id: crypto.randomUUID(),
-      createdAt,
-      reason,
-      summary: backupSummary(state),
-      state: JSON.parse(rawState),
-    };
-
-    if (!options.force && newest) {
-      const newestTime = new Date(newest.createdAt).getTime();
-      if (Number.isFinite(newestTime) && now.getTime() - newestTime < AUTO_BACKUP_BUCKET_MS) {
-        backups[0] = {
-          ...snapshot,
-          id: newest.id,
-        };
-        writeAutoBackups(backups);
-        return true;
-      }
-    }
-
-    backups.unshift(snapshot);
-    writeAutoBackups(backups);
-    return true;
-  } catch (error) {
-    console.error(error);
-    return false;
+  const result = StorageService.createAutoBackup({
+    storage: getBrowserStorage(),
+    state,
+    reason,
+    force: Boolean(options.force),
+    key: AUTO_BACKUP_STORAGE_KEY,
+    limit: AUTO_BACKUP_LIMIT,
+    bucketMs: AUTO_BACKUP_BUCKET_MS,
+    summary: backupSummary,
+  });
+  if (!result.ok) {
+    storageBackupWarning = options.precondition
+      ? "自動バックアップを作成できなかったため、保護が必要な操作を中止しました。"
+      : "主データは保存済みですが、自動バックアップを更新できませんでした。自動バックアップには今回の変更がまだ反映されていません。";
+    console.error(result.error);
   }
+  return result.ok;
 }
 
 function backupSummary(sourceState) {
@@ -6515,12 +6748,14 @@ function backupSummary(sourceState) {
 function renderAutoBackups() {
   const backups = readAutoBackups();
   if (!backups.length) {
-    els.autoBackupStatus.textContent = "まだ自動バックアップはありません。データを保存すると自動で作成されます。";
+    els.autoBackupStatus.textContent = storageBackupWarning || "まだ自動バックアップはありません。データを保存すると自動で作成されます。";
     els.autoBackupList.innerHTML = '<p class="empty-state">バックアップはまだありません。</p>';
     return;
   }
 
-  els.autoBackupStatus.textContent = `最新: ${formatDateTime(backups[0].createdAt)} / ${backups.length}件保存中`;
+  els.autoBackupStatus.textContent = storageBackupWarning
+    ? storageBackupWarning
+    : `最新: ${formatDateTime(backups[0].createdAt)} / ${backups.length}件保存中`;
   els.autoBackupList.innerHTML = backups
     .map((backup) => {
       const summary = backup.summary || backupSummary(backup.state || {});
@@ -6557,33 +6792,65 @@ function downloadAutoBackup(id) {
     showToast("バックアップが見つかりません");
     return;
   }
-  downloadJson(backup.state, `hounyan-stamps-backup-${backup.createdAt.slice(0, 10)}.json`);
+  downloadJson(StorageService.exportEnvelope(backup.state), `hounyan-stamps-backup-${backup.createdAt.slice(0, 10)}.json`);
   showToast("バックアップを書き出しました");
+}
+
+function replaceImportedState(input, {
+  reason = "before-import",
+  confirmationMessage = "検証済みのJSONで現在の台帳を置き換えます。現在のデータは復元前バックアップに残します。置き換えてよろしいですか？",
+  failureMessage = "読み込み前バックアップを作成できないため、読み込みを中止しました",
+  successMessage = "JSONを読み込みました",
+} = {}) {
+  const staged = StorageService.normalizeCandidate(input, normalizeState);
+  if (!staged.ok) {
+    const message = staged.message || staged.error?.message || "JSONの内容を検証できませんでした";
+    showToast(message);
+    return { ok: false, reason: "validation", validation: staged };
+  }
+  const recoveringFailedLoad = stateLoadFailed;
+  if (recoveringFailedLoad && (storageUnavailable || !stateLoadRecoveryAvailable || !stateRecoveryRaw)) {
+    showToast("読み込みに失敗した元データを保護できないため、置き換えを中止しました");
+    return { ok: false, reason: "load_recovery_unavailable" };
+  }
+  if (!confirm(confirmationMessage)) return { ok: false, reason: "cancelled" };
+  if (!recoveringFailedLoad && !createAutoBackup(reason, { force: true, precondition: true })) {
+    showToast(failureMessage);
+    return { ok: false, reason: "pre_backup_failed" };
+  }
+  if (!commitCandidateState(staged.state, { backupReason: "auto", allowLoadRecovery: recoveringFailedLoad })) {
+    return { ok: false, reason: "primary_write_failed" };
+  }
+  render();
+  showToast(successMessage);
+  return { ok: true, state: staged.state };
 }
 
 function restoreAutoBackup(id) {
   const backup = findAutoBackup(id);
   if (!backup) {
     showToast("バックアップが見つかりません");
-    return;
+    return { ok: false, reason: "missing" };
   }
 
-  const ok = confirm(`${formatDateTime(backup.createdAt)}の自動バックアップに戻します。現在の状態も復元前バックアップとして残します。`);
-  if (!ok) {
-    return;
-  }
-
-  createAutoBackup("before-restore", { force: true });
-  state = normalizeState(backup.state);
-  stateLoadFailed = false;
-  ensureSelection();
-  persist();
-  render();
-  showToast("自動バックアップから復元しました");
+  return replaceImportedState(backup.state, {
+    reason: "before-restore",
+    confirmationMessage: `${formatDateTime(backup.createdAt)}の自動バックアップで現在の台帳を置き換えます。現在の状態は復元前バックアップに残します。よろしいですか？`,
+    failureMessage: "復元前バックアップを作成できないため、復元を中止しました",
+    successMessage: "自動バックアップから復元しました",
+  });
 }
 
 function downloadJson(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  let raw;
+  try {
+    raw = StorageService.serialize(data, null, 2);
+  } catch (error) {
+    console.error(error);
+    showToast("JSONを書き出せませんでした");
+    return;
+  }
+  const blob = new Blob([raw], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -6595,7 +6862,7 @@ function downloadJson(data, filename) {
 }
 
 function exportData() {
-  downloadJson(state, `hounyan-stamps-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(StorageService.exportEnvelope(state), `hounyan-stamps-${new Date().toISOString().slice(0, 10)}.json`);
   showToast("JSONを書き出しました");
 }
 
@@ -6608,19 +6875,18 @@ function importData(event) {
   const reader = new FileReader();
   reader.addEventListener("load", () => {
     try {
-      const imported = JSON.parse(String(reader.result));
-      createAutoBackup("before-import", { force: true });
-      state = normalizeState(imported);
-      stateLoadFailed = false;
-      ensureSelection();
-      persist();
-      render();
-      showToast("JSONを読み込みました");
-    } catch {
-      showToast("JSONを読み込めませんでした");
+      const imported = StorageService.parse(String(reader.result));
+      replaceImportedState(imported);
+    } catch (error) {
+      console.error(error);
+      showToast("JSONを読み込めませんでした。形式と内容を確認してください");
     } finally {
       els.importInput.value = "";
     }
+  });
+  reader.addEventListener("error", () => {
+    els.importInput.value = "";
+    showToast("JSONファイルを読み込めませんでした");
   });
   reader.readAsText(file);
 }
@@ -6808,11 +7074,13 @@ function selectStudent(studentId) {
   }
 
   state.selectedStudentId = studentId;
-  persist();
+  prepareDailyMissions();
+  if (!persist({ createBackup: false })) return;
   render();
 }
 
 function ensureSelection() {
+  const previous = `${state.selectedStudentId}|${state.selectedStampId}`;
   if (!state.selectedStudentId && state.students[0]) {
     state.selectedStudentId = state.students[0].id;
   }
@@ -6822,7 +7090,7 @@ function ensureSelection() {
   if (!state.selectedStampId) {
     state.selectedStampId = "sonochoshi";
   }
-  persist();
+  return previous !== `${state.selectedStudentId}|${state.selectedStampId}`;
 }
 
 function studentStats(studentId) {
