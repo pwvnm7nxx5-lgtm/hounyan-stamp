@@ -736,6 +736,8 @@ let stateLoadRecoveryAvailable = false;
 let stateRecoveryRaw = "";
 let state = loadState();
 let committedStateSnapshot = StorageService.snapshot(state);
+const backupStore = window.indexedDB && window.HounyanBackupStore
+  ? window.HounyanBackupStore({ indexedDB: window.indexedDB, storage: getBrowserStorage(), service: StorageService }) : null;
 let lastStampedEventIds = new Set();
 let stampAnimationTimer = 0;
 let hounyanAnimationQueue = [];
@@ -1053,6 +1055,11 @@ const els = {
 };
 
 init();
+if (backupStore) backupStore.ready.then((result) => {
+  if (!result.ok) storageBackupWarning = StorageService.describeBackupFailure(result.error, getBrowserStorage());
+  renderStorageStatus();
+  renderAutoBackups();
+});
 
 if (window.__HOUNYAN_TEST__) {
   window.__HounyanStampTestApi = {
@@ -1266,8 +1273,8 @@ function bindEvents() {
   els.timerResetButton.addEventListener("click", resetTimer);
   els.exportButton.addEventListener("click", exportData);
   els.importInput.addEventListener("change", importData);
-  els.createAutoBackupButton.addEventListener("click", () => {
-    const created = createAutoBackup("manual", { force: true });
+  els.createAutoBackupButton.addEventListener("click", async () => {
+    const created = await createAutoBackup("manual", { force: true });
     renderStorageStatus();
     renderAutoBackups();
     showToast(created ? "自動バックアップを作成しました" : "自動バックアップを更新できませんでした。主データは変更していません");
@@ -2976,12 +2983,12 @@ function addNextSchoolYear() {
   showToast(`${nextYear}年度を追加しました。クラスを作成できます`);
 }
 
-function setSelectedSchoolYearActive() {
+async function setSelectedSchoolYearActive() {
   const schoolYear = selectedSchoolYear();
   if (!schoolYear || schoolYear.active) return;
   const ok = confirm(`${schoolYear.name}を現在年度にします。ミッション・時間割・登校日判定は、この年度の所属クラスを参照します。よろしいですか？`);
   if (!ok) return;
-  if (!createAutoBackup("before-school-year-change", { force: true, precondition: true })) {
+  if (!await createAutoBackup("before-school-year-change", { force: true, precondition: true })) {
     showToast("年度変更前バックアップを作成できないため、変更を中止しました");
     return;
   }
@@ -3189,7 +3196,7 @@ function moveGroup(groupId, direction) {
   render();
 }
 
-function deleteGroup(groupId) {
+async function deleteGroup(groupId) {
   const group = groupById(groupId);
   if (!group) return;
   const related = state.timetables.filter((timetable) => timetable.groupId === groupId).length
@@ -3197,7 +3204,7 @@ function deleteGroup(groupId) {
     + state.calendarEvents.filter((event) => event.groupIds.includes(groupId)).length;
   const ok = confirm(`${group.name}を完全に削除します。関連する時間割・当日変更・クラス別予定も削除されます（${related}件）。よろしいですか？`);
   if (!ok) return;
-  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+  if (!await createAutoBackup("before-delete", { force: true, precondition: true })) {
     showToast("削除前バックアップを作成できないため、削除を中止しました");
     return;
   }
@@ -4706,7 +4713,7 @@ function stampDeletionReason(stampId) {
   return "";
 }
 
-function deleteStampAsset(stampId) {
+async function deleteStampAsset(stampId) {
   const stamp = activeStampAssets().find((item) => item.id === stampId);
   const deletionReason = stampDeletionReason(stampId);
   if (!stamp?.custom || deletionReason) {
@@ -4720,7 +4727,7 @@ function deleteStampAsset(stampId) {
     showToast("スタンプセットに含まれているため、スタンプ単体では削除できません");
     return;
   }
-  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+  if (!await createAutoBackup("before-delete", { force: true, precondition: true })) {
     showToast("削除前の自動バックアップを作成できないため、削除を中止しました");
     return;
   }
@@ -4740,7 +4747,7 @@ function deleteStampAsset(stampId) {
   showToast("スタンプと画像を削除しました");
 }
 
-function deleteStampSet(stampSetId) {
+async function deleteStampSet(stampSetId) {
   const stampSet = activeStampSets().find((item) => item.id === stampSetId);
   if (!stampSet) {
     return;
@@ -4758,7 +4765,7 @@ function deleteStampSet(stampSetId) {
   if (!confirm(`「${stampSet.name}」と中のスタンプ${members.length}こを完全に削除します。画像データは自動バックアップからも消え、元に戻せません。よろしいですか？`)) {
     return;
   }
-  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+  if (!await createAutoBackup("before-delete", { force: true, precondition: true })) {
     showToast("削除前の自動バックアップを作成できないため、削除を中止しました");
     return;
   }
@@ -4782,7 +4789,9 @@ function deleteStampSet(stampSetId) {
   showToast("スタンプセットと画像を削除しました");
 }
 
-function purgeDeletedStampData(stampIds, stampSetIds = []) {
+async function purgeDeletedStampData(stampIds, stampSetIds = []) {
+  // IndexedDB snapshots retain their original assets for lossless recovery.
+  if (backupStore) return;
   const deletedStampIds = new Set(stampIds);
   const deletedSetIds = new Set(stampSetIds);
   try {
@@ -4827,7 +4836,7 @@ function purgeDeletedStampData(stampIds, stampSetIds = []) {
         },
       };
     });
-    if (!writeAutoBackups(nextBackups)) {
+    if (!await writeAutoBackups(nextBackups)) {
       storageBackupWarning = "主データは保存済みですが、自動バックアップ内の削除済み画像を整理できませんでした。";
     }
   } catch (error) {
@@ -6653,7 +6662,7 @@ function editSelectedStudent() {
   els.studentName.focus();
 }
 
-function deleteSelectedStudent() {
+async function deleteSelectedStudent() {
   const student = selectedStudent();
   if (!student) {
     return;
@@ -6664,7 +6673,7 @@ function deleteSelectedStudent() {
     return;
   }
 
-  if (!createAutoBackup("before-delete", { force: true, precondition: true })) {
+  if (!await createAutoBackup("before-delete", { force: true, precondition: true })) {
     showToast("削除前バックアップを作成できないため、削除を中止しました");
     return;
   }
@@ -6685,6 +6694,7 @@ function deleteSelectedStudent() {
 }
 
 function readAutoBackupsResult() {
+  if (backupStore) return backupStore.read();
   const result = StorageService.readAutoBackups({
     storage: getBrowserStorage(),
     key: AUTO_BACKUP_STORAGE_KEY,
@@ -6699,6 +6709,7 @@ function readAutoBackups() {
 }
 
 function writeAutoBackups(backups) {
+  if (backupStore) return backupStore.write(backups).then((result) => result.ok);
   const result = StorageService.writeAutoBackups({
     storage: getBrowserStorage(),
     key: AUTO_BACKUP_STORAGE_KEY,
@@ -6709,20 +6720,22 @@ function writeAutoBackups(backups) {
   return result.ok;
 }
 
-function createAutoBackup(reason = "auto", options = {}) {
+async function createAutoBackup(reason = "auto", options = {}) {
   if (stateLoadFailed || storageUnavailable) {
     return false;
   }
-  const result = StorageService.createAutoBackup({
+  const captured = StorageService.snapshot(state);
+  const backupOptions = {
     storage: getBrowserStorage(),
-    state,
+    state: captured,
     reason,
     force: Boolean(options.force),
     key: AUTO_BACKUP_STORAGE_KEY,
     limit: AUTO_BACKUP_LIMIT,
     bucketMs: AUTO_BACKUP_BUCKET_MS,
     summary: backupSummary,
-  });
+  };
+  const result = backupStore ? await backupStore.create(backupOptions) : StorageService.createAutoBackup(backupOptions);
   if (!result.ok) {
     storageBackupWarning = options.precondition
       ? "自動バックアップを作成できなかったため、保護が必要な操作を中止しました。"
@@ -6731,6 +6744,12 @@ function createAutoBackup(reason = "auto", options = {}) {
     console.error(result.error);
   }
   if (result.ok) storageBackupWarning = "";
+  renderStorageStatus();
+  renderAutoBackups();
+  if (result.ok && options.precondition && StorageService.serialize(state) !== StorageService.serialize(captured)) {
+    showToast("保存中にデータが変更されました。もう一度操作してください");
+    return false;
+  }
   return result.ok;
 }
 
@@ -6752,10 +6771,10 @@ function renderAutoBackups() {
 
   els.autoBackupStatus.textContent = storageBackupWarning
     ? storageBackupWarning
-    : `最新: ${formatDateTime(backups[0].createdAt)} / ${backups.length}件保存中`;
+    : `最新: ${formatDateTime(backups[0].createdAt)} / ${backups.length}件保存中${backupStore ? " / 大容量保存" : ""}`;
   els.autoBackupList.innerHTML = backups
     .map((backup) => {
-      const summary = backup.summary || backupSummary(backup.state || {});
+      const summary = { ...backupSummary(backup.state || {}), ...backup.summary };
       return `
         <article class="auto-backup-card">
           <div>
@@ -6793,7 +6812,7 @@ function downloadAutoBackup(id) {
   showToast("バックアップを書き出しました");
 }
 
-function replaceImportedState(input, {
+async function replaceImportedState(input, {
   reason = "before-import",
   confirmationMessage = "検証済みのJSONで現在の台帳を置き換えます。現在のデータは復元前バックアップに残します。置き換えてよろしいですか？",
   failureMessage = "読み込み前バックアップを作成できないため、読み込みを中止しました",
@@ -6811,7 +6830,7 @@ function replaceImportedState(input, {
     return { ok: false, reason: "load_recovery_unavailable" };
   }
   if (!confirm(confirmationMessage)) return { ok: false, reason: "cancelled" };
-  if (!recoveringFailedLoad && !createAutoBackup(reason, { force: true, precondition: true })) {
+  if (!recoveringFailedLoad && !await createAutoBackup(reason, { force: true, precondition: true })) {
     showToast(failureMessage);
     return { ok: false, reason: "pre_backup_failed" };
   }
@@ -6823,7 +6842,7 @@ function replaceImportedState(input, {
   return { ok: true, state: staged.state };
 }
 
-function restoreAutoBackup(id) {
+async function restoreAutoBackup(id) {
   const backup = findAutoBackup(id);
   if (!backup) {
     showToast("バックアップが見つかりません");
@@ -6870,10 +6889,10 @@ function importData(event) {
   }
 
   const reader = new FileReader();
-  reader.addEventListener("load", () => {
+  reader.addEventListener("load", async () => {
     try {
       const imported = StorageService.parse(String(reader.result));
-      replaceImportedState(imported);
+      await replaceImportedState(imported);
     } catch (error) {
       console.error(error);
       showToast("JSONを読み込めませんでした。形式と内容を確認してください");
