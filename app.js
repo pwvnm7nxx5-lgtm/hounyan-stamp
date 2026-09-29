@@ -2046,12 +2046,7 @@ function commitCandidateState(candidate, { createBackup = true, backupReason = "
   storageUnavailable = false;
   storageErrorMessage = "";
   if (createBackup) {
-    const backup = createAutoBackup(backupReason);
-    if (!backup) {
-      storageBackupWarning = "主データは保存済みですが、自動バックアップを更新できませんでした。自動バックアップには今回の変更がまだ反映されていません。";
-    } else {
-      storageBackupWarning = "";
-    }
+    createAutoBackup(backupReason);
   }
   return true;
 }
@@ -6732,6 +6727,7 @@ function createAutoBackup(reason = "auto", options = {}) {
     storageBackupWarning = options.precondition
       ? "自動バックアップを作成できなかったため、保護が必要な操作を中止しました。"
       : "主データは保存済みですが、自動バックアップを更新できませんでした。自動バックアップには今回の変更がまだ反映されていません。";
+    storageBackupWarning += ` ${StorageService.describeBackupFailure(result.error, getBrowserStorage())}`;
     console.error(result.error);
   }
   if (result.ok) storageBackupWarning = "";

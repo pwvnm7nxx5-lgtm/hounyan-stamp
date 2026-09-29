@@ -108,7 +108,9 @@
       storage.setItem(key, String(value));
       return { ok: true, key };
     } catch (error) {
-      return failed("storage_set_failed", `「${key}」を保存できませんでした。容量不足または保存権限の問題です。`, error, { key });
+      return failed("storage_set_failed", `「${key}」を保存できませんでした。容量不足または保存権限の問題です。`, error, {
+        key, errorName: error?.name || "Error", attemptedChars: String(value).length,
+      });
     }
   }
 
@@ -477,6 +479,22 @@
 
   const COMPACT_BACKUP_FORMAT = "hounyan-backups-shared-v1";
 
+  function describeBackupFailure(error, storage) {
+    const code = error?.code || "unknown";
+    const name = error?.errorName;
+    const reason = code === "backup_parse_failed" ? "既存バックアップを読み込めません。"
+      : name === "QuotaExceededError" ? "ブラウザの保存容量が不足しています。"
+      : name === "SecurityError" || code === "storage_unavailable" ? "ブラウザが保存領域の利用を許可していません。"
+      : "バックアップの保存処理でエラーが発生しました。";
+    const size = (key) => {
+      const result = storageGet(storage, key);
+      return result.ok ? `${((result.value || "").length / 1024 / 1024).toFixed(2)} M文字` : "取得不可";
+    };
+    const attempted = Number.isFinite(error?.attemptedChars)
+      ? `、保存予定 ${(error.attemptedChars / 1024 / 1024).toFixed(2)} M文字` : "";
+    return `${reason} [backup-0929b/${code}${name ? `/${name}` : ""}] 主データ ${size(STORAGE_KEY)}、既存バックアップ ${size(AUTO_BACKUP_STORAGE_KEY)}${attempted}。`;
+  }
+
   // Share unchanged records and images across snapshots without dropping history.
   // Each snapshot is still reconstructed as an independent plain JSON object.
   function encodeBackups(backups) {
@@ -655,6 +673,7 @@
     readAutoBackups,
     writeAutoBackups,
     createAutoBackup,
+    describeBackupFailure,
     exportEnvelope,
   };
 });
