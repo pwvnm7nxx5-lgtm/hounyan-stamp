@@ -475,13 +475,63 @@
     return { ok: true, state: candidate, raw, key };
   }
 
+  const COMPACT_BACKUP_FORMAT = "hounyan-backups-shared-v1";
+
+  // Share unchanged records and images across snapshots without dropping history.
+  // Each snapshot is still reconstructed as an independent plain JSON object.
+  function encodeBackups(backups) {
+    const values = [];
+    const indices = new Map();
+    const intern = (value) => {
+      const json = serialize(value);
+      if (!indices.has(json)) {
+        indices.set(json, values.length);
+        values.push(json);
+      }
+      return indices.get(json);
+    };
+    const entries = backups.map((backup) => ({
+      ...backup,
+      state: Object.fromEntries(Object.entries(backup.state).map(([field, value]) => [
+        field, Array.isArray(value) ? [0, value.map(intern)] : [1, intern(value)],
+      ])),
+    }));
+    const compact = serialize({ format: COMPACT_BACKUP_FORMAT, values, backups: entries });
+    const legacy = serialize(backups);
+    return compact.length < legacy.length ? compact : legacy;
+  }
+
+  function decodeBackups(parsed) {
+    if (Array.isArray(parsed)) return parsed;
+    if (!isPlainObject(parsed) || parsed.format !== COMPACT_BACKUP_FORMAT
+      || !Array.isArray(parsed.values) || !Array.isArray(parsed.backups)) {
+      throw new Error("自動バックアップの形式が不正です。原本は変更していません。");
+    }
+    const valueAt = (index) => {
+      if (!Number.isInteger(index) || index < 0 || index >= parsed.values.length
+        || typeof parsed.values[index] !== "string") throw new Error("バックアップの参照が不正です");
+      return parse(parsed.values[index]);
+    };
+    return parsed.backups.map((backup) => {
+      if (!isPlainObject(backup) || !isPlainObject(backup.state)) throw new Error("バックアップの状態が不正です");
+      return {
+        ...backup,
+        state: Object.fromEntries(Object.entries(backup.state).map(([field, ref]) => {
+          if (!Array.isArray(ref) || ref.length !== 2) throw new Error("バックアップの項目が不正です");
+          if (ref[0] === 0 && Array.isArray(ref[1])) return [field, ref[1].map(valueAt)];
+          if (ref[0] === 1) return [field, valueAt(ref[1])];
+          throw new Error("バックアップの項目が不正です");
+        })),
+      };
+    });
+  }
+
   function readAutoBackups({ storage, key = AUTO_BACKUP_STORAGE_KEY, limit = AUTO_BACKUP_LIMIT }) {
     const result = storageGet(storage, key);
     if (!result.ok) return { ...result, backups: [] };
     if (!result.value) return { ok: true, backups: [] };
     try {
-      const parsed = parse(result.value);
-      if (!Array.isArray(parsed)) return { ok: true, backups: [], ignored: true };
+      const parsed = decodeBackups(parse(result.value));
       return {
         ok: true,
         backups: parsed.filter((backup) => backup && backup.id && backup.createdAt && backup.state).slice(0, limit),
@@ -493,7 +543,7 @@
 
   function writeAutoBackups({ storage, key = AUTO_BACKUP_STORAGE_KEY, backups, limit = AUTO_BACKUP_LIMIT }) {
     try {
-      const raw = serialize(backups.slice(0, limit));
+      const raw = encodeBackups(backups.slice(0, limit));
       return storageSet(storage, key, raw);
     } catch (error) {
       return failed("backup_serialize_failed", "自動バックアップをJSONに変換できませんでした。", error);

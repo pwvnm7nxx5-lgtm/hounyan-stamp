@@ -6734,6 +6734,7 @@ function createAutoBackup(reason = "auto", options = {}) {
       : "主データは保存済みですが、自動バックアップを更新できませんでした。自動バックアップには今回の変更がまだ反映されていません。";
     console.error(result.error);
   }
+  if (result.ok) storageBackupWarning = "";
   return result.ok;
 }
 
