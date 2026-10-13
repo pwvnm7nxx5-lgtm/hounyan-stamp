@@ -747,6 +747,8 @@ let stampCountTarget = 0;
 let stampPreviewContext = null;
 let stampPreviewCounts = {};
 let stampPreviewCategoryId = "all";
+let stampPreviewSubmitting = false;
+let stampPreviewCloseTimer = 0;
 let exchangeConfirmRewardId = "";
 let exchangeConfirmAction = null;
 let timerDurationSeconds = TIMER_DEFAULT_SECONDS;
@@ -5981,6 +5983,7 @@ function continueToStampPreview() {
 }
 
 function openStampPreview(context) {
+  if (stampPreviewSubmitting) return;
   const student = selectedStudent();
   if (!student || student.id !== context.studentId) {
     showToast("児童をもう一度選んでください");
@@ -5994,6 +5997,8 @@ function openStampPreview(context) {
     return;
   }
 
+  clearTimeout(stampPreviewCloseTimer);
+  stampPreviewCloseTimer = 0;
   stampPreviewContext = {
     ...context,
     plannedCount: clampStampCount(context.plannedCount, 0),
@@ -6098,7 +6103,8 @@ function renderStampPreview() {
   els.stampPreviewTotal.textContent = plannedCount > 0
     ? `合計 ${totalCount}/${plannedCount}${unit}`
     : `合計 ${totalCount}${unit}`;
-  els.stampPreviewConfirmButton.disabled = plannedCount > 0 ? totalCount !== plannedCount : totalCount === 0;
+  els.stampPreviewConfirmButton.disabled = stampPreviewSubmitting || !stampPreviewContext
+    || (plannedCount > 0 ? totalCount !== plannedCount : totalCount === 0);
   els.stampPreviewList.querySelectorAll("[data-preview-count]").forEach((button) => {
     button.addEventListener("click", () => {
       const stampId = button.dataset.previewCount;
@@ -6122,12 +6128,15 @@ function renderStampPreview() {
 }
 
 function closeStampPreview() {
+  clearTimeout(stampPreviewCloseTimer);
+  stampPreviewContext = null;
+  stampPreviewCounts = {};
+  stampPreviewCategoryId = "all";
+  els.stampPreviewConfirmButton.disabled = true;
   els.stampPreviewLayer.classList.remove("is-showing");
-  window.setTimeout(() => {
+  stampPreviewCloseTimer = window.setTimeout(() => {
     els.stampPreviewLayer.hidden = true;
-    stampPreviewContext = null;
-    stampPreviewCounts = {};
-    stampPreviewCategoryId = "all";
+    stampPreviewCloseTimer = 0;
   }, 160);
 }
 
@@ -6197,7 +6206,7 @@ function stampPreviewCategoryForStamp(stamp, categories) {
 }
 
 function confirmStampPreview() {
-  if (!stampPreviewContext) {
+  if (!stampPreviewContext || stampPreviewSubmitting) {
     return;
   }
 
@@ -6237,14 +6246,19 @@ function confirmStampPreview() {
     return;
   }
 
-  const added = addStampBatch({
-    student,
-    selections,
-    source: stampPreviewContext.source,
-    memo: stampPreviewContext.memo,
-  });
-  if (added) {
-    closeStampPreview();
+  stampPreviewSubmitting = true;
+  els.stampPreviewConfirmButton.disabled = true;
+  try {
+    const added = addStampBatch({
+      student,
+      selections,
+      source: stampPreviewContext.source,
+      memo: stampPreviewContext.memo,
+    });
+    if (added) closeStampPreview();
+  } finally {
+    stampPreviewSubmitting = false;
+    if (stampPreviewContext) renderStampPreview();
   }
 }
 
