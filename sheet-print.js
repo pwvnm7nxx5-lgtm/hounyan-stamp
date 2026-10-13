@@ -34,7 +34,7 @@
       <section class="sheet">
         <header><div class="identity"><h1>ほうにゃん がんばりシート</h1><p class="name">${escape(studentName)}</p></div>
           <div class="meta"><strong>${escape(sheet.number)}まいめ</strong>完成：${escape(sheet.completedAt)}</div></header>
-        <div class="grid">${sheet.stamps.map((stamp) => `<div class="stamp"><img src="${escape(stamp.src)}" alt="${escape(stamp.name)}"></div>`).join("")}</div>
+        <div class="grid">${sheet.stamps.map((stamp) => `<div class="stamp"><img src="${escape(root.HounyanStorageService.safeImageSrc(stamp.src))}" alt="${escape(stamp.name)}"></div>`).join("")}</div>
         <footer>20こ あつまったね！</footer>
       </section>`).join("")}</body></html>`;
   }

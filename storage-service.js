@@ -189,6 +189,89 @@
     Object.entries(value).forEach(([key, child]) => validateFiniteNumbers(child, `${path}.${key}`, errors, key));
   }
 
+
+  // Imported identifiers are data, never HTML attributes or object prototypes.
+  function isSafeId(value) {
+    return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(value)
+      && !["__proto__", "prototype", "constructor"].includes(value);
+  }
+
+  function isSafeImageSrc(value) {
+    if (typeof value !== "string" || value.length > 12 * 1024 * 1024) return false;
+    if (value.startsWith("assets/") && value.length <= 2048) {
+      const parts = value.split("/");
+      const filename = parts.pop();
+      return parts.every((part) => /^[A-Za-z0-9_-]+$/.test(part))
+        && /^[A-Za-z0-9_-]+\.(?:png|jpe?g|webp|gif)$/i.test(filename);
+    }
+    // Existing upload processing produces a raster data URL, never a remote URL.
+    // Scan the payload without repeated regex groups: large backups must not throw.
+    const comma = value.indexOf(",");
+    if (comma < 0 || comma > 32 || !/^data:image\/(?:png|jpeg|webp|gif);base64$/i.test(value.slice(0, comma))) return false;
+    const length = value.length - comma - 1;
+    if (!length || length % 4 !== 0) return false;
+    const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
+    const end = value.length - padding;
+    for (let index = comma + 1; index < end; index += 1) {
+      const code = value.charCodeAt(index);
+      if (!((code >= 65 && code <= 90) || (code >= 97 && code <= 122)
+        || (code >= 48 && code <= 57) || code === 43 || code === 47)) return false;
+    }
+    return true;
+  }
+
+  function safeImageSrc(value) {
+    return isSafeImageSrc(value) ? value : "assets/hounyan-home.png";
+  }
+
+  function isCompatibleEquippedLevel(value) {
+    // Preserve the published normalizer's positive decimal/floor behavior only.
+    // Do not coerce arrays, booleans, objects, empty strings, or executable text.
+    if (typeof value === "string") {
+      if (value.length > 128 || !/^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value.trim())) return false;
+    } else if (typeof value !== "number") return false;
+    const level = Math.floor(Number(value));
+    return Number.isSafeInteger(level) && level >= 1;
+  }
+
+  function validateIdentityAndImages(value, path, errors, field = "") {
+    if (field === "id" || /Id$/.test(field)) {
+      if (value !== "" && value !== null && value !== undefined && !isSafeId(value)) addValidationError(errors, `${path}: IDの形式が不正です。`);
+      return;
+    }
+    if (["src", "image", "hounyanSrc"].includes(field)) {
+      if (value !== "" && value !== null && value !== undefined && !isSafeImageSrc(value)) addValidationError(errors, `${path}: 画像はassets内またはラスタ画像のdata URLに限ります。`);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((child, index) => {
+        if (/Ids$/.test(field)) {
+          if (!isSafeId(child)) addValidationError(errors, `${path}[${index}]: IDの形式が不正です。`);
+        } else validateIdentityAndImages(child, `${path}[${index}]`, errors);
+      });
+    } else if (value && typeof value === "object") {
+      const keyedById = ["ownedStampIdsByStudent", "rewardGoalsByStudent", "equippedHounyanLevelByStudent", "selectedSupportGroupIdByYear"].includes(field);
+      Object.entries(value).forEach(([key, child]) => {
+        if (keyedById) {
+          if (!isSafeId(key)) addValidationError(errors, `${path}: IDキーの形式が不正です。`);
+          // A dictionary key is an identifier, never a record field name.
+          if (field === "ownedStampIdsByStudent") {
+            if (!Array.isArray(child) || !child.every(isSafeId)) addValidationError(errors, `${path}.${key}: スタンプID配列の形式が不正です。`);
+          } else if (field === "equippedHounyanLevelByStudent") {
+            if (!isCompatibleEquippedLevel(child)) addValidationError(errors, `${path}.${key}: レベルの形式が不正です。`);
+          } else if (field === "selectedSupportGroupIdByYear") {
+            if (child !== "" && !isSafeId(child)) addValidationError(errors, `${path}.${key}: 参照IDの形式が不正です。`);
+          } else {
+            // null is the legacy "no goal" value; existing normalization removes it.
+            if (child === null) return;
+            if (!isPlainObject(child)) addValidationError(errors, `${path}.${key}: 目標レコードの形式が不正です。`);
+            else validateIdentityAndImages(child, `${path}.${key}`, errors);
+          }
+        } else validateIdentityAndImages(child, `${path}.${key}`, errors, key);
+      });
+    }
+  }
+
   function validateArrayShape(source, key, errors, objectEntries = true) {
     if (!Object.prototype.hasOwnProperty.call(source, key)) return;
     const value = source[key];
@@ -211,8 +294,8 @@
         addValidationError(errors, `「${key}」の${index + 1}番目にIDがありません。`);
         return;
       }
-      const id = String(entry.id ?? "").trim();
-      if (!id) {
+      const id = entry.id;
+      if (!isSafeId(id)) {
         addValidationError(errors, `「${key}」の${index + 1}番目にIDがありません。`);
         return;
       }
@@ -343,6 +426,15 @@
   }
 
   function validateState(input, options = {}) {
+    try {
+      return validateStateContents(input, options);
+    } catch (error) {
+      const result = failed("validation_failed", "状態の検証中にエラーが発生したため、読み込みを中止しました。", error);
+      return { ...result, valid: false, errors: [result.error.message], message: result.error.message };
+    }
+  }
+
+  function validateStateContents(input, options = {}) {
     const unwrapped = unwrapCandidate(input);
     if (!unwrapped.ok) return { ...unwrapped, valid: false, errors: [unwrapped.error.message], message: unwrapped.error.message };
     const source = unwrapped.value;
@@ -357,6 +449,7 @@
       "rewards", "stampAssets", "stampSets", "redemptions",
     ].forEach((key) => validateArrayShape(source, key, errors, true));
     validateArrayShape(source, "ownedOutfits", errors, false);
+    validateIdentityAndImages(source, "state", errors);
     validateNestedShapes(source, errors);
     validateDateFields(source, errors);
     validateFiniteNumbers(source, "state", errors);
@@ -665,6 +758,9 @@
     setStorage: storageSet,
     removeStorage: storageRemove,
     unwrapCandidate,
+    isSafeId,
+    isSafeImageSrc,
+    safeImageSrc,
     validateState,
     validateCandidate: validateState,
     normalizeCandidate,

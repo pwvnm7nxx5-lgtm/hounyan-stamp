@@ -2134,20 +2134,21 @@ function renderStudentSwitch() {
     return;
   }
 
-  els.studentSwitchList.innerHTML = visibleStudents
-    .map((studentItem) => {
-      const stats = studentStats(studentItem.id);
-      const selected = studentItem.id === state.selectedStudentId ? " is-selected" : "";
-      const selectedText = studentItem.id === state.selectedStudentId ? "true" : "false";
-      const membershipMeta = studentMembershipSummary(studentItem.id, schoolYearId);
-      return `
-        <button class="student-tab-button${selected}${isTestStudent(studentItem) ? " is-test" : ""}" type="button" role="tab" aria-selected="${selectedText}" title="${escapeHtml(membershipMeta)}" data-switch-student="${studentItem.id}">
-          <strong>${escapeHtml(studentItem.name)}</strong>
-          <span>${isTestStudent(studentItem) ? "テスト" : `${stats.currentSheet.count}/${SHEET_SIZE}`}</span>
-        </button>
-      `;
-    })
-    .join("");
+  els.studentSwitchList.replaceChildren(...visibleStudents.map((studentItem) => {
+    const stats = studentStats(studentItem.id);
+    const selected = studentItem.id === state.selectedStudentId;
+    const button = document.createElement("button");
+    button.className = `student-tab-button${selected ? " is-selected" : ""}${isTestStudent(studentItem) ? " is-test" : ""}`;
+    button.type = "button";
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(selected));
+    button.title = studentMembershipSummary(studentItem.id, schoolYearId);
+    button.dataset.switchStudent = String(studentItem.id);
+    const name = document.createElement("strong"); name.textContent = studentItem.name;
+    const summary = document.createElement("span"); summary.textContent = isTestStudent(studentItem) ? "テスト" : `${stats.currentSheet.count}/${SHEET_SIZE}`;
+    button.append(name, summary);
+    return button;
+  }));
 
   els.studentSwitchList.querySelectorAll("[data-switch-student]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2268,7 +2269,7 @@ function renderStudentSupportFilter({ container = els.studentSupportFilter, scho
     <div class="student-filter-options" role="group" aria-label="特支クラスで児童を絞り込む">
       ${options.map(([value, label]) => `
         <button class="support-filter-button${value === filter ? " is-selected" : ""}" type="button"
-          aria-pressed="${value === filter}" data-support-filter="${escapeHtml(value)}" data-support-filter-year="${escapeHtml(schoolYearId)}">${escapeHtml(label)}</button>
+          aria-pressed="${escapeHtml(value === filter)}" data-support-filter="${escapeHtml(value)}" data-support-filter-year="${escapeHtml(schoolYearId)}">${escapeHtml(label)}</button>
       `).join("")}
     </div>
   `;
@@ -2294,29 +2295,25 @@ function renderStudentList(container, { childMode }) {
     return;
   }
 
-  container.innerHTML = students
-    .map((student) => {
-      const stats = studentStats(student.id);
-      const selected = student.id === state.selectedStudentId ? " is-selected" : "";
-      const testStudent = isTestStudent(student);
-      const sheetText = testStudent
-        ? childMode ? "テスト / つかいほうだい" : "テスト / 制限なし"
-        : childMode
-        ? `シート ${stats.currentSheet.count}/${SHEET_SIZE}`
-        : `累計 ${stats.total} / 使えるシート ${stats.availableSheets}`;
-      const membershipMeta = studentMembershipSummary(student.id, schoolYearId);
-      return `
-        <button class="student-card${selected}${testStudent ? " is-test" : ""}" type="button" data-select-student="${student.id}">
-          <span class="student-card-main">
-            <span class="student-name">${escapeHtml(student.name)}${testStudent ? '<span class="test-student-badge">テスト</span>' : ""}</span>
-            <span class="student-meta student-membership-meta">${escapeHtml(membershipMeta)}</span>
-            ${student.note ? `<span class="student-meta student-note-meta">メモ: ${escapeHtml(student.note)}</span>` : ""}
-          </span>
-          <span class="student-meta">${escapeHtml(sheetText)}</span>
-        </button>
-      `;
-    })
-    .join("");
+  container.replaceChildren(...students.map((student) => {
+    const stats = studentStats(student.id);
+    const selected = student.id === state.selectedStudentId;
+    const testStudent = isTestStudent(student);
+    const sheetText = testStudent
+      ? childMode ? "テスト / つかうほうだい" : "テスト / 消費なし"
+      : childMode ? `シート ${stats.currentSheet.count}/${SHEET_SIZE}` : `累計 ${stats.total} / 使えるシート ${stats.availableSheets}`;
+    const button = document.createElement("button");
+    button.className = `student-card${selected ? " is-selected" : ""}${testStudent ? " is-test" : ""}`;
+    button.type = "button"; button.dataset.selectStudent = String(student.id);
+    const main = document.createElement("span"); main.className = "student-card-main";
+    const name = document.createElement("span"); name.className = "student-name"; name.textContent = student.name;
+    if (testStudent) { const badge = document.createElement("span"); badge.className = "test-student-badge"; badge.textContent = "テスト"; name.append(badge); }
+    const membership = document.createElement("span"); membership.className = "student-meta student-membership-meta"; membership.textContent = studentMembershipSummary(student.id, schoolYearId);
+    main.append(name, membership);
+    if (student.note) { const note = document.createElement("span"); note.className = "student-meta student-note-meta"; note.textContent = `メモ: ${student.note}`; main.append(note); }
+    const summary = document.createElement("span"); summary.className = "student-meta"; summary.textContent = sheetText;
+    button.append(main, summary); return button;
+  }));
 
   container.querySelectorAll("[data-select-student]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2405,8 +2402,8 @@ function dailyMissionCardMarkup(mission, { teacher = false } = {}) {
 function renderMissionTemplateOptions() {
   const previousCategory = els.missionTemplateCategory.value || "learning";
   const previousCondition = els.missionTemplateCondition.value || "print_completed_count";
-  els.missionTemplateCategory.innerHTML = missionCategories.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
-  els.missionTemplateCondition.innerHTML = missionConditions.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+  els.missionTemplateCategory.innerHTML = missionCategories.map(([id, label]) => `<option value="${escapeHtml(id)}">${label}</option>`).join("");
+  els.missionTemplateCondition.innerHTML = missionConditions.map(([id, label]) => `<option value="${escapeHtml(id)}">${label}</option>`).join("");
   els.missionTemplateCategory.value = missionCategories.some(([id]) => id === previousCategory) ? previousCategory : "learning";
   els.missionTemplateCondition.value = missionConditions.some(([id]) => id === previousCondition) ? previousCondition : "print_completed_count";
 }
@@ -2498,7 +2495,7 @@ function renderTeacherDailyMissions() {
     if (removeDailyMission(button.dataset.missionRemove)) showToast("今日のミッションを削除しました");
   }));
   els.teacherDailyMissions.querySelectorAll("[data-mission-adjust]").forEach((button) => button.addEventListener("click", () => {
-    const input = els.teacherDailyMissions.querySelector(`[data-mission-adjustment="${button.dataset.missionAdjust}"]`);
+    const input = els.teacherDailyMissions.querySelector(`[data-mission-adjustment="${escapeHtml(button.dataset.missionAdjust)}"]`);
     if (adjustMissionProgress(button.dataset.missionAdjust, Number(input?.value || 0))) showToast("進捗を更新しました");
   }));
 }
@@ -2659,7 +2656,7 @@ function renderChildNextUnlock(total, student) {
       <span>つぎのもくひょう</span>
       <strong>あと${remaining}こで${escapeHtml(nextStamp.name)}かいほう！</strong>
     </div>
-    <img class="next-unlock-preview" src="${escapeHtml(nextStamp.src)}" alt="${escapeHtml(nextStamp.name)}のプレビュー">
+    <img class="next-unlock-preview" src="${escapeHtml(StorageService.safeImageSrc(nextStamp.src))}" alt="${escapeHtml(nextStamp.name)}のプレビュー">
   `;
   els.childNextUnlock.classList.remove("is-complete");
 }
@@ -2700,9 +2697,9 @@ function renderChildRewardGoal(student, stats) {
   const ready = availableSheets >= goal.costSheets;
   const remaining = Math.max(0, goal.costSheets - availableSheets);
   const preview = goal.type === "stamp"
-    ? `<img class="reward-goal-stamp" src="${escapeHtml(goal.item.src)}" alt="${escapeHtml(goal.item.name)}スタンプ">`
+    ? `<img class="reward-goal-stamp" src="${escapeHtml(StorageService.safeImageSrc(goal.item.src))}" alt="${escapeHtml(goal.item.name)}スタンプ">`
     : `<div class="reward-goal-set-preview" aria-label="${escapeHtml(goal.item.name)}のスタンプ">
-        ${stampSetMembers(goal.item).slice(0, 6).map((stamp) => `<img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}">`).join("")}
+        ${stampSetMembers(goal.item).slice(0, 6).map((stamp) => `<img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}">`).join("")}
       </div>`;
   const progressText = isTestStudent(student)
     ? "テストなら いつでも こうにゅうできるよ！"
@@ -2730,15 +2727,15 @@ function renderHounyanLevel(student, stats) {
   const actualImage = currentRule.image || defaultLevelRules[0].image;
   const alt = `${currentRule.name}のほうにゃん`;
   if (els.childHounyanImage) {
-    els.childHounyanImage.src = image;
+    els.childHounyanImage.src = StorageService.safeImageSrc(image);
     els.childHounyanImage.alt = `${displayRule.name}のほうにゃん`;
   }
   if (els.shopHounyanImage) {
-    els.shopHounyanImage.src = image;
+    els.shopHounyanImage.src = StorageService.safeImageSrc(image);
     els.shopHounyanImage.alt = `${displayRule.name}のほうにゃん`;
   }
   if (els.teacherLevelImage) {
-    els.teacherLevelImage.src = actualImage;
+    els.teacherLevelImage.src = StorageService.safeImageSrc(actualImage);
     els.teacherLevelImage.alt = alt;
   }
   if (els.teacherLevelName) {
@@ -3284,7 +3281,7 @@ function renderTimetableEditor(draft = null) {
         const periodNumber = periodIndex + 1;
         return `<tr><th>${periodNumber}時間目</th>${WEEKDAYS.map((_, weekdayIndex) => {
           const key = `${weekdayIndex}-${periodNumber}`;
-          return `<td><select class="select timetable-cell-select" data-timetable-cell="${key}">${subjectOptions(source.cells?.[key] || "")}</select></td>`;
+          return `<td><select class="select timetable-cell-select" data-timetable-cell="${escapeHtml(key)}">${subjectOptions(source.cells?.[key] || "")}</select></td>`;
         }).join("")}</tr>`;
       }).join("")}</tbody>
     </table>
@@ -3357,7 +3354,7 @@ function renderSubjectList() {
   els.subjectList.innerHTML = activeSubjects({ includeDisabled: true }).map((subject) => `
     <span class="subject-chip${subject.enabled ? "" : " is-disabled"}">${escapeHtml(subject.name)}
       <button type="button" title="編集" aria-label="${escapeHtml(subject.name)}を編集" data-subject-edit="${escapeHtml(subject.id)}">✎</button>
-      <button type="button" title="${subject.enabled ? "無効にする" : "有効にする"}" aria-label="${escapeHtml(subject.name)}を切り替え" data-subject-toggle="${escapeHtml(subject.id)}">${subject.enabled ? "−" : "+"}</button>
+      <button type="button" title="${escapeHtml(subject.enabled ? "無効にする" : "有効にする")}" aria-label="${escapeHtml(subject.name)}を切り替え" data-subject-toggle="${escapeHtml(subject.id)}">${subject.enabled ? "−" : "+"}</button>
     </span>
   `).join("");
   els.subjectList.querySelectorAll("[data-subject-edit]").forEach((button) => button.addEventListener("click", () => editSubject(button.dataset.subjectEdit)));
@@ -3790,7 +3787,7 @@ function renderCalendar() {
 
 function renderCalendarEventTypeOptions() {
   const previous = els.calendarEventType.value || "other";
-  els.calendarEventType.innerHTML = calendarEventTypes.map(([id, label]) => `<option value="${id}">${label}</option>`).join("");
+  els.calendarEventType.innerHTML = calendarEventTypes.map(([id, label]) => `<option value="${escapeHtml(id)}">${label}</option>`).join("");
   els.calendarEventType.value = calendarEventTypes.some(([id]) => id === previous) ? previous : "other";
 }
 
@@ -3813,7 +3810,7 @@ function renderCalendarMonth() {
     const eventLabels = events.slice(0, 2).map((event) => `<span>${escapeHtml(event.title)}</span>`).join("");
     const more = events.length > 2 ? `<span>ほか${events.length - 2}件</span>` : "";
     return `
-      <button class="calendar-day${inMonth ? "" : " is-outside"}${key === today ? " is-today" : ""}${key === calendarSelectedDate ? " is-selected" : ""}${info.isSchoolDay ? "" : " is-holiday"}${weekend}" type="button" data-calendar-date="${key}">
+      <button class="calendar-day${inMonth ? "" : " is-outside"}${key === today ? " is-today" : ""}${key === calendarSelectedDate ? " is-selected" : ""}${info.isSchoolDay ? "" : " is-holiday"}${weekend}" type="button" data-calendar-date="${escapeHtml(key)}">
         <strong>${date.getDate()}</strong>
         <div class="calendar-day-events">${eventLabels}${more}</div>
       </button>
@@ -3858,7 +3855,7 @@ function renderCalendarDayDetail() {
       : `<ol class="day-timetable-list">${dayTimetable.periods.map((period) => `<li><span>${period.periodNumber}時間目</span><strong>${escapeHtml(period.subject?.name || "未設定")}</strong>${period.override ? '<em>変更</em>' : ""}</li>`).join("")}</ol>`;
 
   const periodCount = dayTimetable.timetable?.periodCount || timetableForEditor(groupId)?.periodCount || DEFAULT_PERIOD_COUNT;
-  els.overridePeriod.innerHTML = Array.from({ length: periodCount }, (_, index) => `<option value="${index + 1}">${index + 1}時間目</option>`).join("");
+  els.overridePeriod.innerHTML = Array.from({ length: periodCount }, (_, index) => `<option value="${escapeHtml(index + 1)}">${index + 1}時間目</option>`).join("");
   els.overrideSubject.innerHTML = subjectOptions("", { includeBlank: true });
   const overrides = state.timetableOverrides.filter((override) => override.groupId === groupId && override.date === calendarSelectedDate).sort((left, right) => left.periodNumber - right.periodNumber);
   els.timetableOverrideList.innerHTML = overrides.map((override) => `
@@ -3877,7 +3874,7 @@ function renderCalendarDisplay() {
     const eventLabels = info.events.slice(0, 2).map((event) => `<span>${escapeHtml(event.title)}</span>`).join("");
     const more = info.events.length > 2 ? `<span>ほか${info.events.length - 2}件</span>` : "";
     return `
-      <button class="calendar-day${inMonth ? "" : " is-outside"}${key === today ? " is-today" : ""}${key === calendarSelectedDate ? " is-selected" : ""}${info.isSchoolDay ? "" : " is-holiday"}${weekend}" type="button" data-calendar-view-date="${key}">
+      <button class="calendar-day${inMonth ? "" : " is-outside"}${key === today ? " is-today" : ""}${key === calendarSelectedDate ? " is-selected" : ""}${info.isSchoolDay ? "" : " is-holiday"}${weekend}" type="button" data-calendar-view-date="${escapeHtml(key)}">
         <strong>${date.getDate()}</strong>
         <div class="calendar-day-events">${eventLabels}${more}</div>
       </button>
@@ -4163,8 +4160,8 @@ function renderHounyanCloset() {
         `;
       }
       return `
-        <button class="hounyan-closet-option${selected ? " is-selected" : ""}" type="button" data-equip-hounyan-level="${rule.level}" aria-pressed="${selected ? "true" : "false"}">
-          <img src="${escapeHtml(rule.image)}" alt="${escapeHtml(rule.name)}のほうにゃん">
+        <button class="hounyan-closet-option${selected ? " is-selected" : ""}" type="button" data-equip-hounyan-level="${escapeHtml(rule.level)}" aria-pressed="${escapeHtml(selected ? "true" : "false")}">
+          <img src="${escapeHtml(StorageService.safeImageSrc(rule.image))}" alt="${escapeHtml(rule.name)}のほうにゃん">
           <strong>Lv.${rule.level} ${escapeHtml(rule.name)}</strong>
           <span>${selected ? "いま" : "えらぶ"}</span>
         </button>
@@ -4269,10 +4266,10 @@ function completedSheetCard(sheet) {
       <div class="completed-sheet-grid" aria-label="${sheet.number}まいめの20こスタンプシート">
         ${sheet.events.map((event) => {
           const stamp = stampById(event.stampId);
-          return `<div class="stamp-slot is-filled"><img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}"></div>`;
+          return `<div class="stamp-slot is-filled"><img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}"></div>`;
         }).join("")}
       </div>
-      <button class="soft-button compact-button sheet-print-button" type="button" data-print-sheet="${sheet.number}" aria-label="${sheet.number}まいめを印刷">このシートを印刷</button>
+      <button class="soft-button compact-button sheet-print-button" type="button" data-print-sheet="${escapeHtml(sheet.number)}" aria-label="${sheet.number}まいめを印刷">このシートを印刷</button>
     </article>
   `;
 }
@@ -4330,20 +4327,19 @@ function renderSheet({ grid, title, progress, stats, childMode }) {
       ? `あと${stats.currentSheet.remaining}こでシートがいっぱい`
       : `あと${stats.currentSheet.remaining}個でシートが埋まります`;
 
-  grid.innerHTML = Array.from({ length: SHEET_SIZE }, (_, index) => {
+  grid.replaceChildren(...Array.from({ length: SHEET_SIZE }, (_, index) => {
     const event = stats.currentSheet.events[index];
+    const slot = document.createElement("div");
     if (!event) {
-      return `<div class="stamp-slot is-empty"><span>${index + 1}</span></div>`;
+      slot.className = "stamp-slot is-empty";
+      const label = document.createElement("span"); label.textContent = String(index + 1); slot.append(label);
+    } else {
+      const stamp = stampById(event.stampId);
+      slot.className = `stamp-slot is-filled${lastStampedEventIds.has(event.id) ? " is-new" : ""}`;
+      const image = document.createElement("img"); image.alt = stamp.name; image.src = StorageService.safeImageSrc(stamp.src); slot.append(image);
     }
-
-    const stamp = stampById(event.stampId);
-    const isNew = lastStampedEventIds.has(event.id) ? " is-new" : "";
-    return `
-      <div class="stamp-slot is-filled${isNew}">
-        <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
-      </div>
-    `;
-  }).join("");
+    return slot;
+  }));
 }
 
 function renderHistory(studentId) {
@@ -4362,7 +4358,7 @@ function renderHistory(studentId) {
       const stamp = stampById(event.stampId);
       return `
         <article class="history-card${event.canceled ? " is-canceled" : ""}">
-          <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
+          <img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}">
           <div>
             <strong>${escapeHtml(stamp.name)}${event.canceled ? "（取消）" : ""}</strong>
             <span>${formatDateTime(event.createdAt)} ${escapeHtml(event.memo || "")}</span>
@@ -4370,7 +4366,7 @@ function renderHistory(studentId) {
           ${
             event.canceled
               ? ""
-              : `<button class="danger-button" type="button" data-cancel-event="${event.id}">取消</button>`
+              : `<button class="danger-button" type="button" data-cancel-event="${escapeHtml(event.id)}">取消</button>`
           }
         </article>
       `;
@@ -4387,7 +4383,7 @@ function renderRewards() {
     els.shopStudentSelect.innerHTML = '<option value="">児童未登録</option>';
   } else {
     els.shopStudentSelect.innerHTML = state.students
-      .map((student) => `<option value="${student.id}">${escapeHtml(student.name)}</option>`)
+      .map((student) => `<option value="${escapeHtml(student.id)}">${escapeHtml(student.name)}</option>`)
       .join("");
     els.shopStudentSelect.value = state.selectedStudentId || state.students[0].id;
   }
@@ -4466,14 +4462,14 @@ function rewardCard(reward, stats, student) {
         </div>
         <div class="shop-prize-foot">
           <span>${done ? "交換できます" : `あと${remaining}シート`}</span>
-          <button class="primary-button" type="button" data-redeem="${reward.id}" ${!student || !done || reward.locked ? "disabled" : ""}>${reward.locked ? "使用不可" : "交換する"}</button>
+          <button class="primary-button" type="button" data-redeem="${escapeHtml(reward.id)}" ${!student || !done || reward.locked ? "disabled" : ""}>${reward.locked ? "使用不可" : "交換する"}</button>
         </div>
       </article>
     `;
   }
   const button = isUnlock
     ? `<strong>${done ? "解放済み" : `あと${cost - value}${unit}`}</strong>`
-    : `<button class="primary-button" type="button" data-redeem="${reward.id}" ${!student || !done || reward.locked ? "disabled" : ""}>${reward.locked ? "使用不可" : "交換"}</button>`;
+    : `<button class="primary-button" type="button" data-redeem="${escapeHtml(reward.id)}" ${!student || !done || reward.locked ? "disabled" : ""}>${reward.locked ? "使用不可" : "交換"}</button>`;
 
   return `
     <article class="reward-card${reward.locked ? " is-disabled" : ""}">
@@ -4507,7 +4503,7 @@ function renderPrizeSettings() {
             <strong>${escapeHtml(prize.name)}</strong>
             <p>${escapeHtml(prize.description || "説明なし")} / ${prize.costSheets}シート${prize.enabled ? "" : " / 非表示"}${prize.locked ? " / 使用不可" : ""}</p>
           </div>
-          <button class="soft-button compact-button" type="button" data-edit-prize="${prize.id}">編集</button>
+          <button class="soft-button compact-button" type="button" data-edit-prize="${escapeHtml(prize.id)}">編集</button>
         </div>
       </article>
     `)
@@ -4522,7 +4518,7 @@ function renderLevelSettings() {
   const rules = activeLevelRules();
   if (!els.levelRuleLevel.options.length) {
     els.levelRuleLevel.innerHTML = rules
-      .map((rule) => `<option value="${rule.level}">Lv.${rule.level}</option>`)
+      .map((rule) => `<option value="${escapeHtml(rule.level)}">Lv.${rule.level}</option>`)
       .join("");
     editLevelRule(1);
   }
@@ -4530,12 +4526,12 @@ function renderLevelSettings() {
   els.levelRulesList.innerHTML = rules
     .map((rule) => `
       <article class="level-rule-card">
-        <img src="${escapeHtml(rule.image)}" alt="${escapeHtml(rule.name)}">
+        <img src="${escapeHtml(StorageService.safeImageSrc(rule.image))}" alt="${escapeHtml(rule.name)}">
         <div>
           <strong>Lv.${rule.level} ${escapeHtml(rule.name)}</strong>
           <p>${rule.requiredSheets}シート完成でレベルアップ</p>
         </div>
-        <button class="soft-button compact-button" type="button" data-edit-level-rule="${rule.level}">編集</button>
+        <button class="soft-button compact-button" type="button" data-edit-level-rule="${escapeHtml(rule.level)}">編集</button>
       </article>
     `)
     .join("");
@@ -4559,14 +4555,14 @@ function renderStampAssets() {
       const canDelete = stamp.custom && !deletionReason;
       return `
         <article class="asset-card${stamp.hidden ? " is-hidden" : ""}">
-          <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
+          <img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}">
           <div>
             <strong>${escapeHtml(stamp.name)}</strong>
             <p>${text} / ${visibilityText}</p>
           </div>
           <div class="asset-card-actions">
-            <button class="soft-button compact-button" type="button" data-edit-stamp="${stamp.id}">編集</button>
-            ${stamp.custom ? `<button class="danger-button compact-button" type="button" data-delete-stamp="${stamp.id}" ${canDelete ? "" : "disabled"} title="${escapeHtml(deletionReason || "追加したスタンプを完全に削除します")}">${canDelete ? "削除" : "使用中"}</button>` : ""}
+            <button class="soft-button compact-button" type="button" data-edit-stamp="${escapeHtml(stamp.id)}">編集</button>
+            ${stamp.custom ? `<button class="danger-button compact-button" type="button" data-delete-stamp="${escapeHtml(stamp.id)}" ${canDelete ? "" : "disabled"} title="${escapeHtml(deletionReason || "追加したスタンプを完全に削除します")}">${canDelete ? "削除" : "使用中"}</button>` : ""}
           </div>
         </article>
       `;
@@ -4604,8 +4600,8 @@ function renderStampSets() {
             <p>${members.length}こ / ${stampSet.priceSheets}シート / ${visibility}</p>
           </div>
           <div class="asset-card-actions">
-            <button class="soft-button compact-button" type="button" data-edit-stamp-set="${stampSet.id}">編集</button>
-            <button class="danger-button compact-button" type="button" data-delete-stamp-set="${stampSet.id}" ${canDelete ? "" : "disabled"} title="${escapeHtml(deletionReason || "セットと中の画像を完全に削除します")}">${canDelete ? "削除" : "使用中"}</button>
+            <button class="soft-button compact-button" type="button" data-edit-stamp-set="${escapeHtml(stampSet.id)}">編集</button>
+            <button class="danger-button compact-button" type="button" data-delete-stamp-set="${escapeHtml(stampSet.id)}" ${canDelete ? "" : "disabled"} title="${escapeHtml(deletionReason || "セットと中の画像を完全に削除します")}">${canDelete ? "削除" : "使用中"}</button>
           </div>
         </article>
       `;
@@ -4624,7 +4620,7 @@ function stampSetCover(stampSet, members) {
   const previews = members.slice(0, 4);
   return `
     <div class="stamp-set-cover" aria-label="${escapeHtml(stampSet.name)}のスタンプ">
-      ${previews.map((stamp) => `<img src="${escapeHtml(stamp.src)}" alt="">`).join("")}
+      ${previews.map((stamp) => `<img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="">`).join("")}
     </div>
   `;
 }
@@ -4659,7 +4655,7 @@ function renderRedemptions() {
           ${
             redemption.canceled
               ? '<span class="status-pill">取消済み</span>'
-              : `<button class="danger-button compact-button" type="button" data-cancel-redemption="${redemption.id}">取り消す</button>`
+              : `<button class="danger-button compact-button" type="button" data-cancel-redemption="${escapeHtml(redemption.id)}">取り消す</button>`
           }
         </article>
       `;
@@ -4925,9 +4921,9 @@ function renderStampSetDraft() {
   els.stampSetMembersDraft.innerHTML = stampSetDraftMembers
     .map((member, index) => `
       <div class="stamp-set-draft-item">
-        <img src="${escapeHtml(member.src)}" alt="">
-        <input type="text" value="${escapeHtml(member.name)}" data-stamp-set-member-name="${index}" aria-label="スタンプ${index + 1}の名前">
-        <button class="icon-button" type="button" data-remove-stamp-set-member="${index}" aria-label="スタンプ${index + 1}を外す">×</button>
+        <img src="${escapeHtml(StorageService.safeImageSrc(member.src))}" alt="">
+        <input type="text" value="${escapeHtml(member.name)}" data-stamp-set-member-name="${escapeHtml(index)}" aria-label="スタンプ${index + 1}の名前">
+        <button class="icon-button" type="button" data-remove-stamp-set-member="${escapeHtml(index)}" aria-label="スタンプ${index + 1}を外す">×</button>
       </div>
     `)
     .join("");
@@ -5186,8 +5182,8 @@ function stampSetShopCard(stampSet, stats, student) {
         <p>${locked ? escapeHtml(stampSetLockText(stampSet)) : `${priceSheets}シート`}</p>
       </div>
       <div class="shop-card-actions">
-        <button class="primary-button" type="button" data-buy-stamp-set="${stampSet.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
-        ${student && !owned && unlocked ? `<button class="soft-button" type="button" data-set-reward-goal="${stampSet.id}" data-set-reward-goal-type="stamp-set" ${isGoal ? "disabled" : ""}>${isGoal ? "ねらい中" : "ねらいにする"}</button>` : ""}
+        <button class="primary-button" type="button" data-buy-stamp-set="${escapeHtml(stampSet.id)}" ${!canBuy ? "disabled" : ""}>${label}</button>
+        ${student && !owned && unlocked ? `<button class="soft-button" type="button" data-set-reward-goal="${escapeHtml(stampSet.id)}" data-set-reward-goal-type="stamp-set" ${isGoal ? "disabled" : ""}>${isGoal ? "ねらい中" : "ねらいにする"}</button>` : ""}
       </div>
     </article>
   `;
@@ -5304,7 +5300,7 @@ function stampBookSetCard(stampSet, student) {
   const stamps = members.map((stamp) => {
     const owned = student && studentOwnsStamp(student.id, stamp.id);
     return owned
-      ? `<div class="stamp-book-stamp"><img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}"></div>`
+      ? `<div class="stamp-book-stamp"><img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}"></div>`
       : '<div class="stamp-book-stamp is-unknown" aria-label="まだひみつ"><span aria-hidden="true">?</span></div>';
   }).join("");
 
@@ -5332,15 +5328,15 @@ function stampShopCard(stamp, stats, student) {
   const label = owned ? "購入済み" : canBuy ? "購入する" : `あと${Math.max(0, price - stats.availableSheets)}シート`;
   return `
     <article class="stamp-shop-card${special ? " is-special" : ""}${owned ? " is-owned" : ""}">
-      <img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}スタンプ">
+      <img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}スタンプ">
       <div>
         <span>${special ? "スペシャル" : "スタンプ"}</span>
         <strong>${escapeHtml(stamp.name)}</strong>
         <p>${price}シート</p>
       </div>
       <div class="shop-card-actions">
-        <button class="primary-button" type="button" data-buy-stamp="${stamp.id}" ${!canBuy ? "disabled" : ""}>${label}</button>
-        ${student && !owned ? `<button class="soft-button" type="button" data-set-reward-goal="${stamp.id}" data-set-reward-goal-type="stamp" ${isGoal ? "disabled" : ""}>${isGoal ? "ねらい中" : "ねらいにする"}</button>` : ""}
+        <button class="primary-button" type="button" data-buy-stamp="${escapeHtml(stamp.id)}" ${!canBuy ? "disabled" : ""}>${label}</button>
+        ${student && !owned ? `<button class="soft-button" type="button" data-set-reward-goal="${escapeHtml(stamp.id)}" data-set-reward-goal-type="stamp" ${isGoal ? "disabled" : ""}>${isGoal ? "ねらい中" : "ねらいにする"}</button>` : ""}
       </div>
     </article>
   `;
@@ -6054,7 +6050,7 @@ function renderStampPreview() {
           class="stamp-preview-tab${isActive ? " is-active" : ""}"
           type="button"
           role="tab"
-          aria-selected="${isActive}"
+          aria-selected="${escapeHtml(isActive)}"
           aria-controls="stampPreviewList"
           data-stamp-preview-category="${escapeHtml(category.id)}"
         >
@@ -6078,15 +6074,15 @@ function renderStampPreview() {
         : stamp.name;
       return `
         <article class="preview-stamp${locked ? " is-locked" : ""}">
-          <img src="${stamp.src}" alt="${escapeHtml(stamp.name)}">
+          <img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}">
           <div>
             <strong>${escapeHtml(locked && childMode ? label : stamp.name)}</strong>
             <span>${escapeHtml(locked ? label : "押す数を選びます")}</span>
           </div>
           <div class="preview-stepper" aria-label="${escapeHtml(stamp.name)}の数">
-            <button type="button" data-preview-count="${stamp.id}" data-delta="-1" ${locked || count === 0 ? "disabled" : ""}>-</button>
+            <button type="button" data-preview-count="${escapeHtml(stamp.id)}" data-delta="-1" ${locked || count === 0 ? "disabled" : ""}>-</button>
             <output>${count}</output>
-            <button type="button" data-preview-count="${stamp.id}" data-delta="1" ${plusDisabled ? "disabled" : ""}>+</button>
+            <button type="button" data-preview-count="${escapeHtml(stamp.id)}" data-delta="1" ${plusDisabled ? "disabled" : ""}>+</button>
           </div>
         </article>
       `;
@@ -6796,8 +6792,8 @@ function renderAutoBackups() {
             <span>${escapeHtml(summary.students)}人 / スタンプ${escapeHtml(summary.stamps)}個 / 交換${escapeHtml(summary.redemptions)}件</span>
           </div>
           <div class="auto-backup-actions">
-            <button class="soft-button compact-button" type="button" data-download-backup="${backup.id}">JSON保存</button>
-            <button class="danger-button compact-button" type="button" data-restore-backup="${backup.id}">復元</button>
+            <button class="soft-button compact-button" type="button" data-download-backup="${escapeHtml(backup.id)}">JSON保存</button>
+            <button class="danger-button compact-button" type="button" data-restore-backup="${escapeHtml(backup.id)}">復元</button>
           </div>
         </article>
       `;
@@ -6936,10 +6932,10 @@ function playNextHounyanAnimation() {
   const outfit = activeOutfit();
   const animation = animationContent(type, options);
   els.animationCard.dataset.animationType = type;
-  els.animationHounyan.src = animation.hounyanSrc || outfitAsset(outfit, animation.pose);
+  els.animationHounyan.src = StorageService.safeImageSrc(animation.hounyanSrc || outfitAsset(outfit, animation.pose));
   els.animationHounyan.alt = animation.hounyanAlt || outfit.name;
   if (animation.featureImage) {
-    els.animationFeatureImage.src = animation.featureImage.src;
+    els.animationFeatureImage.src = StorageService.safeImageSrc(animation.featureImage.src);
     els.animationFeatureImage.alt = animation.featureImage.alt;
     els.animationFeatureImage.hidden = false;
   } else {
@@ -6951,7 +6947,7 @@ function playNextHounyanAnimation() {
     els.animationStampGallery.dataset.count = String(animation.stamps.length);
     els.animationStampGallery.innerHTML = animation.stamps.map((stamp) => `
       <figure>
-        <img src="${escapeHtml(stamp.src)}" alt="${escapeHtml(stamp.name)}スタンプ">
+        <img src="${escapeHtml(StorageService.safeImageSrc(stamp.src))}" alt="${escapeHtml(stamp.name)}スタンプ">
         <figcaption>${escapeHtml(stamp.name)}</figcaption>
       </figure>
     `).join("");
